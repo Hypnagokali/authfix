@@ -1,0 +1,12 @@
+[package]
+name = "actix-auth-middleware"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-web="4"
+serde = { version = "1.0.216", features = ["derive"]}
+actix-session = { version = "0.10.1", features = ["cookie-session"]}
+futures = "0.3.31"
+regex = "1.11.1"
+urlencoding = "2.1.3"
