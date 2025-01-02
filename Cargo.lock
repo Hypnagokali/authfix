@@ -302,6 +302,7 @@ dependencies = [
  "actix-session",
  "actix-web",
  "futures",
+ "log",
  "regex",
  "serde",
  "urlencoding",

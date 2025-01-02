@@ -1,4 +1,4 @@
-use std::{fmt::Debug, future::{ready, Ready}, ops::Deref, time::SystemTime};
+use std::{fmt::Debug, future::{ready, Ready}, ops::Deref};
 
 use actix_session::{Session, SessionExt};
 use actix_web::{Error, FromRequest, HttpRequest};

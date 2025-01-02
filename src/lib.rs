@@ -7,7 +7,11 @@ pub mod middleware;
 pub mod session;
 
 /// This trait is used to retrieve the logged in user.
-/// If no user was found (e.g. in Actix-Session) it will return an Err
+/// If no user was found (e.g. in Actix-Session) it will return an Err.
+/// 
+/// Currently it is only implemented for actix-session:
+/// 
+/// [Impl for Actix-Session](crate::session::session_auth::GetUserFromSession)
 pub trait GetAuthenticatedUserFromRequest<U> 
 where 
     U: DeserializeOwned {

@@ -5,10 +5,10 @@ use std::{
 };
 
 use actix_web::{
-    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    Error, HttpMessage,
+    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform}, Error, HttpMessage
 };
 use futures::future::LocalBoxFuture;
+use log::{debug, trace};
 use regex::Regex;
 use serde::de::DeserializeOwned;
 use urlencoding::encode;
@@ -18,18 +18,19 @@ use crate::{AuthToken, GetAuthenticatedUserFromRequest, UnauthorizedError};
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 
 /// PathMatcher is used to match specific paths or to exclude paths from matching
-/// is_exclusion_list: if true, the entries of path_list will not match otherwise only the entries will match.
+/// is_exclusion_list: the entries of path_list will not match if true, otherwise only the entries will match.
 /// path_list: List of paths you wish to exclude or include (see: is_exclusion_list). The path_list may include wildcards like "/api/user/*"
+#[derive(Clone)]
 pub struct PathMatcher {
     is_exclusion_list: bool,
     path_regex_list: Vec<(&'static str, Regex)>,
 }
 
 impl PathMatcher {
-    /// All routes are secured except everything starting with /login or register (e.g.: /login?error=true, /login-anything, /register, /register-error)
-    /// **Warning:** currently it would left a routes like /register-private-thing/user/123 unsecure
+
+    /// All routes are secured except /login and /register
     pub fn default() -> Self {
-        Self::new(vec!["/login*", "/register*"], true)
+        Self::new(vec!["/login", "/register"], true)
     }
 
     pub fn new(path_list: Vec<&'static str>, is_exclusion_list: bool) -> Self {
@@ -53,8 +54,6 @@ impl PathMatcher {
             return path_regex_iter.all(|p| !p.1.is_match(&encoded_path));
         } else {
             return path_regex_iter.any(|p| {
-                println!("check: {} against: {}", path, p.1.as_str());
-
                 p.1.is_match(&encoded_path)
             })
         }
@@ -117,10 +116,9 @@ where
     forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        println!("Check authentication {}", req.path());
-
         let request_path = req.request().path();
         if self.path_matcher.matches(request_path) {
+            debug!("Secured route: '{}'", req.path());
             match self.auth_provider.get_authenticated_user(&req.request()) {
                 Ok(user) => {
                     let token = AuthToken::new(user);
@@ -128,13 +126,12 @@ where
                     extensions.insert(token);
                 }
                 Err(_) => {
-                    // TODO: should use appropriate logging
-                    println!("Authenticated route but no authenticated user found..");
+                    debug!("No authenticated user found");
                     return Box::pin(async { Err(UnauthorizedError::default().into()) });
                 }
             }
         } else {
-            println!("Path is not secured");
+            trace!("Route is not secured: {}", req.path());
         }
 
         let fut = self.service.call(req);
