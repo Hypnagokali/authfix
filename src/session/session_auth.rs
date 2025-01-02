@@ -1,4 +1,4 @@
-use std::{fmt::Debug, future::{ready, Ready}, ops::Deref, time::{Duration, SystemTime}};
+use std::{fmt::Debug, future::{ready, Ready}, ops::Deref, time::SystemTime};
 
 use actix_session::{Session, SessionExt};
 use actix_web::{Error, FromRequest, HttpRequest};
@@ -20,19 +20,6 @@ where
             Ok(Some(user)) => user,
             _ => return Err(()),
         };
-
-        let ttl = match s.get::<SystemTime>("ttl") {
-            Ok(ttl) => ttl,
-            Err(_) => return Err(()),
-        };
-
-        if let Some(ttl) = ttl {
-            let now = SystemTime::now();
-            if now > ttl {
-                s.purge();
-                return Err(());
-            }            
-        }
 
         Ok(user)
     }
@@ -71,6 +58,10 @@ impl FromRequest for UserSession {
     }
 }
 
+/// For Debugging purposes. May be removed in the future.
+/// Example: 
+/// let ds = DebuggableSession(session);
+/// println!("{?:}", ds);
 pub struct DebuggableSession(pub Session);
 
 impl Deref for DebuggableSession {
