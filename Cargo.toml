@@ -1,5 +1,8 @@
 [package]
-name = "actix-auth-middleware"
+name = "auth-middleware-for-actix-web"
+authors = ["Stefan Simon <stefan.j.c.simon@gmail.com>"]
+keywords = ["actix", "actix-web", "middleware", "auth", "authentication", "session", "web"]
+exclude = [".gitignore"]
 version = "0.1.0"
 edition = "2021"
 
