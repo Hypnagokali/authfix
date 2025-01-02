@@ -17,18 +17,6 @@ ToDo:
 Example with Actix-Session:
 
 ```rust
-use auth_middleware_for_actix_web::{
-    middleware::{AuthMiddleware, PathMatcher},
-    session::session_auth::{GetUserFromSession, UserSession},
-    AuthToken
-};
-use actix_web::{
-    post, get,
-    web::{Form, Data},
-    HttpResponse, Responder,
-};
-use serde::{Deserialize, Serialize};
-
 // To serialize User to and deserialize from Session it needs these serde traits:
 #[derive(Serialize, Deserialize)]
 pub struct User {
@@ -36,11 +24,15 @@ pub struct User {
     pub name: String,
 }
 
+// Get user using the auth_middleware_for_actix_web::AuthToken extractor
 #[get("/secured-route")]
 pub async fn secured_route(token: AuthToken<User>) -> impl Responder {
     HttpResponse::Ok().body(format!("Request from user: {}", token.get_authenticated_user().email))
 }
 
+
+// use auth_middleware_for_actix_web::session::session_auth::UserSession
+// to save the user in the session after the auth process
 #[post("/login")]
 async fn login(
     login_form: Form<FormLogin>,
@@ -52,7 +44,8 @@ async fn login(
                 session.set_user(user).expect("User could not be set in session");
                 return HttpResponse::Ok();
             }
-        }
+        },
+        Err(_) => {},
     }
 
     HttpResponse::BadRequest()
