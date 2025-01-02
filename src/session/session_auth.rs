@@ -59,21 +59,6 @@ impl UserSession {
 
         Ok(())
     }
-
-    pub fn set_user_with_ttl<U: Serialize>(&self, user: U, ttl_in_seconds: u64) -> Result<(), ()> {
-        match self.session.insert("user", user) {
-            Ok(_) => {},
-            Err(_) => return Err(()),
-        }
-
-        let now: SystemTime = SystemTime::now();
-        let ttl = now + Duration::from_secs(ttl_in_seconds);
-
-        match self.session.insert("ttl", ttl) {
-            Ok(_) => return Ok(()),
-            Err(_) => Err(()),
-        }
-    }
 }
 
 impl FromRequest for UserSession {
