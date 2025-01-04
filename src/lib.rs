@@ -1,60 +1,67 @@
-use core::fmt;
-use std::{future::{ready, Ready}, rc::Rc};
 use actix_web::{Error, FromRequest, HttpMessage, HttpRequest, HttpResponse, ResponseError};
+use core::fmt;
 use serde::de::DeserializeOwned;
+use std::{
+    future::{ready, Ready},
+    rc::Rc,
+};
 
 pub mod middleware;
 pub mod session;
 
 /// This trait is used to retrieve the logged in user.
 /// If no user was found (e.g. in Actix-Session) it will return an Err.
-/// 
+///
 /// Currently it is only implemented for actix-session:
-/// 
+///
 /// [Impl for Actix-Session](crate::session::session_auth::GetUserFromSession)
-pub trait GetAuthenticatedUserFromRequest<U> 
-where 
-    U: DeserializeOwned {
-    fn get_authenticated_user(&self, req: &HttpRequest) -> Result<U, ()>;
+pub trait GetAuthenticatedUserFromRequest<U>
+where
+    U: DeserializeOwned,
+{
+    fn get_authenticated_user(&self, req: &HttpRequest) -> Result<U, NoAuthenticatedUserError>;
 }
 
-pub struct AuthToken<U> 
+pub struct NoAuthenticatedUserError;
+
+pub struct AuthToken<U>
 where
-    U: DeserializeOwned 
+    U: DeserializeOwned,
 {
-    inner: Rc<AuthTokenInner<U>>       
+    inner: Rc<AuthTokenInner<U>>,
 }
 
 impl<U> AuthToken<U>
 where
-    U: DeserializeOwned
+    U: DeserializeOwned,
 {
     pub fn get_authenticated_user(&self) -> &U {
         &self.inner.user
     }
 
-    pub (crate) fn new(user: U) -> Self {
+    pub(crate) fn new(user: U) -> Self {
         Self {
-            inner: Rc::new(AuthTokenInner { user })
+            inner: Rc::new(AuthTokenInner { user }),
         }
     }
 
-    pub (crate) fn from_ref(token: &AuthToken<U>) -> Self {
-        AuthToken { inner: Rc::clone(&token.inner) }
+    pub(crate) fn from_ref(token: &AuthToken<U>) -> Self {
+        AuthToken {
+            inner: Rc::clone(&token.inner),
+        }
     }
 }
 
-struct AuthTokenInner<U> 
-where 
-    U: DeserializeOwned
+struct AuthTokenInner<U>
+where
+    U: DeserializeOwned,
 {
     user: U,
 }
 
-
-impl<U> FromRequest for AuthToken<U> 
+impl<U> FromRequest for AuthToken<U>
 where
-    U: DeserializeOwned + 'static
+    U: DeserializeOwned + 'static,
 {
     type Error = Error;
     type Future = Ready<Result<AuthToken<U>, Error>>;
@@ -75,16 +82,17 @@ pub struct UnauthorizedError {
 }
 
 impl UnauthorizedError {
-
-    pub fn default() -> Self {
-        Self {
-            message: "Not authorized".to_owned(),
-        }
-    }
-
     pub fn new(message: &str) -> Self {
         Self {
             message: message.to_owned(),
+        }
+    }
+}
+
+impl Default for UnauthorizedError {
+    fn default() -> Self {
+        Self {
+            message: "Not authorized".to_owned(),
         }
     }
 }
@@ -95,7 +103,6 @@ impl fmt::Display for UnauthorizedError {
     }
 }
 
-
 impl ResponseError for UnauthorizedError {
     fn status_code(&self) -> actix_web::http::StatusCode {
         actix_web::http::StatusCode::UNAUTHORIZED
@@ -105,4 +112,3 @@ impl ResponseError for UnauthorizedError {
         HttpResponse::Unauthorized().json(self.message.clone())
     }
 }
-

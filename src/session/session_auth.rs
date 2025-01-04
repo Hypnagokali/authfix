@@ -1,10 +1,14 @@
-use std::{fmt::Debug, future::{ready, Ready}, ops::Deref};
+use std::{
+    fmt::Debug,
+    future::{ready, Ready},
+    ops::Deref,
+};
 
-use actix_session::{Session, SessionExt};
+use actix_session::{Session, SessionExt, SessionInsertError};
 use actix_web::{Error, FromRequest, HttpRequest};
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::GetAuthenticatedUserFromRequest;
+use crate::{GetAuthenticatedUserFromRequest, NoAuthenticatedUserError};
 
 #[derive(Clone)]
 pub struct GetUserFromSession;
@@ -13,12 +17,12 @@ impl<U> GetAuthenticatedUserFromRequest<U> for GetUserFromSession
 where
     U: DeserializeOwned,
 {
-    fn get_authenticated_user(&self, req: &actix_web::HttpRequest) -> Result<U, ()> {
+    fn get_authenticated_user(&self, req: &actix_web::HttpRequest) -> Result<U, NoAuthenticatedUserError> {
         let s = req.get_session();
 
         let user = match s.get::<U>("user") {
             Ok(Some(user)) => user,
-            _ => return Err(()),
+            _ => return Err(NoAuthenticatedUserError {}),
         };
 
         Ok(user)
@@ -30,16 +34,14 @@ pub struct UserSession {
 }
 
 impl UserSession {
-    pub (crate) fn new(session: Session) -> Self {
-        Self {
-            session,
-        }
+    pub(crate) fn new(session: Session) -> Self {
+        Self { session }
     }
 
-    pub fn set_user<U: Serialize>(&self, user: U) -> Result<(), ()> {
+    pub fn set_user<U: Serialize>(&self, user: U) -> Result<(), SessionInsertError> {
         match self.session.insert("user", user) {
-            Ok(_) => {},
-            Err(_) => return Err(()),
+            Ok(_) => {}
+            Err(e) => return Err(e),
         }
 
         self.session.remove("ttl");
@@ -59,7 +61,7 @@ impl FromRequest for UserSession {
 }
 
 /// For Debugging purposes. May be removed in the future.
-/// Example: 
+/// Example:
 /// let ds = DebuggableSession(session);
 /// println!("{?:}", ds);
 pub struct DebuggableSession(pub Session);

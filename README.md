@@ -17,12 +17,30 @@ ToDo:
 Example with Actix-Session:
 
 ```rust
-// To serialize User to and deserialize from Session it needs these serde traits:
+// User struct needs to be serializable and deserializable
 #[derive(Serialize, Deserialize)]
 pub struct User {
     pub email: String,
     pub name: String,
 }
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    let server = HttpServer::new(move || {
+        App::new()
+        .service(secured_route)
+        .service(login)
+        // The order is important. Actix-Session must be executed before AuthMiddleware
+        .wrap(AuthMiddleware::<_, User>::new(GetUserFromSession, PathMatcher::default()))
+        .wrap(create_actix_session_middleware()) // see Actix-Session on how to create the session middleware
+        
+    })
+    .bind(("127.0.0.1", "8080"))?
+    .run();
+
+    server.await
+}
+
 
 // Get user using the auth_middleware_for_actix_web::AuthToken extractor
 #[get("/secured-route")]
@@ -49,23 +67,6 @@ async fn login(
     }
 
     HttpResponse::BadRequest()
-}
-
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    let server = HttpServer::new(move || {
-        App::new()
-        .service(secured_route)
-        .service(login)
-        // The order is important. Actix-Session must be executed before AuthMiddleware
-        .wrap(AuthMiddleware::<_, User>::new(GetUserFromSession, PathMatcher::default()))
-        .wrap(create_actix_session_middleware()) // see Actix-Session on how to create the session middleware
-        
-    })
-    .bind(("127.0.0.1", "8080"))?
-    .run();
-
-    server.await
 }
 ```
 

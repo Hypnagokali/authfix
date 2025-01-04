@@ -5,7 +5,8 @@ use std::{
 };
 
 use actix_web::{
-    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform}, Error, HttpMessage
+    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
+    Error, HttpMessage,
 };
 use futures::future::LocalBoxFuture;
 use log::{debug, trace};
@@ -27,12 +28,6 @@ pub struct PathMatcher {
 }
 
 impl PathMatcher {
-
-    /// All routes are secured except /login and /register
-    pub fn default() -> Self {
-        Self::new(vec!["/login", "/register"], true)
-    }
-
     pub fn new(path_list: Vec<&'static str>, is_exclusion_list: bool) -> Self {
         let mut path_regex_list = Vec::new();
         for pattern in path_list.into_iter() {
@@ -50,20 +45,26 @@ impl PathMatcher {
     pub fn matches(&self, path: &str) -> bool {
         let encoded_path = transform_to_encoded_regex(path);
         let mut path_regex_iter = self.path_regex_list.iter();
+
         if self.is_exclusion_list {
-            return path_regex_iter.all(|p| !p.1.is_match(&encoded_path));
+            path_regex_iter.all(|p| !p.1.is_match(&encoded_path))
         } else {
-            return path_regex_iter.any(|p| {
-                p.1.is_match(&encoded_path)
-            })
+            path_regex_iter.any(|p| p.1.is_match(&encoded_path))
         }
+    }
+}
+
+impl Default for PathMatcher {
+    /// All routes are secured by default except "/login" and "/register"
+    fn default() -> Self {
+        Self::new(vec!["/login", "/register"], true)
     }
 }
 
 fn transform_to_encoded_regex(input: &str) -> String {
     let encoded = encode(input);
-    let valid_regex = encoded.replace(PATH_MATCHER_ANY_ENCODED, ".*");
-    valid_regex
+
+    encoded.replace(PATH_MATCHER_ANY_ENCODED, ".*")
 }
 
 pub struct AuthMiddleware<AuthProvider, U>
@@ -119,7 +120,7 @@ where
         let request_path = req.request().path();
         if self.path_matcher.matches(request_path) {
             debug!("Secured route: '{}'", req.path());
-            match self.auth_provider.get_authenticated_user(&req.request()) {
+            match self.auth_provider.get_authenticated_user(req.request()) {
                 Ok(user) => {
                     let token = AuthToken::new(user);
                     let mut extensions = req.extensions_mut();
