@@ -38,6 +38,11 @@ where
         Ref::map(self.inner.borrow(), |inner| &inner.user)
     }
 
+    pub fn is_valid(&self) -> bool {
+        let inner = self.inner.borrow();
+        inner.is_valid
+    }
+
     pub fn invalidate(&self) {
         let mut inner = self.inner.as_ref().borrow_mut();
         inner.is_valid = false;

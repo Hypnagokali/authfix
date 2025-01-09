@@ -138,7 +138,16 @@ where
         let fut = self.service.call(req);
 
         Box::pin(async move {
-            let res = fut.await?;
+            let res = fut.await?;      
+            {
+                let extensions = res.request().extensions(); 
+                if let Some(token) = extensions.get::<AuthToken<U>>() {
+                    if !token.is_valid() {
+                        // todo: call invalidate() on GetAuthenticatedUser (maybe rename it?)
+                    }
+                }
+            } 
+
             Ok(res)
         })
     }
