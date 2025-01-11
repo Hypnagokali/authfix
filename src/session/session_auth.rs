@@ -27,6 +27,11 @@ where
 
         Ok(user)
     }
+    
+    fn invalidate(&self, req: HttpRequest) {
+        let s =req.get_session();
+        s.purge();
+    }
 
 }
 

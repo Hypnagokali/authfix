@@ -2,7 +2,7 @@ use actix_web::{Error, FromRequest, HttpMessage, HttpRequest, HttpResponse, Resp
 use core::fmt;
 use serde::de::DeserializeOwned;
 use std::{
-    borrow::BorrowMut, cell::{Ref, RefCell}, future::{ready, Ready}, rc::Rc
+    cell::{Ref, RefCell}, future::{ready, Ready}, rc::Rc
 };
 
 pub mod middleware;
@@ -19,6 +19,7 @@ where
     U: DeserializeOwned,
 {
     fn get_authenticated_user(&self, req: &HttpRequest) -> Result<U, NoAuthenticatedUserError>;
+    fn invalidate(&self, req: HttpRequest);
 }
 
 pub struct NoAuthenticatedUserError;
