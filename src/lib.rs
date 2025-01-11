@@ -14,7 +14,7 @@ pub mod session;
 /// Currently it is only implemented for actix-session:
 ///
 /// [Impl for Actix-Session](crate::session::session_auth::GetUserFromSession)
-pub trait GetAuthenticatedUserFromRequest<U>
+pub trait AuthenticationProvider<U>
 where
     U: DeserializeOwned,
 {

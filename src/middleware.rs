@@ -14,7 +14,7 @@ use regex::Regex;
 use serde::de::DeserializeOwned;
 use urlencoding::encode;
 
-use crate::{AuthToken, GetAuthenticatedUserFromRequest, UnauthorizedError};
+use crate::{AuthToken, AuthenticationProvider, UnauthorizedError};
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 
@@ -69,7 +69,7 @@ fn transform_to_encoded_regex(input: &str) -> String {
 
 pub struct AuthMiddleware<AuthProvider, U>
 where
-    AuthProvider: GetAuthenticatedUserFromRequest<U>,
+    AuthProvider: AuthenticationProvider<U>,
     U: DeserializeOwned,
 {
     auth_provider: Rc<AuthProvider>,
@@ -79,7 +79,7 @@ where
 
 impl<AuthProvider, U> AuthMiddleware<AuthProvider, U>
 where
-    AuthProvider: GetAuthenticatedUserFromRequest<U>,
+    AuthProvider: AuthenticationProvider<U>,
     U: DeserializeOwned,
 {
     pub fn new(auth_provider: AuthProvider, path_matcher: PathMatcher) -> Self {
@@ -93,7 +93,7 @@ where
 
 pub struct AuthMiddlewareInner<S, AuthProvider, U>
 where
-    AuthProvider: GetAuthenticatedUserFromRequest<U>,
+    AuthProvider: AuthenticationProvider<U>,
     U: DeserializeOwned,
 {
     service: S,
@@ -108,7 +108,7 @@ where
     S::Future: 'static,
     B: 'static,
     U: DeserializeOwned + 'static,
-    AuthProvider: GetAuthenticatedUserFromRequest<U> + 'static,
+    AuthProvider: AuthenticationProvider<U> + 'static,
 {
     type Response = ServiceResponse<B>;
     type Error = Error;
@@ -175,7 +175,7 @@ where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
     S::Future: 'static,
     B: 'static,
-    AuthProvider: GetAuthenticatedUserFromRequest<U> + Clone + 'static,
+    AuthProvider: AuthenticationProvider<U> + Clone + 'static,
     U: DeserializeOwned + 'static,
 {
     type Response = ServiceResponse<B>;

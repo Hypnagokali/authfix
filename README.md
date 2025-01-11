@@ -7,9 +7,11 @@ This library provides a middleware for [Actix-Web](https://github.com/actix/acti
 
 ToDo:
 - [x] Implementation for Actix-Session
-    - [ ] Logout-Wrapper for Actix-Session
+    - [x] Login
+    - [x] Secured routes
+    - [x] Logout
     - [ ] Docs and Tests
-    - [ ] CI/CD
+    - [ ] Publish to crates.io
 - [ ] Implementation for OAuth 2.0
 - [ ] Implementation for a JWT library(?)
 

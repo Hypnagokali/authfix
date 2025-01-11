@@ -8,12 +8,12 @@ use actix_session::{Session, SessionExt, SessionInsertError};
 use actix_web::{Error, FromRequest, HttpRequest};
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{GetAuthenticatedUserFromRequest, NoAuthenticatedUserError};
+use crate::{AuthenticationProvider, NoAuthenticatedUserError};
 
 #[derive(Clone)]
-pub struct GetUserFromSession;
+pub struct SessionAuthProvider;
 
-impl<U> GetAuthenticatedUserFromRequest<U> for GetUserFromSession
+impl<U> AuthenticationProvider<U> for SessionAuthProvider
 where
     U: DeserializeOwned,
 {
