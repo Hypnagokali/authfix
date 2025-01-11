@@ -108,7 +108,7 @@ where
     S::Future: 'static,
     B: 'static,
     U: DeserializeOwned + 'static,
-    AuthProvider: GetAuthenticatedUserFromRequest<U>,
+    AuthProvider: GetAuthenticatedUserFromRequest<U> + 'static,
 {
     type Response = ServiceResponse<B>;
     type Error = Error;
@@ -133,12 +133,38 @@ where
             }
         } else {
             trace!("Route is not secured: {}", req.path());
+            let fut = self.service.call(req);
+            
+            // just process the response
+            return Box::pin(async move {
+                Ok(fut.await?)
+            });
         }
-
+        
+        // check if token has been invalidated
+        let debug_path = req.path().to_owned();
         let fut = self.service.call(req);
 
+        let auth_provider = Rc::clone(&self.auth_provider);
         Box::pin(async move {
-            let res = fut.await?;
+            let res = fut.await?;      
+
+            let token_valid = {
+                let extensions = res.request().extensions(); 
+                if let Some(token) = extensions.get::<AuthToken<U>>() {
+                    token.is_valid()
+                } else {
+                    // If there is no AuthToken, authentication is no longer valid
+                    false
+                }
+            };
+
+            if !token_valid {
+                debug!("AuthToken no longer valid (maybe logged out). Invalidate Authentication. (Triggered by: {})", debug_path);
+                let req = res.request().clone();
+                auth_provider.invalidate(req);
+            }
+
             Ok(res)
         })
     }
@@ -149,7 +175,7 @@ where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
     S::Future: 'static,
     B: 'static,
-    AuthProvider: GetAuthenticatedUserFromRequest<U> + Clone,
+    AuthProvider: GetAuthenticatedUserFromRequest<U> + Clone + 'static,
     U: DeserializeOwned + 'static,
 {
     type Response = ServiceResponse<B>;

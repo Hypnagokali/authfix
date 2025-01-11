@@ -35,7 +35,7 @@ async fn main() -> std::io::Result<()> {
         .wrap(create_actix_session_middleware()) // see Actix-Session on how to create the session middleware
         
     })
-    .bind(("127.0.0.1", "8080"))?
+    .bind(("127.0.0.1", 8080))?
     .run();
 
     server.await

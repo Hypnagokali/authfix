@@ -2,8 +2,7 @@ use actix_web::{Error, FromRequest, HttpMessage, HttpRequest, HttpResponse, Resp
 use core::fmt;
 use serde::de::DeserializeOwned;
 use std::{
-    future::{ready, Ready},
-    rc::Rc,
+    cell::{Ref, RefCell}, future::{ready, Ready}, rc::Rc
 };
 
 pub mod middleware;
@@ -20,6 +19,7 @@ where
     U: DeserializeOwned,
 {
     fn get_authenticated_user(&self, req: &HttpRequest) -> Result<U, NoAuthenticatedUserError>;
+    fn invalidate(&self, req: HttpRequest);
 }
 
 pub struct NoAuthenticatedUserError;
@@ -28,20 +28,31 @@ pub struct AuthToken<U>
 where
     U: DeserializeOwned,
 {
-    inner: Rc<AuthTokenInner<U>>,
+    inner: Rc<RefCell<AuthTokenInner<U>>>,
 }
 
 impl<U> AuthToken<U>
 where
     U: DeserializeOwned,
 {
-    pub fn get_authenticated_user(&self) -> &U {
-        &self.inner.user
+    pub fn get_authenticated_user(&self) -> Ref<U> {
+        Ref::map(self.inner.borrow(), |inner| &inner.user)
     }
+
+    pub fn is_valid(&self) -> bool {
+        let inner = self.inner.borrow();
+        inner.is_valid
+    }
+
+    pub fn invalidate(&self) {
+        let mut inner = self.inner.as_ref().borrow_mut();
+        inner.is_valid = false;
+    }
+
 
     pub(crate) fn new(user: U) -> Self {
         Self {
-            inner: Rc::new(AuthTokenInner { user }),
+            inner: Rc::new(RefCell::new(AuthTokenInner{ user, is_valid: true })),
         }
     }
 
@@ -57,6 +68,7 @@ where
     U: DeserializeOwned,
 {
     user: U,
+    is_valid: bool,
 }
 
 impl<U> FromRequest for AuthToken<U>
