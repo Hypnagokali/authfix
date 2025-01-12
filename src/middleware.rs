@@ -70,7 +70,7 @@ fn transform_to_encoded_regex(input: &str) -> String {
 pub struct AuthMiddleware<AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: DeserializeOwned,
+    U: DeserializeOwned + 'static,
 {
     auth_provider: Rc<AuthProvider>,
     path_matcher: Rc<PathMatcher>,
@@ -80,7 +80,7 @@ where
 impl<AuthProvider, U> AuthMiddleware<AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: DeserializeOwned,
+    U: DeserializeOwned + 'static,
 {
     pub fn new(auth_provider: AuthProvider, path_matcher: PathMatcher) -> Self {
         AuthMiddleware {
@@ -94,9 +94,9 @@ where
 pub struct AuthMiddlewareInner<S, AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: DeserializeOwned,
+    U: DeserializeOwned + 'static,
 {
-    service: S,
+    service: Rc<S>,
     auth_provider: Rc<AuthProvider>,
     path_matcher: Rc<PathMatcher>,
     user_type: PhantomData<U>,
@@ -104,7 +104,7 @@ where
 
 impl<S, B, AuthProvider, U> Service<ServiceRequest> for AuthMiddlewareInner<S, AuthProvider, U>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
     U: DeserializeOwned + 'static,
@@ -117,62 +117,69 @@ where
     forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        let request_path = req.request().path();
-        if self.path_matcher.matches(request_path) {
-            debug!("Secured route: '{}'", req.path());
-            match self.auth_provider.get_authenticated_user(req.request()) {
-                Ok(user) => {
-                    let token = AuthToken::new(user);
-                    let mut extensions = req.extensions_mut();
-                    extensions.insert(token);
+        let request_path = req.request().path().to_owned();
+
+        let debug_path = req.path().to_owned();
+        let service = Rc::clone(&self.service);
+        let auth_provider = Rc::clone(&self.auth_provider);
+
+        if self.path_matcher.matches(&request_path) {
+            debug!("Secured route: '{}'", debug_path);
+            
+            // let fut3 = p.get_authenticated_user(&muh);
+            return Box::pin(async move {
+                // Before Request
+                match auth_provider.get_authenticated_user(req.request()).await {
+                    Ok(user) => {
+                        let token = AuthToken::new(user);
+                        let mut extensions = req.extensions_mut();
+                        extensions.insert(token);
+                    }
+                    Err(_) => {
+                        debug!("No authenticated user found");
+                        return Err(UnauthorizedError::default().into());
+                    }
                 }
-                Err(_) => {
-                    debug!("No authenticated user found");
-                    return Box::pin(async { Err(UnauthorizedError::default().into()) });
+
+                let res= service.call(req).await?;
+                // After Request:
+
+                let token_valid = {
+                    let extensions = res.request().extensions(); 
+                    if let Some(token) = extensions.get::<AuthToken<U>>() {
+                        token.is_valid()
+                    } else {
+                        // If there is no AuthToken, authentication is no longer valid
+                        false
+                    }
+                };
+    
+                if !token_valid {
+                    debug!("AuthToken no longer valid (maybe logged out). Invalidate Authentication. (Triggered by: {})", debug_path);
+                    let req = res.request().clone();
+                    auth_provider.invalidate(req).await;
                 }
-            }
+    
+                Ok(res)
+            });
+
+            
         } else {
-            trace!("Route is not secured: {}", req.path());
-            let fut = self.service.call(req);
+            trace!("Route is not secured: {}", debug_path);
+            // let fut = self.service.call(req);
             
             // just process the response
             return Box::pin(async move {
-                Ok(fut.await?)
+                Ok(service.call(req).await?)
             });
         }
         
-        // check if token has been invalidated
-        let debug_path = req.path().to_owned();
-        let fut = self.service.call(req);
-
-        let auth_provider = Rc::clone(&self.auth_provider);
-        Box::pin(async move {
-            let res = fut.await?;      
-
-            let token_valid = {
-                let extensions = res.request().extensions(); 
-                if let Some(token) = extensions.get::<AuthToken<U>>() {
-                    token.is_valid()
-                } else {
-                    // If there is no AuthToken, authentication is no longer valid
-                    false
-                }
-            };
-
-            if !token_valid {
-                debug!("AuthToken no longer valid (maybe logged out). Invalidate Authentication. (Triggered by: {})", debug_path);
-                let req = res.request().clone();
-                auth_provider.invalidate(req);
-            }
-
-            Ok(res)
-        })
     }
 }
 
 impl<S, B, AuthProvider, U> Transform<S, ServiceRequest> for AuthMiddleware<AuthProvider, U>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
     AuthProvider: AuthenticationProvider<U> + Clone + 'static,
@@ -186,7 +193,7 @@ where
 
     fn new_transform(&self, service: S) -> Self::Future {
         ready(Ok(AuthMiddlewareInner {
-            service,
+            service: Rc::new(service),
             path_matcher: Rc::clone(&self.path_matcher),
             auth_provider: Rc::clone(&self.auth_provider),
             user_type: PhantomData,

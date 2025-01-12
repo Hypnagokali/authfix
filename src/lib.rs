@@ -2,7 +2,7 @@ use actix_web::{Error, FromRequest, HttpMessage, HttpRequest, HttpResponse, Resp
 use core::fmt;
 use serde::de::DeserializeOwned;
 use std::{
-    cell::{Ref, RefCell}, future::{ready, Ready}, rc::Rc
+    cell::{Ref, RefCell}, future::{ready, Future, Ready}, pin::Pin, rc::Rc
 };
 
 pub mod middleware;
@@ -16,13 +16,12 @@ pub mod session;
 /// [Impl for Actix-Session](crate::session::session_auth::GetUserFromSession)
 pub trait AuthenticationProvider<U>
 where
-    U: DeserializeOwned,
+    U: DeserializeOwned + 'static,
 {
-    fn get_authenticated_user(&self, req: &HttpRequest) -> Result<U, NoAuthenticatedUserError>;
-    fn invalidate(&self, req: HttpRequest);
+    fn get_authenticated_user(&self, req: &HttpRequest) -> Pin<Box<dyn Future<Output = Result<U, UnauthorizedError>>>>;
+    fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
 }
 
-pub struct NoAuthenticatedUserError;
 
 pub struct AuthToken<U>
 where
