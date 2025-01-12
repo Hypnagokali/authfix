@@ -1,36 +1,38 @@
 use std::{
     fmt::Debug,
-    future::{ready, Ready},
-    ops::Deref,
+    future::{ready, Future, Ready},
+    ops::Deref, pin::Pin,
 };
 
 use actix_session::{Session, SessionExt, SessionInsertError};
 use actix_web::{Error, FromRequest, HttpRequest};
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{AuthenticationProvider, NoAuthenticatedUserError};
+use crate::{AuthenticationProvider, UnauthorizedError};
 
 #[derive(Clone)]
 pub struct SessionAuthProvider;
 
 impl<U> AuthenticationProvider<U> for SessionAuthProvider
 where
-    U: DeserializeOwned,
+    U: DeserializeOwned + 'static,
 {
-    fn get_authenticated_user(&self, req: &actix_web::HttpRequest) -> Result<U, NoAuthenticatedUserError> {
-        let s = req.get_session();
+    fn get_authenticated_user(&self, req: &actix_web::HttpRequest) -> Pin<Box<dyn Future<Output = Result<U, UnauthorizedError>>>> {
+        let s = req.get_session().clone();
 
         let user = match s.get::<U>("user") {
             Ok(Some(user)) => user,
-            _ => return Err(NoAuthenticatedUserError {}),
+            _ => return Box::pin(ready(Err(UnauthorizedError::default()))),
         };
 
-        Ok(user)
+        Box::pin(ready(Ok(user)))
     }
     
-    fn invalidate(&self, req: HttpRequest) {
+    fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>> {
         let s =req.get_session();
         s.purge();
+
+        Box::pin(async {})
     }
 
 }
