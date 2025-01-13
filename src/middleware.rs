@@ -18,9 +18,22 @@ use crate::{AuthToken, AuthenticationProvider, UnauthorizedError};
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 
-/// PathMatcher is used to match specific paths or to exclude paths from matching
-/// is_exclusion_list: the entries of path_list will not match if true, otherwise only the entries will match.
-/// path_list: List of paths you wish to exclude or include (see: is_exclusion_list). The path_list may include wildcards like "/api/user/*"
+
+/// It is used to specify secured paths 
+/// 
+/// [`PathMatcher`] stores the paths that should be excluded or included for authentication.
+/// In the most cases it is desired to exclude paths from authentication, so that every path is secured but e.g. /login, /register are reachable for
+/// the user. For this default configuration where all paths are secured except `/login` and `/register` use [`PathMatcher::default`]
+/// 
+/// But if you would like to secure just some paths just set the `is_exclusion_list` flag to `false` and specify the paths with:
+/// ```ignore
+/// PathMatcher::new(vec!["/my-secure-route", "another-secure-route"], false)
+/// ```
+/// 
+/// You can use wildcards for path matching like 
+/// ```ignore
+/// PathMatcher::new(vec!["/private/*"], false)
+/// ```
 #[derive(Clone)]
 pub struct PathMatcher {
     is_exclusion_list: bool,
@@ -67,6 +80,51 @@ fn transform_to_encoded_regex(input: &str) -> String {
     encoded.replace(PATH_MATCHER_ANY_ENCODED, ".*")
 }
 
+/// A middleware that can simplify handling of authentication in [Actix Web](https://actix.rs/)
+/// 
+/// [`AuthMiddleware`] checks if a user is logged in and if not, it responses with 401. If a user is present it gets injected into the `Actix Web`-pipeline and
+/// you can then retrieve it in request handlers by using the [AuthToken] extractor.
+/// Furthermore [`AuthMiddleware`] checks, if the `AuthToken` is still valid, if not it invalidates the underlying authentication.
+/// 
+/// To decide, if a user is logged in or not, [`AuthMiddleware`] uses the [AuthenticationProvider] trait to get the user from the underlying mechanism/store. 
+/// 
+/// Currently only [SessionAuthProvider](crate::session::session_auth::SessionAuthProvider) implements [AuthenticationProvider]. Internally it uses
+/// [Actix Session](https://crates.io/crates/actix-session). For session authentication it is important to wrap the `SessionMiddleware`
+/// after the `AuthMiddleware`, so that the session is created/handled before the `AuthMiddleware`.
+///  
+/// # Examples
+/// ```no_run
+/// use actix_session::{storage::CookieSessionStore, SessionMiddleware};
+/// use actix_web::{cookie::Key, App, HttpServer};
+/// use auth_middleware_for_actix_web::{middleware::{AuthMiddleware, PathMatcher}, session::session_auth::{SessionAuthProvider}};
+/// use serde::{Deserialize, Serialize};
+/// 
+/// fn create_actix_session_middleware() -> SessionMiddleware<CookieSessionStore> {
+///     let key = Key::generate();
+///    
+///     SessionMiddleware::new(CookieSessionStore::default(), key.clone())
+/// }
+/// #[actix_web::main]
+/// async fn main() -> std::io::Result<()> {
+///     HttpServer::new(move || {
+///         App::new()
+///           .wrap(AuthMiddleware::<_, User>::new(SessionAuthProvider, PathMatcher::default()))
+///             .wrap(create_actix_session_middleware())
+///     })
+///     .bind(("127.0.0.1", 8080))?
+///     .run()
+///     .await
+/// }
+/// 
+/// #[derive(Serialize, Deserialize)]
+/// pub struct User {
+///    pub email: String,
+///    pub name: String,
+/// }
+/// ```
+/// 
+/// 
+#[derive(Clone)]
 pub struct AuthMiddleware<AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
@@ -142,8 +200,8 @@ where
                 }
 
                 let res= service.call(req).await?;
-                // After Request:
 
+                // After Request:
                 let token_valid = {
                     let extensions = res.request().extensions(); 
                     if let Some(token) = extensions.get::<AuthToken<U>>() {
@@ -166,9 +224,6 @@ where
             
         } else {
             trace!("Route is not secured: {}", debug_path);
-            // let fut = self.service.call(req);
-            
-            // just process the response
             return Box::pin(async move {
                 Ok(service.call(req).await?)
             });

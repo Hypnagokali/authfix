@@ -1,3 +1,9 @@
+//! Authentication middleware for Actix Web.
+//! 
+//! `auth-middleware-for-actix-web` makes it easy to configure authentication in Actix Web. 
+//! It provides a middleware with which secured paths can be defined globally and it provides an extractor [AuthToken] that can be used, to
+//! retrieve the currently logged in user.
+
 use actix_web::{Error, FromRequest, HttpMessage, HttpRequest, HttpResponse, ResponseError};
 use core::fmt;
 use serde::de::DeserializeOwned;
@@ -12,8 +18,7 @@ pub mod session;
 /// If no user was found (e.g. in Actix-Session) it will return an Err.
 ///
 /// Currently it is only implemented for actix-session:
-///
-/// [Impl for Actix-Session](crate::session::session_auth::GetUserFromSession)
+/// [SessionAuthProvider](crate::session::session_auth::SessionAuthProvider)
 pub trait AuthenticationProvider<U>
 where
     U: DeserializeOwned + 'static,
@@ -38,7 +43,7 @@ where
         Ref::map(self.inner.borrow(), |inner| &inner.user)
     }
 
-    pub fn is_valid(&self) -> bool {
+    pub (crate) fn is_valid(&self) -> bool {
         let inner = self.inner.borrow();
         inner.is_valid
     }
