@@ -12,7 +12,7 @@ ToDo:
     - [x] Logout
     - [ ] Docs and Tests
     - [ ] Publish to crates.io
-- [ ] Implementation for OAuth 2.0
+- [ ] Implementation for OIDC
 - [ ] Implementation for a JWT library(?)
 
 
