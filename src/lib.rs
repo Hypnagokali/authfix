@@ -68,7 +68,7 @@ where
 /// Extractor that holds the authenticated user
 ///
 /// [`AuthToken`] will be used to handle the logged in user within secured routes. If you inject it a route that is not secured,
-/// an [UnauthorizedError] is thrown.
+/// an 401 [UnauthorizedError] will be returned to the client.
 /// Retrieve the current user:
 /// ```ignore
 /// #[get("/secured-route")]
