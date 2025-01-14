@@ -18,19 +18,18 @@ use crate::{AuthToken, AuthenticationProvider, UnauthorizedError};
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 
-
-/// It is used to specify secured paths 
-/// 
+/// It is used to specify secured paths
+///
 /// [`PathMatcher`] stores the paths that should be excluded or included for authentication.
 /// In the most cases it is desired to exclude paths from authentication, so that every path is secured but e.g. /login, /register are reachable for
 /// the user. For this default configuration where all paths are secured except `/login` and `/register` use [`PathMatcher::default`]
-/// 
+///
 /// But if you would like to secure just some paths just set the `is_exclusion_list` flag to `false` and specify the paths with:
 /// ```ignore
 /// PathMatcher::new(vec!["/my-secure-route", "another-secure-route"], false)
 /// ```
-/// 
-/// You can use wildcards for path matching like 
+///
+/// You can use wildcards for path matching like
 /// ```ignore
 /// PathMatcher::new(vec!["/private/*"], false)
 /// ```
@@ -81,13 +80,13 @@ fn transform_to_encoded_regex(input: &str) -> String {
 }
 
 /// A middleware that can simplify handling of authentication in [Actix Web](https://actix.rs/)
-/// 
+///
 /// [`AuthMiddleware`] checks if a user is logged in and if not, it responses with 401. If a user is present it gets injected into the `Actix Web`-pipeline and
 /// you can then retrieve it in request handlers by using the [AuthToken] extractor.
 /// Furthermore [`AuthMiddleware`] checks, if the `AuthToken` is still valid, if not it invalidates the underlying authentication.
-/// 
-/// To decide, if a user is logged in or not, [`AuthMiddleware`] uses the [AuthenticationProvider] trait to get the user from the underlying mechanism/store. 
-/// 
+///
+/// To decide, if a user is logged in or not, [`AuthMiddleware`] uses the [AuthenticationProvider] trait to get the user from the underlying mechanism/store.
+///
 /// Currently only [SessionAuthProvider](crate::session::session_auth::SessionAuthProvider) implements [AuthenticationProvider]. Internally it uses
 /// [Actix Session](https://crates.io/crates/actix-session). For session authentication it is important to wrap the `SessionMiddleware`
 /// after the `AuthMiddleware`, so that the session is created/handled before the `AuthMiddleware`.
@@ -98,7 +97,7 @@ fn transform_to_encoded_regex(input: &str) -> String {
 /// use actix_web::{cookie::Key, App, HttpServer};
 /// use auth_middleware_for_actix_web::{middleware::{AuthMiddleware, PathMatcher}, session::session_auth::{SessionAuthProvider}};
 /// use serde::{Deserialize, Serialize};
-/// 
+///
 /// fn create_actix_session_middleware() -> SessionMiddleware<CookieSessionStore> {
 ///     let key = Key::generate();
 ///    
@@ -115,15 +114,15 @@ fn transform_to_encoded_regex(input: &str) -> String {
 ///     .run()
 ///     .await
 /// }
-/// 
+///
 /// #[derive(Serialize, Deserialize)]
 /// pub struct User {
 ///    pub email: String,
 ///    pub name: String,
 /// }
 /// ```
-/// 
-/// 
+///
+///
 #[derive(Clone)]
 pub struct AuthMiddleware<AuthProvider, U>
 where
@@ -183,7 +182,7 @@ where
 
         if self.path_matcher.matches(&request_path) {
             debug!("Secured route: '{}'", debug_path);
-            
+
             // let fut3 = p.get_authenticated_user(&muh);
             return Box::pin(async move {
                 // Before Request
@@ -199,11 +198,11 @@ where
                     }
                 }
 
-                let res= service.call(req).await?;
+                let res = service.call(req).await?;
 
                 // After Request:
                 let token_valid = {
-                    let extensions = res.request().extensions(); 
+                    let extensions = res.request().extensions();
                     if let Some(token) = extensions.get::<AuthToken<U>>() {
                         token.is_valid()
                     } else {
@@ -211,24 +210,19 @@ where
                         false
                     }
                 };
-    
+
                 if !token_valid {
                     debug!("AuthToken no longer valid (maybe logged out). Invalidate Authentication. (Triggered by: {})", debug_path);
                     let req = res.request().clone();
                     auth_provider.invalidate(req).await;
                 }
-    
+
                 Ok(res)
             });
-
-            
         } else {
             trace!("Route is not secured: {}", debug_path);
-            return Box::pin(async move {
-                Ok(service.call(req).await?)
-            });
+            return Box::pin(async move { Ok(service.call(req).await?) });
         }
-        
     }
 }
 

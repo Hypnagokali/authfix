@@ -1,14 +1,49 @@
 //! Authentication middleware for Actix Web.
-//! 
-//! `auth-middleware-for-actix-web` makes it easy to configure authentication in Actix Web. 
+//!
+//! `auth-middleware-for-actix-web` makes it easy to configure authentication in Actix Web.
 //! It provides a middleware with which secured paths can be defined globally and it provides an extractor [AuthToken] that can be used, to
 //! retrieve the currently logged in user.
+//!
+//! # Examples
+//! ## For session based authentication ([Actix Session](https://docs.rs/actix-session/latest/actix_session/)).
+//! ```no_run
+//! use actix_session::{storage::CookieSessionStore, SessionMiddleware};
+//! use actix_web::{cookie::Key, App, HttpServer};
+//! use auth_middleware_for_actix_web::{middleware::{AuthMiddleware, PathMatcher}, session::session_auth::{SessionAuthProvider}};
+//! use serde::{Deserialize, Serialize};
+//!
+//! fn create_actix_session_middleware() -> SessionMiddleware<CookieSessionStore> {
+//!     let key = Key::generate();
+//!    
+//!     SessionMiddleware::new(CookieSessionStore::default(), key.clone())
+//! }
+//! #[actix_web::main]
+//! async fn main() -> std::io::Result<()> {
+//!     HttpServer::new(move || {
+//!         App::new()
+//!           .wrap(AuthMiddleware::<_, User>::new(SessionAuthProvider, PathMatcher::default()))
+//!             .wrap(create_actix_session_middleware())
+//!     })
+//!     .bind(("127.0.0.1", 8080))?
+//!     .run()
+//!     .await
+//! }
+//!
+//! #[derive(Serialize, Deserialize)]
+//! pub struct User {
+//!    pub email: String,
+//!    pub name: String,
+//! }
+//! ```
 
 use actix_web::{Error, FromRequest, HttpMessage, HttpRequest, HttpResponse, ResponseError};
 use core::fmt;
 use serde::de::DeserializeOwned;
 use std::{
-    cell::{Ref, RefCell}, future::{ready, Future, Ready}, pin::Pin, rc::Rc
+    cell::{Ref, RefCell},
+    future::{ready, Future, Ready},
+    pin::Pin,
+    rc::Rc,
 };
 
 pub mod middleware;
@@ -23,11 +58,35 @@ pub trait AuthenticationProvider<U>
 where
     U: DeserializeOwned + 'static,
 {
-    fn get_authenticated_user(&self, req: &HttpRequest) -> Pin<Box<dyn Future<Output = Result<U, UnauthorizedError>>>>;
+    fn get_authenticated_user(
+        &self,
+        req: &HttpRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<U, UnauthorizedError>>>>;
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
 }
 
-
+/// Extractor that holds the authenticated user
+///
+/// [`AuthToken`] will be used to handle the logged in user within secured routes. If you inject it a route that is not secured,
+/// an [UnauthorizedError] is thrown.
+/// Retrieve the current user:
+/// ```ignore
+/// #[get("/secured-route")]
+/// pub async fn secured_route(token: AuthToken<User>) -> impl Responder {
+///     HttpResponse::Ok().body(format!(
+///         "Request from user: {}",
+///         token.get_authenticated_user().email
+///     ))
+/// }
+/// ```
+/// You can also initiate a logout with:
+/// ```ignore
+/// #[post("/logout")]
+/// pub async fn logout(token: AuthToken<User>) -> impl Responder {
+///     token.invalidate();
+///     HttpResponse::Ok()
+/// }
+/// ```
 pub struct AuthToken<U>
 where
     U: DeserializeOwned,
@@ -43,7 +102,7 @@ where
         Ref::map(self.inner.borrow(), |inner| &inner.user)
     }
 
-    pub (crate) fn is_valid(&self) -> bool {
+    pub(crate) fn is_valid(&self) -> bool {
         let inner = self.inner.borrow();
         inner.is_valid
     }
@@ -53,10 +112,12 @@ where
         inner.is_valid = false;
     }
 
-
     pub(crate) fn new(user: U) -> Self {
         Self {
-            inner: Rc::new(RefCell::new(AuthTokenInner{ user, is_valid: true })),
+            inner: Rc::new(RefCell::new(AuthTokenInner {
+                user,
+                is_valid: true,
+            })),
         }
     }
 
