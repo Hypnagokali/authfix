@@ -48,6 +48,8 @@ use std::{
 
 pub mod middleware;
 pub mod session;
+pub mod multifactor;
+pub mod google_auth;
 
 /// This trait is used to retrieve the logged in user.
 /// If no user was found (e.g. in Actix-Session) it will return an Err.
