@@ -5,8 +5,7 @@ use std::{
 };
 
 use actix_web::{
-    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    Error, HttpMessage,
+    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform}, error::ErrorBadRequest, Error, HttpMessage
 };
 use futures::future::LocalBoxFuture;
 use log::{debug, trace};
@@ -14,7 +13,7 @@ use regex::Regex;
 use serde::de::DeserializeOwned;
 use urlencoding::encode;
 
-use crate::{AuthToken, AuthenticationProvider, UnauthorizedError};
+use crate::{multifactor::Factor, web::MFA_ROUTE, AuthToken, AuthenticationProvider, UnauthorizedError};
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 
@@ -127,12 +126,14 @@ fn transform_to_encoded_regex(input: &str) -> String {
 pub struct AuthMiddleware<AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + 'static
 {
     auth_provider: Rc<AuthProvider>,
     path_matcher: Rc<PathMatcher>,
+    additional_factor: Rc<Option<Box<dyn Factor>>>,
     user_type: PhantomData<U>,
 }
+
 
 impl<AuthProvider, U> AuthMiddleware<AuthProvider, U>
 where
@@ -143,9 +144,20 @@ where
         AuthMiddleware {
             auth_provider: Rc::new(auth_provider),
             path_matcher: Rc::new(path_matcher),
+            additional_factor: Rc::new(None),
             user_type: PhantomData,
         }
     }
+
+    pub fn new_with_factor(auth_provider: AuthProvider, path_matcher: PathMatcher, factor: Box<dyn Factor>) -> Self {
+        AuthMiddleware {
+            auth_provider: Rc::new(auth_provider),
+            path_matcher: Rc::new(path_matcher),
+            additional_factor: Rc::new(Some(factor)),
+            user_type: PhantomData,
+        }
+    }
+
 }
 
 pub struct AuthMiddlewareInner<S, AuthProvider, U>
@@ -156,6 +168,7 @@ where
     service: Rc<S>,
     auth_provider: Rc<AuthProvider>,
     path_matcher: Rc<PathMatcher>,
+    factor: Rc<Option<Box<dyn Factor>>>,
     user_type: PhantomData<U>,
 }
 
@@ -186,9 +199,17 @@ where
             // let fut3 = p.get_authenticated_user(&muh);
             return Box::pin(async move {
                 // Before Request
-                match auth_provider.get_authenticated_user(req.request()).await {
-                    Ok(user) => {
-                        let token = AuthToken::new(user);
+                match auth_provider.get_auth_token(req.request()).await {
+                    Ok(token) => {
+                        // ToDo: currently hardcoded: needs to be configurable
+                        if request_path.to_lowercase() == MFA_ROUTE {
+                            if !token.needs_mfa() {
+                                return Err(ErrorBadRequest("No mfa needed"));
+                            }
+                        } else if !token.is_authenticated() {
+                            return Err(UnauthorizedError::default().into());
+                        }
+
                         let mut extensions = req.extensions_mut();
                         extensions.insert(token);
                     }
@@ -204,7 +225,7 @@ where
                 let token_valid = {
                     let extensions = res.request().extensions();
                     if let Some(token) = extensions.get::<AuthToken<U>>() {
-                        token.is_valid()
+                        token.is_authenticated()
                     } else {
                         // If there is no AuthToken, authentication is no longer valid
                         false
@@ -244,6 +265,7 @@ where
         ready(Ok(AuthMiddlewareInner {
             service: Rc::new(service),
             path_matcher: Rc::clone(&self.path_matcher),
+            factor: Rc::clone(&self.additional_factor),
             auth_provider: Rc::clone(&self.auth_provider),
             user_type: PhantomData,
         }))

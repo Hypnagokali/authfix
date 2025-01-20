@@ -1,13 +1,17 @@
 use std::{
     future::{ready, Future, Ready},
-    pin::Pin,
+    pin::Pin, rc::Rc, time::SystemTime,
 };
 
 use actix_session::{Session, SessionExt, SessionInsertError};
-use actix_web::{Error, FromRequest, HttpRequest};
-use serde::{de::DeserializeOwned, Serialize};
+use actix_web::{error::ErrorInternalServerError, Error, FromRequest, HttpRequest};
+use log::error;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::{AuthenticationProvider, UnauthorizedError};
+use crate::{AuthState, AuthToken, AuthenticationProvider, UnauthorizedError};
+
+const SESSION_KEY_USER: &str = "user";
+const SESSION_KEY_NEED_MFA: &str = "needs_mfa";
 
 /// Provider for session based authentication.
 ///
@@ -21,18 +25,28 @@ impl<U> AuthenticationProvider<U> for SessionAuthProvider
 where
     U: DeserializeOwned + 'static,
 {
-    fn get_authenticated_user(
+    fn get_auth_token(
         &self,
         req: &actix_web::HttpRequest,
-    ) -> Pin<Box<dyn Future<Output = Result<U, UnauthorizedError>>>> {
+    ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>> {
         let s = req.get_session().clone();
 
-        let user = match s.get::<U>("user") {
+        // ToDo: refactor: remove the matches here
+        let user = match s.get::<U>(SESSION_KEY_USER) {
             Ok(Some(user)) => user,
             _ => return Box::pin(ready(Err(UnauthorizedError::default()))),
         };
 
-        Box::pin(ready(Ok(user)))
+        let state = match s.get::<bool>(SESSION_KEY_NEED_MFA) {
+            Ok(Some(needs_mfa)) => if needs_mfa { AuthState::NeedsMfa } else { AuthState::Authenticated },
+            Ok(None) => AuthState::Authenticated,
+            Err(_) => {
+                error!("Cannot read `need_mfa' value from session");
+                return Box::pin(ready(Err(UnauthorizedError::default())));
+            }
+        };
+
+        Box::pin(ready(Ok(AuthToken::new(user, state))))
     }
 
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>> {
@@ -41,6 +55,15 @@ where
 
         Box::pin(async {})
     }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+struct SessionBasedLoginState {
+    authenticated: bool, // if true, is fully authenticated for app
+    factors_already_checked: Vec<String>, // IDs of checked factors
+    needs_mfa_with_id: Option<String>, // ID of next factor
+    mfa_code: Option<String>,
+    valid_unti: SystemTime, // after this timestamp LoginState is discarded
 }
 
 /// Extractor to set the user into the current session
@@ -70,7 +93,7 @@ impl UserSession {
     }
 
     pub fn set_user<U: Serialize>(&self, user: U) -> Result<(), SessionInsertError> {
-        match self.session.insert("user", user) {
+        match self.session.insert(SESSION_KEY_USER, user) {
             Ok(_) => {}
             Err(e) => return Err(e),
         }
