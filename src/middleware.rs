@@ -43,9 +43,10 @@ impl PathMatcher {
     pub fn new(path_list: Vec<&'static str>, is_exclusion_list: bool) -> Self {
         let mut path_regex_list = Vec::new();
         for pattern in path_list.into_iter() {
+            let regex_pattern = format!("^{}$", transform_to_encoded_regex(pattern));
             path_regex_list.push((
                 pattern,
-                Regex::new(&transform_to_encoded_regex(pattern)).unwrap(),
+                Regex::new(&regex_pattern).unwrap(),
             ));
         }
         Self {
@@ -274,5 +275,7 @@ mod tests {
 
         assert!(matcher.matches("/api/users/231/edit"));
         assert!(!matcher.matches("/login"));
+        // As long as there is no wildcard, only the exact string should be matched
+        assert!(matcher.matches("/login/something"))
     }
 }
