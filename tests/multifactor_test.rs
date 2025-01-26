@@ -1,13 +1,17 @@
-use std::{error::Error as StdError, future::ready, net::SocketAddr, sync::Arc, thread};
+use std::{future::ready, net::SocketAddr, sync::Arc, thread};
 
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
-use actix_web::{cookie::Key, get, post, web::{self, Path}, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{cookie::Key, get, post, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use auth_middleware_for_actix_web::{
-    google_auth::google_auth::GoogleAuth, middleware::{AuthMiddleware, PathMatcher}, multifactor::{OptionalFactor, TotpSecretRepository}, session::session_auth::{SessionAuthProvider, UserSession}, web::{ErrorResponse, MfaRequestBody}, AuthToken
-};
+    google_auth::google_auth::GoogleAuth, middleware::{
+        AuthMiddleware, PathMatcher
+    }, multifactor::{OptionalFactor, TotpSecretRepository}, session::session_auth::{SessionAuthProvider, UserSession}, web::{ErrorResponse, MfaRequestBody}, AuthToken};
+use google_authenticator::GoogleAuthenticator;
 use reqwest::{Client, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
+
+const SECRET: &str = "I3VFM3JKMNDJCDH5BMBEEQAW6KJ6NOE3";
 
 #[derive(Serialize, Deserialize)]
 pub struct User {
@@ -28,7 +32,7 @@ where
     type Error = NoSecretFoundError;
 
     fn get_auth_secret(&self, _user: &U) -> impl std::future::Future<Output = Result<String, Self::Error>> {
-        Box::pin(ready(Ok("I3VFM3JKMNDJCDH5BMBEEQAW6KJ6NOE3".to_owned())))
+        Box::pin(ready(Ok(SECRET.to_owned())))
     }
 }
 
@@ -36,7 +40,9 @@ where
 // ToDo: should be created by a macro or automatically if possible
 #[post("/login/mfa")]
 pub async fn mfa_route(factor: OptionalFactor, body: web::Json<MfaRequestBody>, req: HttpRequest, token: AuthToken<User>) -> impl Responder {
+    println!("Schnuff: mfa_route yeah");
     if let Some(f) = factor.get_value() {
+        println!("Schnuff: We have a value");
         match f.check_code(body.get_code(), &req).await {
             Ok(_) => {
                 token.mfa_challenge_done();
@@ -45,8 +51,9 @@ pub async fn mfa_route(factor: OptionalFactor, body: web::Json<MfaRequestBody>, 
             Err(e) => HttpResponse::BadRequest().json(ErrorResponse::from(e))
         }
    } else {
-    HttpResponse::BadRequest().finish()
+        HttpResponse::BadRequest().finish()
    }
+   
 }
 
 #[get("/secured-route")]
@@ -64,16 +71,27 @@ pub async fn logout(token: AuthToken<User>) -> impl Responder {
 }
 
 #[post("/login")]
-async fn login(session: UserSession) -> impl Responder {
+async fn login(session: UserSession, opt_factor: OptionalFactor) -> impl Responder {
     // For session based authentication we need to manually check user and password and save the user in the session
     let user = User {
         email: "jenny@example.org".to_owned(),
         name: "Jenny B.".to_owned(),
     };
 
-    session
-        .set_user(user)
-        .expect("User could not be set in session");
+    if opt_factor.get_value().is_some() {
+        println!("Schnuff: is some");
+    } else {
+        println!("Schnuff: is none");
+    }
+
+    match opt_factor.get_value() {
+        Some(factor) => session.needs_mfa(&factor.get_unique_id()).expect("Could not set factor in session"),
+        None => {},
+    };
+
+    // Only set the user if the factor could be set or is not present
+    session.set_user(user).expect("Could not set user in session");
+    
     return HttpResponse::Ok();
 }
 
@@ -89,11 +107,37 @@ fn create_actix_session_middleware() -> SessionMiddleware<CookieSessionStore> {
 // - mfa failure 
 
 #[actix_rt::test]
-async fn should_not_be_looged_in_without_mfa() {
+async fn should_not_be_logged_in_without_mfa() {
     let addr = actix_test::unused_addr();
     start_test_server(addr);
 
     let client = Client::builder().cookie_store(true).build().unwrap();
+
+    let mut res = client
+        .post(format!("http://{addr}/login"))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+
+    res = client
+        .get(format!("http://{addr}/secured-route"))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[actix_rt::test]
+async fn should_be_logged_in_after_mfa() {
+    let addr = actix_test::unused_addr();
+    start_test_server(addr);
+
+    let client = Client::builder().cookie_store(true).build().unwrap();
+    let authenticator = GoogleAuthenticator::new();
+    let code = authenticator.get_code(SECRET, 0).expect("Code should be created");
 
     client
         .post(format!("http://{addr}/login"))
@@ -101,13 +145,24 @@ async fn should_not_be_looged_in_without_mfa() {
         .await
         .unwrap();
 
-    let res = client
+
+    let mut res = client
+        .post(format!("http://{addr}/login/mfa"))
+        .body(format!("{{ code: {} }}", "hasen"))
+        .header("Content-Type", "application/json")
+        .send()
+        .await
+        .unwrap();
+    println!("Schnuffhasen: {}", res.text().await.expect("Schnuff"));
+    // assert_eq!(res.status(), StatusCode::OK);
+
+    res = client
         .get(format!("http://{addr}/secured-route"))
         .send()
         .await
         .unwrap();
 
-    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(res.status(), StatusCode::OK);
 }
 
 fn start_test_server(addr: SocketAddr) {

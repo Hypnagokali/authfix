@@ -42,9 +42,10 @@ impl PathMatcher {
     pub fn new(path_list: Vec<&'static str>, is_exclusion_list: bool) -> Self {
         let mut path_regex_list = Vec::new();
         for pattern in path_list.into_iter() {
+            let regex_pattern_encoded = format!("^{}$", transform_to_encoded_regex(pattern));
             path_regex_list.push((
                 pattern,
-                Regex::new(&transform_to_encoded_regex(pattern)).unwrap(),
+                Regex::new(&regex_pattern_encoded).unwrap(),
             ));
         }
         Self {
@@ -52,6 +53,7 @@ impl PathMatcher {
             path_regex_list,
         }
     }
+
 
     pub fn matches(&self, path: &str) -> bool {
         let encoded_path = transform_to_encoded_regex(path);
@@ -188,10 +190,19 @@ where
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let request_path = req.request().path().to_owned();
+        println!("route: {}", request_path);
 
         let debug_path = req.path().to_owned();
         let service = Rc::clone(&self.service);
         let auth_provider = Rc::clone(&self.auth_provider);
+        let factor = Rc::clone(&self.factor);
+
+        {
+            // ToDo: Just a quick fix. Dont use an extra scope !!!
+            let mut extensions = req.extensions_mut();
+            println!("Schnuff: Add factor to route");
+            extensions.insert(factor);
+        }
 
         if self.path_matcher.matches(&request_path) {
             debug!("Secured route: '{}'", debug_path);
@@ -201,17 +212,21 @@ where
                 // Before Request
                 match auth_provider.get_auth_token(req.request()).await {
                     Ok(token) => {
+                        println!("Schnuff: Has AuthToken yeah");
                         // ToDo: currently hardcoded: needs to be configurable
                         if request_path.to_lowercase() == MFA_ROUTE {
+                            println!("Schnuff: is mfa route");
                             if !token.needs_mfa() {
                                 return Err(ErrorBadRequest("No mfa needed"));
                             }
                         } else if !token.is_authenticated() {
+                            println!("Schnuff: FIX THIS: MFA route should not go here");
                             return Err(UnauthorizedError::default().into());
                         }
 
                         let mut extensions = req.extensions_mut();
                         extensions.insert(token);
+                        // is it really needed on each secured route? or only on /mfa and /login?
                     }
                     Err(_) => {
                         debug!("No authenticated user found");
@@ -221,10 +236,14 @@ where
 
                 let res = service.call(req).await?;
 
+
                 // After Request:
                 let token_valid = {
                     let extensions = res.request().extensions();
                     if let Some(token) = extensions.get::<AuthToken<U>>() {
+                        // TODO:
+                        // Do not use is_authenticated()
+                        // we need is_valid() -> needs_mfa is also valid !!!
                         token.is_authenticated()
                     } else {
                         // If there is no AuthToken, authentication is no longer valid
@@ -241,6 +260,7 @@ where
                 Ok(res)
             });
         } else {
+            println!("Schnuff: not secured");
             trace!("Route is not secured: {}", debug_path);
             return Box::pin(async move { Ok(service.call(req).await?) });
         }

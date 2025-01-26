@@ -171,6 +171,7 @@ where
             return ready(Ok(AuthToken::from_ref(token)));
         }
 
+        // ToDo: not a good error, needs 500
         ready(Err(UnauthorizedError::default().into()))
     }
 }

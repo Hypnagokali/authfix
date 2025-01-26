@@ -59,9 +59,9 @@ impl FromRequest for OptionalFactor {
                 }
             ))
         } else {
-            ready(Err(error::ErrorInternalServerError(
-                "Try to retrieve factor from request, but no one is registered.",
-            )))
+            ready(Ok(Self {
+                value: Rc::new(None)
+            }))
         }
     }
 }

@@ -37,8 +37,8 @@ where
             _ => return Box::pin(ready(Err(UnauthorizedError::default()))),
         };
 
-        let state = match s.get::<bool>(SESSION_KEY_NEED_MFA) {
-            Ok(Some(needs_mfa)) => if needs_mfa { AuthState::NeedsMfa } else { AuthState::Authenticated },
+        let state = match s.get::<String>(SESSION_KEY_NEED_MFA) {
+            Ok(Some(_mfa_id)) => AuthState::NeedsMfa,
             Ok(None) => AuthState::Authenticated,
             Err(_) => {
                 error!("Cannot read `need_mfa' value from session");
@@ -92,15 +92,18 @@ impl UserSession {
         Self { session }
     }
 
-    pub fn set_user<U: Serialize>(&self, user: U) -> Result<(), SessionInsertError> {
-        match self.session.insert(SESSION_KEY_USER, user) {
-            Ok(_) => {}
+    pub fn needs_mfa(&self, mfa_id: &str) -> Result<(), SessionInsertError>{
+        match self.session.insert(SESSION_KEY_NEED_MFA,mfa_id) {
+            Ok(_) => Ok(()),
             Err(e) => return Err(e),
         }
+    }
 
-        self.session.remove("ttl");
-
-        Ok(())
+    pub fn set_user<U: Serialize>(&self, user: U) -> Result<(), SessionInsertError> {
+        match self.session.insert(SESSION_KEY_USER, user) {
+            Ok(_) => Ok(()),
+            Err(e) => return Err(e),
+        }
     }
 }
 
