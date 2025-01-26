@@ -1,6 +1,8 @@
 use std::{
     future::{ready, Future, Ready},
-    pin::Pin, rc::Rc, time::SystemTime,
+    pin::Pin,
+    rc::Rc,
+    time::SystemTime,
 };
 
 use actix_session::{Session, SessionExt, SessionInsertError};
@@ -59,9 +61,9 @@ where
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct SessionBasedLoginState {
-    authenticated: bool, // if true, is fully authenticated for app
+    authenticated: bool,                  // if true, is fully authenticated for app
     factors_already_checked: Vec<String>, // IDs of checked factors
-    needs_mfa_with_id: Option<String>, // ID of next factor
+    needs_mfa_with_id: Option<String>,    // ID of next factor
     mfa_code: Option<String>,
     valid_unti: SystemTime, // after this timestamp LoginState is discarded
 }
@@ -92,8 +94,12 @@ impl UserSession {
         Self { session }
     }
 
-    pub fn needs_mfa(&self, mfa_id: &str) -> Result<(), SessionInsertError>{
-        match self.session.insert(SESSION_KEY_NEED_MFA,mfa_id) {
+    pub fn mfa_challenge_done(&self) {
+        self.session.remove(SESSION_KEY_NEED_MFA);
+    }
+
+    pub fn needs_mfa(&self, mfa_id: &str) -> Result<(), SessionInsertError> {
+        match self.session.insert(SESSION_KEY_NEED_MFA, mfa_id) {
             Ok(_) => Ok(()),
             Err(e) => return Err(e),
         }

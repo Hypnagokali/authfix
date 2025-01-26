@@ -2,15 +2,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::multifactor::CheckCodeError;
 
-
 // hardcoded routes
 pub const LOGIN_ROUTE: &str = "/login";
-pub const MFA_ROUTE: &str = "/login/mfa*";
+pub const MFA_ROUTE: &str = "/login/mfa";
 
 /// For a code request
 #[derive(Deserialize)]
 pub struct MfaRequestBody {
-    code: String
+    code: String,
 }
 
 impl MfaRequestBody {
@@ -40,7 +39,7 @@ impl From<CheckCodeError> for ErrorResponse {
             },
             CheckCodeError::UnknownError(message) => Self {
                 message,
-                finally_rejected: true
+                finally_rejected: true,
             },
         }
     }

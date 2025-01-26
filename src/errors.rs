@@ -2,7 +2,6 @@ use std::fmt;
 
 use actix_web::{HttpResponse, ResponseError};
 
-
 #[derive(Debug)]
 pub struct UnauthorizedError {
     message: String,

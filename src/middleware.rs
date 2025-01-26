@@ -5,7 +5,9 @@ use std::{
 };
 
 use actix_web::{
-    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform}, error::ErrorBadRequest, Error, HttpMessage
+    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
+    error::ErrorBadRequest,
+    Error, HttpMessage,
 };
 use futures::future::LocalBoxFuture;
 use log::{debug, trace};
@@ -13,7 +15,9 @@ use regex::Regex;
 use serde::de::DeserializeOwned;
 use urlencoding::encode;
 
-use crate::{multifactor::Factor, web::MFA_ROUTE, AuthToken, AuthenticationProvider, UnauthorizedError};
+use crate::{
+    multifactor::Factor, web::MFA_ROUTE, AuthToken, AuthenticationProvider, UnauthorizedError,
+};
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 
@@ -43,17 +47,13 @@ impl PathMatcher {
         let mut path_regex_list = Vec::new();
         for pattern in path_list.into_iter() {
             let regex_pattern_encoded = format!("^{}$", transform_to_encoded_regex(pattern));
-            path_regex_list.push((
-                pattern,
-                Regex::new(&regex_pattern_encoded).unwrap(),
-            ));
+            path_regex_list.push((pattern, Regex::new(&regex_pattern_encoded).unwrap()));
         }
         Self {
             is_exclusion_list,
             path_regex_list,
         }
     }
-
 
     pub fn matches(&self, path: &str) -> bool {
         let encoded_path = transform_to_encoded_regex(path);
@@ -128,14 +128,13 @@ fn transform_to_encoded_regex(input: &str) -> String {
 pub struct AuthMiddleware<AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: DeserializeOwned + 'static
+    U: DeserializeOwned + 'static,
 {
     auth_provider: Rc<AuthProvider>,
     path_matcher: Rc<PathMatcher>,
     additional_factor: Rc<Option<Box<dyn Factor>>>,
     user_type: PhantomData<U>,
 }
-
 
 impl<AuthProvider, U> AuthMiddleware<AuthProvider, U>
 where
@@ -151,7 +150,11 @@ where
         }
     }
 
-    pub fn new_with_factor(auth_provider: AuthProvider, path_matcher: PathMatcher, factor: Box<dyn Factor>) -> Self {
+    pub fn new_with_factor(
+        auth_provider: AuthProvider,
+        path_matcher: PathMatcher,
+        factor: Box<dyn Factor>,
+    ) -> Self {
         AuthMiddleware {
             auth_provider: Rc::new(auth_provider),
             path_matcher: Rc::new(path_matcher),
@@ -159,7 +162,6 @@ where
             user_type: PhantomData,
         }
     }
-
 }
 
 pub struct AuthMiddlewareInner<S, AuthProvider, U>
@@ -190,7 +192,6 @@ where
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let request_path = req.request().path().to_owned();
-        println!("route: {}", request_path);
 
         let debug_path = req.path().to_owned();
         let service = Rc::clone(&self.service);
@@ -200,7 +201,6 @@ where
         {
             // ToDo: Just a quick fix. Dont use an extra scope !!!
             let mut extensions = req.extensions_mut();
-            println!("Schnuff: Add factor to route");
             extensions.insert(factor);
         }
 
@@ -212,15 +212,12 @@ where
                 // Before Request
                 match auth_provider.get_auth_token(req.request()).await {
                     Ok(token) => {
-                        println!("Schnuff: Has AuthToken yeah");
                         // ToDo: currently hardcoded: needs to be configurable
                         if request_path.to_lowercase() == MFA_ROUTE {
-                            println!("Schnuff: is mfa route");
                             if !token.needs_mfa() {
                                 return Err(ErrorBadRequest("No mfa needed"));
                             }
                         } else if !token.is_authenticated() {
-                            println!("Schnuff: FIX THIS: MFA route should not go here");
                             return Err(UnauthorizedError::default().into());
                         }
 
@@ -236,15 +233,11 @@ where
 
                 let res = service.call(req).await?;
 
-
                 // After Request:
                 let token_valid = {
                     let extensions = res.request().extensions();
                     if let Some(token) = extensions.get::<AuthToken<U>>() {
-                        // TODO:
-                        // Do not use is_authenticated()
-                        // we need is_valid() -> needs_mfa is also valid !!!
-                        token.is_authenticated()
+                        token.is_valid()
                     } else {
                         // If there is no AuthToken, authentication is no longer valid
                         false
@@ -260,7 +253,6 @@ where
                 Ok(res)
             });
         } else {
-            println!("Schnuff: not secured");
             trace!("Route is not secured: {}", debug_path);
             return Box::pin(async move { Ok(service.call(req).await?) });
         }

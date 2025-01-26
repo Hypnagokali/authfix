@@ -3,7 +3,9 @@ use std::{net::SocketAddr, thread};
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
 use actix_web::{cookie::Key, get, post, App, HttpResponse, HttpServer, Responder};
 use auth_middleware_for_actix_web::{
-    middleware::{AuthMiddleware, PathMatcher}, session::session_auth::{SessionAuthProvider, UserSession}, AuthToken
+    middleware::{AuthMiddleware, PathMatcher},
+    session::session_auth::{SessionAuthProvider, UserSession},
+    AuthToken,
 };
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -141,7 +143,6 @@ async fn logout_should_invalidate_session() {
 }
 
 fn start_test_server(addr: SocketAddr) {
-
     thread::spawn(move || {
         actix_rt::System::new()
             .block_on(async {

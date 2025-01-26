@@ -46,11 +46,11 @@ use std::{
     rc::Rc,
 };
 
-pub mod middleware;
-pub mod session;
-pub mod multifactor;
-pub mod google_auth;
 pub mod errors;
+pub mod google_auth;
+pub mod middleware;
+pub mod multifactor;
+pub mod session;
 pub mod web;
 
 /// This trait is used to retrieve the logged in user.
@@ -64,7 +64,7 @@ where
 {
     fn get_auth_token(
         &self,
-        req: &HttpRequest
+        req: &HttpRequest,
     ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
 }
@@ -107,14 +107,14 @@ where
         Ref::map(self.inner.borrow(), |inner| &inner.user)
     }
 
-    pub fn mfa_challenge_done(&self) {
-        let mut inner = self.inner.borrow_mut();
-        inner.auth_state = AuthState::Authenticated;
-    }
-
     pub(crate) fn needs_mfa(&self) -> bool {
         let inner: Ref<'_, AuthTokenInner<U>> = self.inner.borrow();
         inner.auth_state == AuthState::NeedsMfa
+    }
+
+    pub(crate) fn is_valid(&self) -> bool {
+        let inner = self.inner.borrow();
+        inner.auth_state != AuthState::Invalid
     }
 
     pub(crate) fn is_authenticated(&self) -> bool {
@@ -123,16 +123,13 @@ where
     }
 
     pub fn invalidate(&self) {
-        let mut inner = self.inner.as_ref().borrow_mut();
+        let mut inner = self.inner.borrow_mut();
         inner.auth_state = AuthState::Invalid;
     }
 
     pub(crate) fn new(user: U, auth_state: AuthState) -> Self {
         Self {
-            inner: Rc::new(RefCell::new(AuthTokenInner {
-                user,
-                auth_state,
-            })),
+            inner: Rc::new(RefCell::new(AuthTokenInner { user, auth_state })),
         }
     }
 
