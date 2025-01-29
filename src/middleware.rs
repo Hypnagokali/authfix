@@ -128,7 +128,7 @@ fn transform_to_encoded_regex(input: &str) -> String {
 pub struct AuthMiddleware<AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
 {
     auth_provider: Rc<AuthProvider>,
     path_matcher: Rc<PathMatcher>,
@@ -139,7 +139,7 @@ where
 impl<AuthProvider, U> AuthMiddleware<AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
 {
     pub fn new(auth_provider: AuthProvider, path_matcher: PathMatcher) -> Self {
         AuthMiddleware {
@@ -167,7 +167,7 @@ where
 pub struct AuthMiddlewareInner<S, AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
 {
     service: Rc<S>,
     auth_provider: Rc<AuthProvider>,
@@ -181,7 +181,7 @@ where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
     AuthProvider: AuthenticationProvider<U> + 'static,
 {
     type Response = ServiceResponse<B>;
@@ -208,7 +208,7 @@ where
             debug!("Secured route: '{}'", debug_path);
 
             // let fut3 = p.get_authenticated_user(&muh);
-            return Box::pin(async move {
+            Box::pin(async move {
                 // Before Request
                 match auth_provider.get_auth_token(req.request()).await {
                     Ok(token) => {
@@ -251,10 +251,10 @@ where
                 }
 
                 Ok(res)
-            });
+            })
         } else {
             trace!("Route is not secured: {}", debug_path);
-            return Box::pin(async move { Ok(service.call(req).await?) });
+            Box::pin(async move { service.call(req).await })
         }
     }
 }
@@ -265,7 +265,7 @@ where
     S::Future: 'static,
     B: 'static,
     AuthProvider: AuthenticationProvider<U> + Clone + 'static,
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
 {
     type Response = ServiceResponse<B>;
     type Error = Error;

@@ -29,7 +29,7 @@ where
 impl<T, U> GoogleAuth<T, U>
 where
     T: TotpSecretRepository<U>,
-    U: DeserializeOwned,
+    U: DeserializeOwned + Clone,
 {
     pub fn new(totp_secret_repo: Arc<T>) -> Self {
         Self::with_discrepancy(totp_secret_repo, 0)
@@ -46,7 +46,7 @@ where
 impl<T, U> Factor for GoogleAuth<T, U>
 where
     T: TotpSecretRepository<U> + 'static,
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
 {
     fn generate_code(
         &self,
@@ -75,12 +75,11 @@ where
         let code_to_check = code.to_owned();
         let discrepancy = self.discrepancy;
         Box::pin(async move {
-            let u = &token_to_check.get_authenticated_user();
-            repo.get_auth_secret(u)
+            let u = token_to_check.get_authenticated_user().clone();
+            repo.get_auth_secret(&u)
                 .await
                 .map(|secret| {
                     let authenticator = GoogleAuthenticator::new();
-                    // ToDo: Settings should be externalized
                     if authenticator.verify_code(&secret, &code_to_check, discrepancy, 0) {
                         Ok(())
                     } else {

@@ -1,12 +1,11 @@
 use std::{
     future::{ready, Future, Ready},
     pin::Pin,
-    rc::Rc,
     time::SystemTime,
 };
 
 use actix_session::{Session, SessionExt, SessionInsertError};
-use actix_web::{error::ErrorInternalServerError, Error, FromRequest, HttpRequest};
+use actix_web::{Error, FromRequest, HttpRequest};
 use log::error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -25,7 +24,7 @@ pub struct SessionAuthProvider;
 
 impl<U> AuthenticationProvider<U> for SessionAuthProvider
 where
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
 {
     fn get_auth_token(
         &self,
@@ -99,17 +98,11 @@ impl UserSession {
     }
 
     pub fn needs_mfa(&self, mfa_id: &str) -> Result<(), SessionInsertError> {
-        match self.session.insert(SESSION_KEY_NEED_MFA, mfa_id) {
-            Ok(_) => Ok(()),
-            Err(e) => return Err(e),
-        }
+        self.session.insert(SESSION_KEY_NEED_MFA, mfa_id)
     }
 
     pub fn set_user<U: Serialize>(&self, user: U) -> Result<(), SessionInsertError> {
-        match self.session.insert(SESSION_KEY_USER, user) {
-            Ok(_) => Ok(()),
-            Err(e) => return Err(e),
-        }
+        self.session.insert(SESSION_KEY_USER, user)
     }
 }
 

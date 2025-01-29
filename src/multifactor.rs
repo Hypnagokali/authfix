@@ -5,7 +5,7 @@ use std::{
     rc::Rc,
 };
 
-use actix_web::{dev::Payload, error, FromRequest, HttpMessage, HttpRequest};
+use actix_web::{dev::Payload, FromRequest, HttpMessage, HttpRequest};
 use serde::de::DeserializeOwned;
 use thiserror::Error;
 

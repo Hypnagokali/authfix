@@ -47,9 +47,9 @@ use std::{
 };
 
 pub mod errors;
-pub mod google_auth;
 pub mod middleware;
 pub mod multifactor;
+pub mod multifactor_impl;
 pub mod session;
 pub mod web;
 
@@ -60,7 +60,7 @@ pub mod web;
 /// [SessionAuthProvider](crate::session::session_auth::SessionAuthProvider)
 pub trait AuthenticationProvider<U>
 where
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
 {
     fn get_auth_token(
         &self,
@@ -94,14 +94,14 @@ where
 #[derive(Clone)]
 pub struct AuthToken<U>
 where
-    U: DeserializeOwned,
+    U: DeserializeOwned + Clone,
 {
     inner: Rc<RefCell<AuthTokenInner<U>>>,
 }
 
 impl<U> AuthToken<U>
 where
-    U: DeserializeOwned,
+    U: DeserializeOwned + Clone,
 {
     pub fn get_authenticated_user(&self) -> Ref<U> {
         Ref::map(self.inner.borrow(), |inner| &inner.user)
@@ -149,7 +149,7 @@ pub enum AuthState {
 
 struct AuthTokenInner<U>
 where
-    U: DeserializeOwned,
+    U: DeserializeOwned + Clone,
 {
     user: U,
     auth_state: AuthState,
@@ -157,7 +157,7 @@ where
 
 impl<U> FromRequest for AuthToken<U>
 where
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
 {
     type Error = Error;
     type Future = Ready<Result<AuthToken<U>, Error>>;

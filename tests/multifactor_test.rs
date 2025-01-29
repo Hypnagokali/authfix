@@ -5,9 +5,9 @@ use actix_web::{
     cookie::Key, get, post, web, App, HttpRequest, HttpResponse, HttpServer, Responder,
 };
 use auth_middleware_for_actix_web::{
-    google_auth::google_auth::GoogleAuth,
     middleware::{AuthMiddleware, PathMatcher},
     multifactor::{OptionalFactor, TotpSecretRepository},
+    multifactor_impl::google_auth::GoogleAuth,
     session::session_auth::{SessionAuthProvider, UserSession},
     web::{ErrorResponse, MfaRequestBody},
     AuthToken,
@@ -19,7 +19,7 @@ use thiserror::Error;
 
 const SECRET: &str = "I3VFM3JKMNDJCDH5BMBEEQAW6KJ6NOE3";
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct User {
     pub email: String,
     pub name: String,
