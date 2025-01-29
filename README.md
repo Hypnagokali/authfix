@@ -19,8 +19,8 @@ ToDo:
 Example with Actix-Session:
 
 ```rust
-// User struct needs to be serializable and deserializable
-#[derive(Serialize, Deserialize)]
+// User struct needs to be serializable, deserializable and clonable
+#[derive(Serialize, Deserialize, Clone)]
 pub struct User {
     pub email: String,
     pub name: String,
