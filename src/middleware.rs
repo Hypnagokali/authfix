@@ -6,6 +6,7 @@ use std::{
 
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
+    error::ErrorBadRequest,
     Error, HttpMessage,
 };
 use futures::future::LocalBoxFuture;
@@ -14,7 +15,9 @@ use regex::Regex;
 use serde::de::DeserializeOwned;
 use urlencoding::encode;
 
-use crate::{AuthToken, AuthenticationProvider, UnauthorizedError};
+use crate::{
+    multifactor::Factor, web::MFA_ROUTE, AuthToken, AuthenticationProvider, UnauthorizedError,
+};
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 
@@ -116,7 +119,8 @@ fn transform_to_encoded_regex(input: &str) -> String {
 ///     .await
 /// }
 ///
-/// #[derive(Serialize, Deserialize)]
+/// // The user needs the traits Serialize and Deserialize and Clone
+/// #[derive(Serialize, Deserialize, Clone)]
 /// pub struct User {
 ///    pub email: String,
 ///    pub name: String,
@@ -128,22 +132,37 @@ fn transform_to_encoded_regex(input: &str) -> String {
 pub struct AuthMiddleware<AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
 {
     auth_provider: Rc<AuthProvider>,
     path_matcher: Rc<PathMatcher>,
+    additional_factor: Rc<Option<Box<dyn Factor>>>,
     user_type: PhantomData<U>,
 }
 
 impl<AuthProvider, U> AuthMiddleware<AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
 {
     pub fn new(auth_provider: AuthProvider, path_matcher: PathMatcher) -> Self {
         AuthMiddleware {
             auth_provider: Rc::new(auth_provider),
             path_matcher: Rc::new(path_matcher),
+            additional_factor: Rc::new(None),
+            user_type: PhantomData,
+        }
+    }
+
+    pub fn new_with_factor(
+        auth_provider: AuthProvider,
+        path_matcher: PathMatcher,
+        factor: Box<dyn Factor>,
+    ) -> Self {
+        AuthMiddleware {
+            auth_provider: Rc::new(auth_provider),
+            path_matcher: Rc::new(path_matcher),
+            additional_factor: Rc::new(Some(factor)),
             user_type: PhantomData,
         }
     }
@@ -152,11 +171,12 @@ where
 pub struct AuthMiddlewareInner<S, AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
 {
     service: Rc<S>,
     auth_provider: Rc<AuthProvider>,
     path_matcher: Rc<PathMatcher>,
+    factor: Rc<Option<Box<dyn Factor>>>,
     user_type: PhantomData<U>,
 }
 
@@ -165,7 +185,7 @@ where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
     AuthProvider: AuthenticationProvider<U> + 'static,
 {
     type Response = ServiceResponse<B>;
@@ -180,18 +200,34 @@ where
         let debug_path = req.path().to_owned();
         let service = Rc::clone(&self.service);
         let auth_provider = Rc::clone(&self.auth_provider);
+        let factor = Rc::clone(&self.factor);
+
+        {
+            // ToDo: Just a quick fix. Dont use an extra scope !!!
+            let mut extensions = req.extensions_mut();
+            extensions.insert(factor);
+        }
 
         if self.path_matcher.matches(&request_path) {
             debug!("Secured route: '{}'", debug_path);
 
             // let fut3 = p.get_authenticated_user(&muh);
-            return Box::pin(async move {
+            Box::pin(async move {
                 // Before Request
-                match auth_provider.get_authenticated_user(req.request()).await {
-                    Ok(user) => {
-                        let token = AuthToken::new(user);
+                match auth_provider.get_auth_token(req.request()).await {
+                    Ok(token) => {
+                        // ToDo: currently hardcoded: needs to be configurable
+                        if request_path.to_lowercase() == MFA_ROUTE {
+                            if !token.needs_mfa() {
+                                return Err(ErrorBadRequest("No mfa needed"));
+                            }
+                        } else if !token.is_authenticated() {
+                            return Err(UnauthorizedError::default().into());
+                        }
+
                         let mut extensions = req.extensions_mut();
                         extensions.insert(token);
+                        // is it really needed on each secured route? or only on /mfa and /login?
                     }
                     Err(_) => {
                         debug!("No authenticated user found");
@@ -219,10 +255,10 @@ where
                 }
 
                 Ok(res)
-            });
+            })
         } else {
             trace!("Route is not secured: {}", debug_path);
-            return Box::pin(async move { Ok(service.call(req).await?) });
+            Box::pin(async move { service.call(req).await })
         }
     }
 }
@@ -233,7 +269,7 @@ where
     S::Future: 'static,
     B: 'static,
     AuthProvider: AuthenticationProvider<U> + Clone + 'static,
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
 {
     type Response = ServiceResponse<B>;
     type Error = Error;
@@ -245,6 +281,7 @@ where
         ready(Ok(AuthMiddlewareInner {
             service: Rc::new(service),
             path_matcher: Rc::clone(&self.path_matcher),
+            factor: Rc::clone(&self.additional_factor),
             auth_provider: Rc::clone(&self.auth_provider),
             user_type: PhantomData,
         }))

@@ -29,15 +29,16 @@
 //!     .await
 //! }
 //!
-//! #[derive(Serialize, Deserialize)]
+//! // The user needs the traits Serialize and Deserialize and Clone
+//! #[derive(Serialize, Deserialize, Clone)]
 //! pub struct User {
 //!    pub email: String,
 //!    pub name: String,
 //! }
 //! ```
 
-use actix_web::{Error, FromRequest, HttpMessage, HttpRequest, HttpResponse, ResponseError};
-use core::fmt;
+use actix_web::{Error, FromRequest, HttpMessage, HttpRequest};
+use errors::UnauthorizedError;
 use serde::de::DeserializeOwned;
 use std::{
     cell::{Ref, RefCell},
@@ -46,8 +47,12 @@ use std::{
     rc::Rc,
 };
 
+pub mod errors;
 pub mod middleware;
+pub mod multifactor;
+pub mod multifactor_impl;
 pub mod session;
+pub mod web;
 
 /// This trait is used to retrieve the logged in user.
 /// If no user was found (e.g. in Actix-Session) it will return an Err.
@@ -56,12 +61,12 @@ pub mod session;
 /// [SessionAuthProvider](crate::session::session_auth::SessionAuthProvider)
 pub trait AuthenticationProvider<U>
 where
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
 {
-    fn get_authenticated_user(
+    fn get_auth_token(
         &self,
         req: &HttpRequest,
-    ) -> Pin<Box<dyn Future<Output = Result<U, UnauthorizedError>>>>;
+    ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
 }
 
@@ -87,37 +92,45 @@ where
 ///     HttpResponse::Ok()
 /// }
 /// ```
+#[derive(Clone)]
 pub struct AuthToken<U>
 where
-    U: DeserializeOwned,
+    U: DeserializeOwned + Clone,
 {
     inner: Rc<RefCell<AuthTokenInner<U>>>,
 }
 
 impl<U> AuthToken<U>
 where
-    U: DeserializeOwned,
+    U: DeserializeOwned + Clone,
 {
     pub fn get_authenticated_user(&self) -> Ref<U> {
         Ref::map(self.inner.borrow(), |inner| &inner.user)
     }
 
+    pub(crate) fn needs_mfa(&self) -> bool {
+        let inner: Ref<'_, AuthTokenInner<U>> = self.inner.borrow();
+        inner.auth_state == AuthState::NeedsMfa
+    }
+
     pub(crate) fn is_valid(&self) -> bool {
         let inner = self.inner.borrow();
-        inner.is_valid
+        inner.auth_state != AuthState::Invalid
+    }
+
+    pub(crate) fn is_authenticated(&self) -> bool {
+        let inner = self.inner.borrow();
+        inner.auth_state == AuthState::Authenticated
     }
 
     pub fn invalidate(&self) {
-        let mut inner = self.inner.as_ref().borrow_mut();
-        inner.is_valid = false;
+        let mut inner = self.inner.borrow_mut();
+        inner.auth_state = AuthState::Invalid;
     }
 
-    pub(crate) fn new(user: U) -> Self {
+    pub(crate) fn new(user: U, auth_state: AuthState) -> Self {
         Self {
-            inner: Rc::new(RefCell::new(AuthTokenInner {
-                user,
-                is_valid: true,
-            })),
+            inner: Rc::new(RefCell::new(AuthTokenInner { user, auth_state })),
         }
     }
 
@@ -128,17 +141,24 @@ where
     }
 }
 
+#[derive(PartialEq, Debug)]
+pub enum AuthState {
+    Authenticated,
+    NeedsMfa,
+    Invalid,
+}
+
 struct AuthTokenInner<U>
 where
-    U: DeserializeOwned,
+    U: DeserializeOwned + Clone,
 {
     user: U,
-    is_valid: bool,
+    auth_state: AuthState,
 }
 
 impl<U> FromRequest for AuthToken<U>
 where
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned + Clone + 'static,
 {
     type Error = Error;
     type Future = Ready<Result<AuthToken<U>, Error>>;
@@ -149,43 +169,7 @@ where
             return ready(Ok(AuthToken::from_ref(token)));
         }
 
+        // ToDo: not a good error, needs 500
         ready(Err(UnauthorizedError::default().into()))
-    }
-}
-
-#[derive(Debug)]
-pub struct UnauthorizedError {
-    message: String,
-}
-
-impl UnauthorizedError {
-    pub fn new(message: &str) -> Self {
-        Self {
-            message: message.to_owned(),
-        }
-    }
-}
-
-impl Default for UnauthorizedError {
-    fn default() -> Self {
-        Self {
-            message: "Not authorized".to_owned(),
-        }
-    }
-}
-
-impl fmt::Display for UnauthorizedError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Debug unauth error")
-    }
-}
-
-impl ResponseError for UnauthorizedError {
-    fn status_code(&self) -> actix_web::http::StatusCode {
-        actix_web::http::StatusCode::UNAUTHORIZED
-    }
-
-    fn error_response(&self) -> HttpResponse<actix_web::body::BoxBody> {
-        HttpResponse::Unauthorized().json(self.message.clone())
     }
 }

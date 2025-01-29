@@ -10,7 +10,7 @@ use auth_middleware_for_actix_web::{
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct User {
     pub email: String,
     pub name: String,
@@ -49,7 +49,8 @@ async fn login(session: UserSession) -> impl Responder {
     session
         .set_user(user)
         .expect("User could not be set in session");
-    return HttpResponse::Ok();
+    
+    HttpResponse::Ok()
 }
 
 fn create_actix_session_middleware() -> SessionMiddleware<CookieSessionStore> {
