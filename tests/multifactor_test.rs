@@ -57,7 +57,7 @@ pub async fn mfa_route(
         match f.check_code(body.get_code(), &req).await {
             Ok(_) => {
                 session.mfa_challenge_done();
-                return HttpResponse::Ok().finish();
+                HttpResponse::Ok().finish()
             }
             Err(e) => HttpResponse::BadRequest().json(ErrorResponse::from(e)),
         }
@@ -88,11 +88,10 @@ async fn login(session: UserSession, opt_factor: OptionalFactor) -> impl Respond
         name: "Jenny B.".to_owned(),
     };
 
-    match opt_factor.get_value() {
-        Some(factor) => session
+    if let Some(factor) = opt_factor.get_value() {
+        session
             .needs_mfa(&factor.get_unique_id())
-            .expect("Could not set factor in session"),
-        None => {}
+            .expect("Could not set factor in session");
     };
 
     // Only set the user if the factor could be set or is not present
@@ -100,7 +99,7 @@ async fn login(session: UserSession, opt_factor: OptionalFactor) -> impl Respond
         .set_user(user)
         .expect("Could not set user in session");
 
-    return HttpResponse::Ok();
+    HttpResponse::Ok()
 }
 
 fn create_actix_session_middleware() -> SessionMiddleware<CookieSessionStore> {

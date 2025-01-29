@@ -29,7 +29,8 @@
 //!     .await
 //! }
 //!
-//! #[derive(Serialize, Deserialize)]
+//! // The user needs the traits Serialize and Deserialize and Clone
+//! #[derive(Serialize, Deserialize, Clone)]
 //! pub struct User {
 //!    pub email: String,
 //!    pub name: String,

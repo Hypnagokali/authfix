@@ -116,7 +116,8 @@ fn transform_to_encoded_regex(input: &str) -> String {
 ///     .await
 /// }
 ///
-/// #[derive(Serialize, Deserialize)]
+/// // The user needs the traits Serialize and Deserialize and Clone
+/// #[derive(Serialize, Deserialize, Clone)]
 /// pub struct User {
 ///    pub email: String,
 ///    pub name: String,
