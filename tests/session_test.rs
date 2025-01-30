@@ -49,7 +49,7 @@ async fn login(session: UserSession) -> impl Responder {
     session
         .set_user(user)
         .expect("User could not be set in session");
-    
+
     HttpResponse::Ok()
 }
 

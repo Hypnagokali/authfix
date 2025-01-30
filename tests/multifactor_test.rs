@@ -9,7 +9,7 @@ use auth_middleware_for_actix_web::{
     multifactor::{OptionalFactor, TotpSecretRepository},
     multifactor_impl::google_auth::GoogleAuth,
     session::session_auth::{SessionAuthProvider, UserSession},
-    web::{ErrorResponse, MfaRequestBody},
+    web::{add_mfa_route, ErrorResponse, MfaRequestBody},
     AuthToken,
 };
 use google_authenticator::GoogleAuthenticator;
@@ -42,27 +42,6 @@ where
         _user: &U,
     ) -> impl std::future::Future<Output = Result<String, Self::Error>> {
         Box::pin(ready(Ok(SECRET.to_owned())))
-    }
-}
-
-// ToDo: should be created by a macro or automatically if possible
-#[post("/login/mfa")]
-pub async fn mfa_route(
-    factor: OptionalFactor,
-    body: web::Json<MfaRequestBody>,
-    req: HttpRequest,
-    session: UserSession,
-) -> impl Responder {
-    if let Some(f) = factor.get_value() {
-        match f.check_code(body.get_code(), &req).await {
-            Ok(_) => {
-                session.mfa_challenge_done();
-                HttpResponse::Ok().finish()
-            }
-            Err(e) => HttpResponse::BadRequest().json(ErrorResponse::from(e)),
-        }
-    } else {
-        HttpResponse::BadRequest().finish()
     }
 }
 
@@ -230,7 +209,7 @@ fn start_test_server(addr: SocketAddr) {
                         .service(secured_route)
                         .service(login)
                         .service(logout)
-                        .service(mfa_route)
+                        .configure(add_mfa_route)
                         .wrap(AuthMiddleware::<_, User>::new_with_factor(
                             SessionAuthProvider,
                             PathMatcher::default(),

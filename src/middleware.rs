@@ -47,10 +47,7 @@ impl PathMatcher {
         let mut path_regex_list = Vec::new();
         for pattern in path_list.into_iter() {
             let regex_pattern = format!("^{}$", transform_to_encoded_regex(pattern));
-            path_regex_list.push((
-                pattern,
-                Regex::new(&regex_pattern).unwrap(),
-            ));
+            path_regex_list.push((pattern, Regex::new(&regex_pattern).unwrap()));
         }
         Self {
             is_exclusion_list,
