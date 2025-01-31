@@ -6,12 +6,12 @@ use actix_web::{
 };
 use auth_middleware_for_actix_web::{
     middleware::{AuthMiddleware, PathMatcher},
-    multifactor::{OptionalFactor, TotpSecretRepository},
-    multifactor_impl::google_auth::GoogleAuth,
+    multifactor::{google_auth::GoogleAuth, OptionalFactor, TotpSecretRepository},
     session::session_auth::{SessionAuthProvider, UserSession},
     web::add_mfa_route,
     AuthToken,
 };
+
 use google_authenticator::GoogleAuthenticator;
 use reqwest::{Client, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -203,7 +203,6 @@ fn start_test_server(addr: SocketAddr) {
         actix_rt::System::new()
             .block_on(async {
                 let totp_secret_repo = Arc::new(TotpTestRepo);
-
                 HttpServer::new(move || {
                     App::new()
                         .service(secured_route)

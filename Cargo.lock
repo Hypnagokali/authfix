@@ -377,6 +377,7 @@ dependencies = [
  "actix-session",
  "actix-test",
  "actix-web",
+ "auth-middleware-for-actix-web",
  "futures",
  "google-authenticator",
  "log",

@@ -1,3 +1,6 @@
+#[cfg(feature = "google_auth")]
+pub mod google_auth;
+
 use std::{
     error::Error as StdError,
     future::{ready, Future, Ready},

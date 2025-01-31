@@ -50,7 +50,6 @@ use std::{
 pub mod errors;
 pub mod middleware;
 pub mod multifactor;
-pub mod multifactor_impl;
 pub mod session;
 pub mod web;
 
