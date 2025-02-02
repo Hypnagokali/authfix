@@ -6,7 +6,7 @@ use actix_web::{
 };
 use auth_middleware_for_actix_web::{
     middleware::{AuthMiddleware, PathMatcher},
-    multifactor::{google_auth::GoogleAuth, OptionalFactor, TotpSecretRepository},
+    multifactor::{google_auth::GoogleAuthFactor, OptionalFactor, TotpSecretRepository},
     session::session_auth::{SessionAuthProvider, UserSession},
     web::add_mfa_route,
     AuthToken,
@@ -212,7 +212,7 @@ fn start_test_server(addr: SocketAddr) {
                         .wrap(AuthMiddleware::<_, User>::new_with_factor(
                             SessionAuthProvider,
                             PathMatcher::default(),
-                            Box::new(GoogleAuth::<_, User>::with_discrepancy(
+                            Box::new(GoogleAuthFactor::<_, User>::with_discrepancy(
                                 Arc::clone(&totp_secret_repo),
                                 3,
                             )),
