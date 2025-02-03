@@ -1,5 +1,5 @@
 use std::{
-    backtrace::Backtrace, fmt::format, future::{ready, Future}, marker::PhantomData, pin::Pin, sync::Arc
+    future::{ready, Future}, marker::PhantomData, pin::Pin, sync::Arc
 };
 
 use actix_web::{HttpMessage, HttpRequest};
@@ -171,4 +171,5 @@ pub mod tests {
         let qr_code_slice_without_lbr = &qr_code.replace("\n", "").replace("\r", "")[0..100];
         assert!(qr_code_slice_without_lbr.starts_with(start_svg))
     }
+
 }
