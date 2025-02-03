@@ -1,5 +1,8 @@
 use std::{
-    future::{ready, Future}, marker::PhantomData, pin::Pin, sync::Arc
+    future::{ready, Future},
+    marker::PhantomData,
+    pin::Pin,
+    sync::Arc,
 };
 
 use actix_web::{HttpMessage, HttpRequest};
@@ -85,8 +88,12 @@ where
                         Err(CheckCodeError::InvalidCode)
                     }
                 })
-                .unwrap_or_else(|e|
-                Err(CheckCodeError::UnknownError(format!("Cannot check code: {}", e))))
+                .unwrap_or_else(|e| {
+                    Err(CheckCodeError::UnknownError(format!(
+                        "Cannot check code: {}",
+                        e
+                    )))
+                })
         })
     }
 
@@ -119,22 +126,28 @@ impl TotpSecretGenerator {
     }
 
     /// Generate a QR-Code as SVG for 6 digit codes
-    pub fn create_qr_code(secret: &str, app_name: &str, users_email: &str) -> Result<String, SecretCodeGenerationError> {
-        let otpauth_value = format!("otpauth://totp/{app_name}:{users_email}?secret={secret}&issuer={app_name}&digits=6");
+    pub fn create_qr_code(
+        secret: &str,
+        app_name: &str,
+        users_email: &str,
+    ) -> Result<String, SecretCodeGenerationError> {
+        let otpauth_value = format!(
+            "otpauth://totp/{app_name}:{users_email}?secret={secret}&issuer={app_name}&digits=6"
+        );
         qrcode_generator::to_svg_to_string(
-            otpauth_value, 
-            qrcode_generator::QrCodeEcc::Low, 
-            200, 
-            Some("QR-Code for authentcator app")
+            otpauth_value,
+            qrcode_generator::QrCodeEcc::Low,
+            200,
+            Some("QR-Code for authentcator app"),
         )
-        .map_err(|_| SecretCodeGenerationError::QrCodeGenerationError )
+        .map_err(|_| SecretCodeGenerationError::QrCodeGenerationError)
     }
 }
 
 #[derive(Error, Debug)]
 pub enum SecretCodeGenerationError {
     #[error("Unable to generate QR code")]
-    QrCodeGenerationError        
+    QrCodeGenerationError,
 }
 
 #[cfg(test)]
@@ -146,7 +159,7 @@ pub mod tests {
         let gen = TotpSecretGenerator::new();
         let code = gen.create_secret();
 
-        assert_eq!(code.len(), 32);        
+        assert_eq!(code.len(), 32);
     }
 
     #[test]
@@ -155,22 +168,20 @@ pub mod tests {
         let code1 = gen.create_secret();
         let code2 = gen.create_secret();
 
-        assert_ne!(code1, code2);     
+        assert_ne!(code1, code2);
     }
 
     #[test]
     fn should_generate_svg_with_200px() {
         let gen = TotpSecretGenerator::new();
         let secret = gen.create_secret();
-        let qr_code = TotpSecretGenerator::create_qr_code(
-            &secret, 
-            "TestApp",
-             "john.doe@example.org"
-        ).unwrap();
+        let qr_code =
+            TotpSecretGenerator::create_qr_code(&secret, "TestApp", "john.doe@example.org")
+                .unwrap();
 
-        let start_svg = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg width=\"200\" height=\"200\"";
+        let start_svg =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg width=\"200\" height=\"200\"";
         let qr_code_slice_without_lbr = &qr_code.replace("\n", "").replace("\r", "")[0..100];
         assert!(qr_code_slice_without_lbr.starts_with(start_svg))
     }
-
 }
