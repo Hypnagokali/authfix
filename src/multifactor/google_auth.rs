@@ -105,6 +105,7 @@ where
 pub struct TotpSecretGenerator;
 
 impl TotpSecretGenerator {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self
     }
