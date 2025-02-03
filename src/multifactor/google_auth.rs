@@ -1,5 +1,5 @@
 use std::{
-    backtrace::Backtrace, future::{ready, Future}, marker::PhantomData, pin::Pin, sync::Arc
+    backtrace::Backtrace, fmt::format, future::{ready, Future}, marker::PhantomData, pin::Pin, sync::Arc
 };
 
 use actix_web::{HttpMessage, HttpRequest};
@@ -64,7 +64,7 @@ where
             Some(token) => token,
             None => {
                 return Box::pin(ready(Err(CheckCodeError::UnknownError(
-                    "Cant load AuthToken".to_owned(),
+                    "Cannot load AuthToken".to_owned(),
                 ))))
             }
         };
@@ -85,8 +85,8 @@ where
                         Err(CheckCodeError::InvalidCode)
                     }
                 })
-                .unwrap_or_else(|_| // ToDo: use error type 
-                Err(CheckCodeError::UnknownError("Something went wrong".to_owned())))
+                .unwrap_or_else(|e|
+                Err(CheckCodeError::UnknownError(format!("Cannot check code: {}", e))))
         })
     }
 
@@ -124,7 +124,7 @@ impl TotpSecretGenerator {
             otpauth_value, 
             qrcode_generator::QrCodeEcc::Low, 
             200, 
-            Some("Scan this QR-Code with your authentcator app")
+            Some("QR-Code for authentcator app")
         )
         .map_err(|_| SecretCodeGenerationError::QrCodeGenerationError )
     }
