@@ -59,7 +59,7 @@ pub async fn logout(token: AuthToken<User>) -> impl Responder {
 }
 
 #[post("/login")]
-async fn login(session: UserSession, opt_factor: OptionalFactor, req: HttpRequest) -> impl Responder {
+async fn login(session: UserSession, opt_factor: OptionalFactor) -> impl Responder {
     // For session based authentication we need to manually check user and password and save the user in the session
     let user = User {
         email: "jenny@example.org".to_owned(),

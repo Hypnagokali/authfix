@@ -13,7 +13,7 @@ use thiserror::Error;
 
 use crate::{
     multifactor::{
-        CheckCodeError, ConditionCheckError, Factor, GenerateCodeError, TotpSecretRepository,
+        CheckCodeError, Factor, GenerateCodeError, TotpSecretRepository,
     },
     AuthToken,
 };

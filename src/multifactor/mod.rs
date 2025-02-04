@@ -5,7 +5,7 @@ use std::{
     error::Error as StdError,
     future::{ready, Future, Ready},
     pin::Pin,
-    rc::Rc, sync::Arc,
+    rc::Rc,
 };
 
 use actix_web::{dev::Payload, FromRequest, HttpMessage, HttpRequest};
