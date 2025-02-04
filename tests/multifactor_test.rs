@@ -1,7 +1,7 @@
 use std::{future::ready, net::SocketAddr, sync::Arc, thread};
 
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
-use actix_web::{cookie::Key, get, post, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{cookie::Key, get, post, App, HttpResponse, HttpServer, Responder};
 use auth_middleware_for_actix_web::{
     middleware::{AuthMiddleware, PathMatcher},
     multifactor::{google_auth::GoogleAuthFactor, OptionalFactor, TotpSecretRepository},
