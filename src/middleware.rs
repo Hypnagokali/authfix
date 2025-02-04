@@ -200,7 +200,7 @@ where
         let factor = Rc::clone(&self.factor);
 
         {
-            // ToDo: Just a quick fix. Dont use an extra scope !!!
+            // ToDo: Just a quick fix. Dont use an extra scope
             let mut extensions = req.extensions_mut();
             extensions.insert(factor);
         }
@@ -208,7 +208,6 @@ where
         if self.path_matcher.matches(&request_path) {
             debug!("Secured route: '{}'", debug_path);
 
-            // let fut3 = p.get_authenticated_user(&muh);
             Box::pin(async move {
                 // Before Request
                 match auth_provider.get_auth_token(req.request()).await {

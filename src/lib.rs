@@ -172,3 +172,14 @@ where
         ready(Err(UnauthorizedError::default().into()))
     }
 }
+
+pub trait AuthTokenExt {
+    fn get_auth_token<U: DeserializeOwned + Clone + 'static>(&self) -> Option<AuthToken<U>>;
+}
+
+impl AuthTokenExt for HttpRequest {
+    fn get_auth_token<U: DeserializeOwned + Clone + 'static>(&self) -> Option<AuthToken<U>> {
+        let ext = self.extensions();
+        ext.get::<AuthToken<U>>().map(|auth_token_ref| AuthToken::from_ref(auth_token_ref))
+    }
+}

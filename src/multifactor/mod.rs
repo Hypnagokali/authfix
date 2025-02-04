@@ -5,7 +5,7 @@ use std::{
     error::Error as StdError,
     future::{ready, Future, Ready},
     pin::Pin,
-    rc::Rc,
+    rc::Rc, sync::Arc,
 };
 
 use actix_web::{dev::Payload, FromRequest, HttpMessage, HttpRequest};
@@ -32,12 +32,6 @@ pub enum GetTotpSecretError {
 // Split Factor in two traits:
 // one should be public, the other needs to be pub (crate) to hide is_condition_met() and generate_code()
 pub trait Factor {
-    /// Called first. Directly after checking credentials was successfully
-    /// If condition is met, this factor will be used to check the users identity
-    fn is_condition_met(
-        &self,
-        req: &HttpRequest,
-    ) -> Pin<Box<dyn Future<Output = Result<bool, ConditionCheckError>>>>;
     /// Called second. It generates the code, the code can then saved in the session or a token. It can be empty when using for example TOTP
     fn generate_code(&self, req: &HttpRequest) -> Result<Option<String>, GenerateCodeError>;
     /// Identifier for the Factor. Can be any String it only needs to be unique inside the app

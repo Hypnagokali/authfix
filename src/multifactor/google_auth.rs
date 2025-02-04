@@ -31,7 +31,7 @@ where
 impl<T, U> GoogleAuthFactor<T, U>
 where
     T: TotpSecretRepository<U>,
-    U: DeserializeOwned + Clone,
+    U: DeserializeOwned + Clone
 {
     pub fn new(totp_secret_repo: Arc<T>) -> Self {
         Self::with_discrepancy(totp_secret_repo, 0)
@@ -95,13 +95,6 @@ where
                     )))
                 })
         })
-    }
-
-    fn is_condition_met(
-        &self,
-        _: &HttpRequest,
-    ) -> Pin<Box<dyn Future<Output = Result<bool, ConditionCheckError>>>> {
-        Box::pin(async { Ok(true) })
     }
 
     fn get_unique_id(&self) -> String {

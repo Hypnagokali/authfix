@@ -1,13 +1,13 @@
 use std::{future::ready, net::SocketAddr, sync::Arc, thread};
 
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
-use actix_web::{cookie::Key, get, post, App, HttpResponse, HttpServer, Responder};
+use actix_web::{cookie::Key, get, post, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use auth_middleware_for_actix_web::{
     middleware::{AuthMiddleware, PathMatcher},
     multifactor::{google_auth::GoogleAuthFactor, OptionalFactor, TotpSecretRepository},
     session::session_auth::{SessionAuthProvider, UserSession},
     web::add_mfa_route,
-    AuthToken,
+    AuthToken
 };
 
 use google_authenticator::GoogleAuthenticator;
@@ -21,6 +21,7 @@ const SECRET: &str = "I3VFM3JKMNDJCDH5BMBEEQAW6KJ6NOE3";
 pub struct User {
     pub email: String,
     pub name: String,
+    pub mfa_already_checked: bool,
 }
 
 struct TotpTestRepo;
@@ -58,17 +59,19 @@ pub async fn logout(token: AuthToken<User>) -> impl Responder {
 }
 
 #[post("/login")]
-async fn login(session: UserSession, opt_factor: OptionalFactor) -> impl Responder {
+async fn login(session: UserSession, opt_factor: OptionalFactor, req: HttpRequest) -> impl Responder {
     // For session based authentication we need to manually check user and password and save the user in the session
     let user = User {
         email: "jenny@example.org".to_owned(),
         name: "Jenny B.".to_owned(),
+        mfa_already_checked: false,
     };
 
+    // ToDo: Condition and this part is redundant. 
     if let Some(factor) = opt_factor.get_value() {
         session
-            .needs_mfa(&factor.get_unique_id())
-            .expect("Could not set factor in session");
+        .needs_mfa(&factor.get_unique_id())
+        .expect("Could not set factor in session");
     };
 
     // Only set the user if the factor could be set or is not present
@@ -201,6 +204,7 @@ fn start_test_server(addr: SocketAddr) {
         actix_rt::System::new()
             .block_on(async {
                 let totp_secret_repo = Arc::new(TotpTestRepo);
+
                 HttpServer::new(move || {
                     App::new()
                         .service(secured_route)
@@ -212,7 +216,7 @@ fn start_test_server(addr: SocketAddr) {
                             PathMatcher::default(),
                             Box::new(GoogleAuthFactor::<_, User>::with_discrepancy(
                                 Arc::clone(&totp_secret_repo),
-                                3,
+                                3
                             )),
                         ))
                         .wrap(create_actix_session_middleware())
