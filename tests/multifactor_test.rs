@@ -67,7 +67,6 @@ async fn login(session: UserSession, opt_factor: OptionalFactor) -> impl Respond
         mfa_already_checked: false,
     };
 
-    // ToDo: Condition and this part is redundant. 
     if let Some(factor) = opt_factor.get_value() {
         session
         .needs_mfa(&factor.get_unique_id())
