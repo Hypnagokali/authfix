@@ -6,7 +6,7 @@ use actix_web::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    multifactor::{CheckCodeError, OptionalFactor},
+    multifactor::{CheckCodeError, MfaRegistry},
     session::session_auth::UserSession,
 };
 
@@ -28,7 +28,7 @@ impl MfaRequestBody {
 /// Route handler to check multifactor code
 #[post("/login/mfa")]
 async fn mfa_route(
-    factor: OptionalFactor,
+    factor: MfaRegistry,
     body: web::Json<MfaRequestBody>,
     req: HttpRequest,
     session: UserSession,

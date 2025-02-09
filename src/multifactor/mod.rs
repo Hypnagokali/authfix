@@ -44,19 +44,19 @@ pub trait Factor {
     ) -> Pin<Box<dyn Future<Output = Result<(), CheckCodeError>>>>;
 }
 
-pub struct OptionalFactor {
+pub struct MfaRegistry {
     value: Rc<Option<Box<dyn Factor>>>,
 }
 
-impl OptionalFactor {
+impl MfaRegistry {
     pub fn get_value(&self) -> &Option<Box<dyn Factor>> {
         self.value.as_ref()
     }
 }
 
-impl FromRequest for OptionalFactor {
+impl FromRequest for MfaRegistry {
     type Error = actix_web::Error;
-    type Future = Ready<Result<OptionalFactor, Self::Error>>;
+    type Future = Ready<Result<MfaRegistry, Self::Error>>;
 
     fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
         let extensions = req.extensions();
