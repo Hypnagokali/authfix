@@ -8,7 +8,7 @@ use std::{
     rc::Rc,
 };
 
-use actix_web::{dev::Payload, FromRequest, HttpMessage, HttpRequest};
+use actix_web::{dev::Payload, FromRequest, HttpMessage, HttpRequest, HttpResponse, ResponseError};
 use serde::de::DeserializeOwned;
 use thiserror::Error;
 
@@ -32,8 +32,8 @@ pub enum GetTotpSecretError {
 // Split Factor in two traits:
 // one should be public, the other needs to be pub (crate) to hide is_condition_met() and generate_code()
 pub trait Factor {
-    /// Called second. It generates the code, the code can then saved in the session or a token. It can be empty when using for example TOTP
-    fn generate_code(&self, req: &HttpRequest) -> Result<Option<String>, GenerateCodeError>;
+    /// Responsible for generating the code and sending it to the user. Currently its needed to retrieve the user from the request
+    fn generate_code(&self, req: &HttpRequest) -> Result<(), GenerateCodeError>;
     /// Identifier for the Factor. Can be any String it only needs to be unique inside the app
     fn get_unique_id(&self) -> String;
     /// checks the code and returns empty Ok if code is correct, an Error otherwise
@@ -84,6 +84,12 @@ pub struct GenerateCodeError {
     message: String,
     #[source]
     cause: Option<Box<dyn StdError>>,
+}
+
+impl ResponseError for GenerateCodeError {
+    fn error_response(&self) -> HttpResponse {
+        HttpResponse::InternalServerError().body(self.message.clone())
+    }
 }
 
 impl GenerateCodeError {

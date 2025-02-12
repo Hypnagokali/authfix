@@ -1,15 +1,12 @@
-use std::{future::ready, net::SocketAddr, sync::Arc, thread};
+use std::{future::ready, marker::PhantomData, net::SocketAddr, sync::Arc, thread};
 
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
-use actix_web::{cookie::Key, get, post, App, HttpResponse, HttpServer, Responder};
+use actix_web::{cookie::Key, get, post, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use auth_middleware_for_actix_web::{
-    middleware::{AuthMiddleware, PathMatcher},
-    multifactor::{google_auth::GoogleAuthFactor, MfaRegistry, TotpSecretRepository},
-    session::session_auth::{SessionAuthProvider, UserSession},
-    web::add_mfa_route,
-    AuthToken
+    login::{HandlerError, LoadUserError, LoadUserService, LoginToken}, middleware::{AuthMiddleware, PathMatcher}, multifactor::{google_auth::GoogleAuthFactor, MfaRegistry, TotpSecretRepository}, session::{handlers::SessionLoginHandler, session_auth::{SessionAuthProvider, UserSession}}, web::add_mfa_route, AuthToken
 };
 
+use futures::future::LocalBoxFuture;
 use google_authenticator::GoogleAuthenticator;
 use reqwest::{Client, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -21,8 +18,40 @@ const SECRET: &str = "I3VFM3JKMNDJCDH5BMBEEQAW6KJ6NOE3";
 pub struct User {
     pub email: String,
     pub name: String,
-    pub mfa_already_checked: bool,
 }
+
+
+fn mfa_condition(user: &User, _req: &HttpRequest) -> bool {
+    user.name == "anna"
+} 
+
+pub struct HardCodedLoadUserService {}
+
+impl LoadUserService for HardCodedLoadUserService {
+    type User = User;
+
+    fn load_user(&self, login_token: &LoginToken) -> LocalBoxFuture<'_, Result<Self::User, LoadUserError>> {
+        if (login_token.username == "anna" || login_token.username == "bob") && login_token.password == "test123" {
+            Box::pin(ready(Ok(
+                User {
+                        name: login_token.username.to_owned(),
+                        email: format!("{}@example.org", login_token.username)
+                }
+            )))
+        } else {
+            Box::pin(ready(Err(LoadUserError::LoginFailed)))
+        }
+    }
+    
+    fn on_success_handler(&self, _req: &HttpRequest, _user: &Self::User) -> LocalBoxFuture<'_, Result<(), HandlerError>> {
+        Box::pin(ready(Ok(())))
+    }
+    
+    fn on_error_handler(&self, _req: &HttpRequest) -> LocalBoxFuture<'_, Result<(), HandlerError>> {
+        Box::pin(ready(Ok(())))
+    }
+}
+
 
 struct TotpTestRepo;
 
@@ -58,29 +87,6 @@ pub async fn logout(token: AuthToken<User>) -> impl Responder {
     HttpResponse::Ok()
 }
 
-#[post("/login")]
-async fn login(session: UserSession, opt_factor: MfaRegistry) -> impl Responder {
-    // For session based authentication we need to manually check user and password and save the user in the session
-    let user = User {
-        email: "jenny@example.org".to_owned(),
-        name: "Jenny B.".to_owned(),
-        mfa_already_checked: false,
-    };
-
-    if let Some(factor) = opt_factor.get_value() {
-        session
-        .needs_mfa(&factor.get_unique_id())
-        .expect("Could not set factor in session");
-    };
-
-    // Only set the user if the factor could be set or is not present
-    session
-        .set_user(user)
-        .expect("Could not set user in session");
-
-    HttpResponse::Ok()
-}
-
 fn create_actix_session_middleware() -> SessionMiddleware<CookieSessionStore> {
     let key = Key::generate();
 
@@ -95,7 +101,9 @@ async fn should_not_be_logged_in_without_mfa() {
     let client = Client::builder().cookie_store(true).build().unwrap();
 
     let mut res = client
-        .post(format!("http://{addr}/login"))
+       .post(format!("http://{addr}/login"))
+        .body("{ \"username\": \"anna\", \"password\": \"test123\" }")
+        .header("Content-Type", "application/json")
         .send()
         .await
         .unwrap();
@@ -145,9 +153,12 @@ async fn should_be_logged_in_after_mfa() {
 
     client
         .post(format!("http://{addr}/login"))
+        .body("{ \"username\": \"anna\", \"password\": \"test123\" }")
+        .header("Content-Type", "application/json")
         .send()
         .await
         .unwrap();
+ 
 
     let mut res = client
         .post(format!("http://{addr}/login/mfa"))
@@ -176,9 +187,12 @@ async fn should_be_not_logged_in_if_mfa_fails() {
 
     client
         .post(format!("http://{addr}/login"))
+        .body("{ \"username\": \"anna\", \"password\": \"test123\" }")
+        .header("Content-Type", "application/json")
         .send()
         .await
         .unwrap();
+
 
     let mut res = client
         .post(format!("http://{addr}/login/mfa"))
@@ -207,8 +221,8 @@ fn start_test_server(addr: SocketAddr) {
                 HttpServer::new(move || {
                     App::new()
                         .service(secured_route)
-                        .service(login)
                         .service(logout)
+                        .service(SessionLoginHandler::with_mfa_condition(HardCodedLoadUserService {}, mfa_condition))
                         .configure(add_mfa_route)
                         .wrap(AuthMiddleware::<_, User>::new_with_factor(
                             SessionAuthProvider,

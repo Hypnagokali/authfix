@@ -53,8 +53,8 @@ where
     fn generate_code(
         &self,
         _req: &actix_web::HttpRequest,
-    ) -> Result<Option<String>, GenerateCodeError> {
-        Ok(None)
+    ) -> Result<(), GenerateCodeError> {
+        Ok(())
     }
 
     fn check_code(
