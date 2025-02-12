@@ -1,2 +1,2 @@
-pub mod session_auth;
 pub mod handlers;
+pub mod session_auth;

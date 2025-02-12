@@ -12,9 +12,7 @@ use serde::de::DeserializeOwned;
 use thiserror::Error;
 
 use crate::{
-    multifactor::{
-        CheckCodeError, Factor, GenerateCodeError, TotpSecretRepository,
-    },
+    multifactor::{CheckCodeError, Factor, GenerateCodeError, TotpSecretRepository},
     AuthToken,
 };
 
@@ -31,7 +29,7 @@ where
 impl<T, U> GoogleAuthFactor<T, U>
 where
     T: TotpSecretRepository<U>,
-    U: DeserializeOwned + Clone
+    U: DeserializeOwned + Clone,
 {
     pub fn new(totp_secret_repo: Arc<T>) -> Self {
         Self::with_discrepancy(totp_secret_repo, 0)
@@ -50,10 +48,7 @@ where
     T: TotpSecretRepository<U> + 'static,
     U: DeserializeOwned + Clone + 'static,
 {
-    fn generate_code(
-        &self,
-        _req: &actix_web::HttpRequest,
-    ) -> Result<(), GenerateCodeError> {
+    fn generate_code(&self, _req: &actix_web::HttpRequest) -> Result<(), GenerateCodeError> {
         Ok(())
     }
 

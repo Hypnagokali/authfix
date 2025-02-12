@@ -26,7 +26,9 @@ fn should_contain_valid_url() {
     fs::create_dir_all(TEST_OUT).unwrap();
     pixmap.save_png(test_out_path("qr_code.png")).unwrap();
 
-    let img: GrayImage = image::open(test_out_path("qr_code.png")).unwrap().to_luma8();
+    let img: GrayImage = image::open(test_out_path("qr_code.png"))
+        .unwrap()
+        .to_luma8();
     let mut img = rqrr::PreparedImage::prepare(img);
     let grids = img.detect_grids();
     let (_, content) = grids[0].decode().unwrap();

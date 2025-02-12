@@ -1,9 +1,14 @@
-use std::{future::ready, marker::PhantomData, net::SocketAddr, sync::Arc, thread};
+use std::{future::ready, net::SocketAddr, sync::Arc, thread};
 
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
 use actix_web::{cookie::Key, get, post, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use auth_middleware_for_actix_web::{
-    login::{HandlerError, LoadUserError, LoadUserService, LoginToken}, middleware::{AuthMiddleware, PathMatcher}, multifactor::{google_auth::GoogleAuthFactor, MfaRegistry, TotpSecretRepository}, session::{handlers::SessionLoginHandler, session_auth::{SessionAuthProvider, UserSession}}, web::add_mfa_route, AuthToken
+    login::{HandlerError, LoadUserError, LoadUserService, LoginToken},
+    middleware::{AuthMiddleware, PathMatcher},
+    multifactor::{google_auth::GoogleAuthFactor, TotpSecretRepository},
+    session::{handlers::SessionLoginHandler, session_auth::SessionAuthProvider},
+    web::add_mfa_route,
+    AuthToken,
 };
 
 use futures::future::LocalBoxFuture;
@@ -20,38 +25,43 @@ pub struct User {
     pub name: String,
 }
 
-
 fn mfa_condition(user: &User, _req: &HttpRequest) -> bool {
     user.name == "anna"
-} 
+}
 
 pub struct HardCodedLoadUserService {}
 
 impl LoadUserService for HardCodedLoadUserService {
     type User = User;
 
-    fn load_user(&self, login_token: &LoginToken) -> LocalBoxFuture<'_, Result<Self::User, LoadUserError>> {
-        if (login_token.username == "anna" || login_token.username == "bob") && login_token.password == "test123" {
-            Box::pin(ready(Ok(
-                User {
-                        name: login_token.username.to_owned(),
-                        email: format!("{}@example.org", login_token.username)
-                }
-            )))
+    fn load_user(
+        &self,
+        login_token: &LoginToken,
+    ) -> LocalBoxFuture<'_, Result<Self::User, LoadUserError>> {
+        if (login_token.username == "anna" || login_token.username == "bob")
+            && login_token.password == "test123"
+        {
+            Box::pin(ready(Ok(User {
+                name: login_token.username.to_owned(),
+                email: format!("{}@example.org", login_token.username),
+            })))
         } else {
             Box::pin(ready(Err(LoadUserError::LoginFailed)))
         }
     }
-    
-    fn on_success_handler(&self, _req: &HttpRequest, _user: &Self::User) -> LocalBoxFuture<'_, Result<(), HandlerError>> {
+
+    fn on_success_handler(
+        &self,
+        _req: &HttpRequest,
+        _user: &Self::User,
+    ) -> LocalBoxFuture<'_, Result<(), HandlerError>> {
         Box::pin(ready(Ok(())))
     }
-    
+
     fn on_error_handler(&self, _req: &HttpRequest) -> LocalBoxFuture<'_, Result<(), HandlerError>> {
         Box::pin(ready(Ok(())))
     }
 }
-
 
 struct TotpTestRepo;
 
@@ -101,7 +111,7 @@ async fn should_not_be_logged_in_without_mfa() {
     let client = Client::builder().cookie_store(true).build().unwrap();
 
     let mut res = client
-       .post(format!("http://{addr}/login"))
+        .post(format!("http://{addr}/login"))
         .body("{ \"username\": \"anna\", \"password\": \"test123\" }")
         .header("Content-Type", "application/json")
         .send()
@@ -158,7 +168,6 @@ async fn should_be_logged_in_after_mfa() {
         .send()
         .await
         .unwrap();
- 
 
     let mut res = client
         .post(format!("http://{addr}/login/mfa"))
@@ -193,7 +202,6 @@ async fn should_be_not_logged_in_if_mfa_fails() {
         .await
         .unwrap();
 
-
     let mut res = client
         .post(format!("http://{addr}/login/mfa"))
         .body(format!("{{ \"code\": \"{}\" }}", "\"WRONGCODE\""))
@@ -222,14 +230,17 @@ fn start_test_server(addr: SocketAddr) {
                     App::new()
                         .service(secured_route)
                         .service(logout)
-                        .service(SessionLoginHandler::with_mfa_condition(HardCodedLoadUserService {}, mfa_condition))
+                        .service(SessionLoginHandler::with_mfa_condition(
+                            HardCodedLoadUserService {},
+                            mfa_condition,
+                        ))
                         .configure(add_mfa_route)
                         .wrap(AuthMiddleware::<_, User>::new_with_factor(
                             SessionAuthProvider,
                             PathMatcher::default(),
                             Box::new(GoogleAuthFactor::<_, User>::with_discrepancy(
                                 Arc::clone(&totp_secret_repo),
-                                3
+                                3,
                             )),
                         ))
                         .wrap(create_actix_session_middleware())

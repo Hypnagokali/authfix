@@ -1,21 +1,27 @@
 use std::sync::Arc;
 
-use actix_web::{web::{Data, Json}, Error, HttpRequest, HttpResponse, Responder};
+use actix_web::{
+    web::{Data, Json},
+    Error, HttpRequest, HttpResponse, Responder,
+};
 use serde::Serialize;
 
-use crate::{login::{LoadUserService, LoginToken}, multifactor::MfaRegistry};
+use crate::{
+    login::{LoadUserService, LoginToken},
+    multifactor::MfaRegistry,
+};
 
 use super::session_auth::UserSession;
 
-pub struct SessionLoginHandler<T: LoadUserService, U>
-{
+#[allow(clippy::type_complexity)]
+pub struct SessionLoginHandler<T: LoadUserService, U> {
     user_service: Arc<T>,
     mfa_condition: Arc<Option<fn(&U, &HttpRequest) -> bool>>,
 }
 
 impl<T, U> SessionLoginHandler<T, U>
 where
-    T: LoadUserService
+    T: LoadUserService,
 {
     pub fn new(user_service: T) -> Self {
         Self {
@@ -24,7 +30,10 @@ where
         }
     }
 
-    pub fn with_mfa_condition(user_service: T, mfa_condition: fn(&U, &HttpRequest) -> bool) -> Self {
+    pub fn with_mfa_condition(
+        user_service: T,
+        mfa_condition: fn(&U, &HttpRequest) -> bool,
+    ) -> Self {
         Self {
             user_service: Arc::new(user_service),
             mfa_condition: Arc::new(Some(mfa_condition)),
@@ -32,15 +41,15 @@ where
     }
 }
 
-
 /// Triggers the code generation and sets the login state to mfa needed
 /// Returns true if mfa needed
-fn generate_code_if_mfa_necessary<U: Serialize>( // U will need a trait bound like 'HasFactor' -> user.get_factor() -> String
-    user: &U, 
-    mfa_registry: &MfaRegistry, 
-    condition: &Option<fn(&U, &HttpRequest) -> bool>, 
+fn generate_code_if_mfa_necessary<U: Serialize>(
+    // U will need a trait bound like 'HasFactor' -> user.get_factor() -> String
+    user: &U,
+    mfa_registry: &MfaRegistry,
+    condition: &Option<fn(&U, &HttpRequest) -> bool>,
     req: &HttpRequest,
-    session: &UserSession
+    session: &UserSession,
 ) -> Result<bool, Error> {
     let mut mfa_needed = false;
     if let Some(factor) = mfa_registry.get_value() {
@@ -55,15 +64,15 @@ fn generate_code_if_mfa_necessary<U: Serialize>( // U will need a trait bound li
             factor.generate_code(req)?;
             session.needs_mfa(&factor.get_unique_id())?;
             mfa_needed = true;
-        } 
+        }
     }
 
     session.set_user(user)?;
 
     Ok(mfa_needed)
-
 }
 
+#[allow(clippy::type_complexity)]
 async fn login<T: LoadUserService<User = U>, U: Serialize>(
     login_token: Json<LoginToken>,
     user_service: Data<Arc<T>>,
@@ -74,7 +83,13 @@ async fn login<T: LoadUserService<User = U>, U: Serialize>(
 ) -> Result<impl Responder, Error> {
     match user_service.load_user(&login_token).await {
         Ok(user) => {
-            if !generate_code_if_mfa_necessary(&user, &mfa_registry, &mfa_condition, &req, &session)? {
+            if !generate_code_if_mfa_necessary(
+                &user,
+                &mfa_registry,
+                &mfa_condition,
+                &req,
+                &session,
+            )? {
                 user_service.on_success_handler(&req, &user).await?;
             }
 
@@ -89,11 +104,11 @@ async fn login<T: LoadUserService<User = U>, U: Serialize>(
 }
 
 impl<T, U> ::actix_web::dev::HttpServiceFactory for SessionLoginHandler<T, U>
-where 
-    T: LoadUserService<User=U> + 'static,
+where
+    T: LoadUserService<User = U> + 'static,
     U: Serialize + 'static,
 {
-    fn register(self, __config: &mut actix_web::dev::AppService) {        
+    fn register(self, __config: &mut actix_web::dev::AppService) {
         let __resource = ::actix_web::Resource::new("/login")
             .name("login")
             .guard(actix_web::guard::Post())

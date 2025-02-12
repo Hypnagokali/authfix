@@ -48,11 +48,11 @@ use std::{
 };
 
 pub mod errors;
+pub mod login;
 pub mod middleware;
 pub mod multifactor;
 pub mod session;
 pub mod web;
-pub mod login;
 
 /// This trait is used to retrieve the logged in user.
 /// If no user was found (e.g. in Actix-Session) it will return an Err.
@@ -181,6 +181,7 @@ pub trait AuthTokenExt {
 impl AuthTokenExt for HttpRequest {
     fn get_auth_token<U: DeserializeOwned + Clone + 'static>(&self) -> Option<AuthToken<U>> {
         let ext = self.extensions();
-        ext.get::<AuthToken<U>>().map(|auth_token_ref| AuthToken::from_ref(auth_token_ref))
+        ext.get::<AuthToken<U>>()
+            .map(|auth_token_ref| AuthToken::from_ref(auth_token_ref))
     }
 }
