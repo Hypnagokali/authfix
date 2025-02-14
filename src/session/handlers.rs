@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use actix_web::{
-    web::{Data, Json},
-    Error, HttpRequest, HttpResponse, Responder,
+    dev::{AppService, HttpServiceFactory}, guard::Post, web::{Data, Json}, Error, HttpRequest, HttpResponse, Resource, Responder
 };
 use serde::Serialize;
 
@@ -103,18 +102,18 @@ async fn login<T: LoadUserService<User = U>, U: Serialize>(
     }
 }
 
-impl<T, U> ::actix_web::dev::HttpServiceFactory for SessionLoginHandler<T, U>
+impl<T, U> HttpServiceFactory for SessionLoginHandler<T, U>
 where
     T: LoadUserService<User = U> + 'static,
     U: Serialize + 'static,
 {
-    fn register(self, __config: &mut actix_web::dev::AppService) {
-        let __resource = ::actix_web::Resource::new("/login")
+    fn register(self, __config: &mut AppService) {
+        let __resource = Resource::new("/login")
             .name("login")
-            .guard(actix_web::guard::Post())
+            .guard(Post())
             .app_data(Data::new(Arc::clone(&self.user_service)))
             .app_data(Data::new(Arc::clone(&self.mfa_condition)))
             .to(login::<T, U>);
-        ::actix_web::dev::HttpServiceFactory::register(__resource, __config);
+        HttpServiceFactory::register(__resource, __config);
     }
 }
