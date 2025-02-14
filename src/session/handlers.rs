@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use actix_web::{
-    dev::{AppService, HttpServiceFactory}, guard::Post, web::{Data, Json}, Error, HttpRequest, HttpResponse, Resource, Responder
+    dev::{AppService, HttpServiceFactory}, guard::Post, web::{Data, Json, ServiceConfig}, Error, HttpRequest, HttpResponse, Resource, Responder
 };
 use serde::Serialize;
 
@@ -115,5 +115,11 @@ where
             .app_data(Data::new(Arc::clone(&self.mfa_condition)))
             .to(login::<T, U>);
         HttpServiceFactory::register(__resource, __config);
+    }
+}
+
+pub fn login_config<L: LoadUserService<User = U> + 'static, U: Serialize + 'static>(login_handler: SessionLoginHandler<L, U>) -> impl FnOnce(&mut ServiceConfig) { 
+    |config: &mut ServiceConfig| { 
+        config.service(login_handler);
     }
 }
