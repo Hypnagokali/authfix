@@ -6,7 +6,10 @@ use auth_middleware_for_actix_web::{
     login::{HandlerError, LoadUserError, LoadUserService, LoginToken},
     middleware::{AuthMiddleware, PathMatcher},
     multifactor::{google_auth::GoogleAuthFactor, TotpSecretRepository},
-    session::{handlers::{login_config, SessionLoginHandler}, session_auth::SessionAuthProvider},
+    session::{
+        handlers::{login_config, SessionLoginHandler},
+        session_auth::SessionAuthProvider,
+    },
     AuthToken,
 };
 
@@ -222,7 +225,10 @@ fn start_test_server(addr: SocketAddr) {
                 HttpServer::new(move || {
                     App::new()
                         .service(secured_route)
-                        .configure(login_config(SessionLoginHandler::with_mfa_condition(HardCodedLoadUserService {}, mfa_condition)))
+                        .configure(login_config(SessionLoginHandler::with_mfa_condition(
+                            HardCodedLoadUserService {},
+                            mfa_condition,
+                        )))
                         .wrap(AuthMiddleware::<_, User>::new_with_factor(
                             SessionAuthProvider,
                             PathMatcher::default(),

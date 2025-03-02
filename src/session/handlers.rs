@@ -1,12 +1,18 @@
 use std::sync::Arc;
 
 use actix_web::{
-    dev::{AppService, HttpServiceFactory}, guard::{Get, Post}, web::{Data, Json, ServiceConfig}, Error, HttpRequest, HttpResponse, Resource, Responder
+    dev::{AppService, HttpServiceFactory},
+    guard::{Get, Post},
+    web::{Data, Json, ServiceConfig},
+    Error, HttpRequest, HttpResponse, Resource, Responder,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    login::{LoadUserService, LoginToken}, multifactor::{CheckCodeError, MfaRegistry}, web::{LOGIN_ROUTE, LOGOUT_ROUTE, MFA_ROUTE}, AuthToken
+    login::{LoadUserService, LoginToken},
+    multifactor::{CheckCodeError, MfaRegistry},
+    web::{LOGIN_ROUTE, LOGOUT_ROUTE, MFA_ROUTE},
+    AuthToken,
 };
 
 use super::session_auth::UserSession;
@@ -187,12 +193,11 @@ where
 
         if self.is_with_mfa() {
             let mfa_resource = Resource::new(MFA_ROUTE)
-            .name("mfa")
-            .guard(Post())
-            .to(mfa_route);
+                .name("mfa")
+                .guard(Post())
+                .to(mfa_route);
             HttpServiceFactory::register(mfa_resource, __config);
         }
-        
     }
 }
 
@@ -201,10 +206,13 @@ async fn logout<U: DeserializeOwned + Clone>(token: AuthToken<U>) -> impl Respon
     HttpResponse::Ok()
 }
 
-pub fn login_config<L: LoadUserService<User = U> + 'static, U: Serialize + DeserializeOwned + Clone + 'static> (login_handler: SessionLoginHandler<L, U>)
--> impl FnOnce(&mut ServiceConfig) {
+pub fn login_config<
+    L: LoadUserService<User = U> + 'static,
+    U: Serialize + DeserializeOwned + Clone + 'static,
+>(
+    login_handler: SessionLoginHandler<L, U>,
+) -> impl FnOnce(&mut ServiceConfig) {
     |config: &mut ServiceConfig| {
         config.service(login_handler);
     }
-
 }
