@@ -1,9 +1,9 @@
 # auth-middleware-for-actix-web
 > Actix Web Middleware for securing routes with session based authentication and mfa. Based on Actix-Session
 
-This library provides a middleware for [Actix Web](https://github.com/actix/actix-web) to secure routes globally based on other authentication middleware like [Actix-Session](https://github.com/actix/actix-extras/tree/master/actix-session) and it provides an extractor to retrieve the logged in user.
+This library provides a middleware for [Actix Web](https://github.com/actix/actix-web) to secure routes based on [Actix-Session](https://github.com/actix/actix-extras/tree/master/actix-session). It provides an extractor to retrieve the logged in user and it provides mfa-functionality.
 
-*I have implemented this middleware for my personal use, but maybe it can help others to save time as well. Feel free to submit issues.*
+*Not published yet*
 
 First test version `0.1.0-alpha.1`:
 - [x] Implementation on top of Actix-Session
