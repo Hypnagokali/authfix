@@ -1,13 +1,15 @@
 use std::{future::ready, net::SocketAddr, sync::Arc, thread};
 
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
-use actix_web::{cookie::Key, get, post, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{cookie::Key, get, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use auth_middleware_for_actix_web::{
     login::{HandlerError, LoadUserError, LoadUserService, LoginToken},
     middleware::{AuthMiddleware, PathMatcher},
     multifactor::{google_auth::GoogleAuthFactor, TotpSecretRepository},
-    session::{handlers::{login_config, SessionLoginHandler}, session_auth::SessionAuthProvider},
-    web::add_mfa_route,
+    session::{
+        handlers::{login_config, SessionLoginHandler},
+        session_auth::SessionAuthProvider,
+    },
     AuthToken,
 };
 
@@ -89,12 +91,6 @@ pub async fn secured_route(token: AuthToken<User>) -> impl Responder {
         "Request from user: {}",
         token.get_authenticated_user().email
     ))
-}
-
-#[post("/logout")]
-pub async fn logout(token: AuthToken<User>) -> impl Responder {
-    token.invalidate();
-    HttpResponse::Ok()
 }
 
 fn create_actix_session_middleware() -> SessionMiddleware<CookieSessionStore> {
@@ -229,9 +225,10 @@ fn start_test_server(addr: SocketAddr) {
                 HttpServer::new(move || {
                     App::new()
                         .service(secured_route)
-                        .service(logout)
-                        .configure(login_config(SessionLoginHandler::with_mfa_condition(HardCodedLoadUserService {}, mfa_condition)))
-                        .configure(add_mfa_route)
+                        .configure(login_config(SessionLoginHandler::with_mfa_condition(
+                            HardCodedLoadUserService {},
+                            mfa_condition,
+                        )))
                         .wrap(AuthMiddleware::<_, User>::new_with_factor(
                             SessionAuthProvider,
                             PathMatcher::default(),

@@ -1,13 +1,18 @@
 use std::sync::Arc;
 
 use actix_web::{
-    dev::{AppService, HttpServiceFactory}, guard::Post, web::{Data, Json, ServiceConfig}, Error, HttpRequest, HttpResponse, Resource, Responder
+    dev::{AppService, HttpServiceFactory},
+    guard::{Get, Post},
+    web::{Data, Json, ServiceConfig},
+    Error, HttpRequest, HttpResponse, Resource, Responder,
 };
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     login::{LoadUserService, LoginToken},
-    multifactor::MfaRegistry,
+    multifactor::{CheckCodeError, MfaRegistry},
+    web::{LOGIN_ROUTE, LOGOUT_ROUTE, MFA_ROUTE},
+    AuthToken,
 };
 
 use super::session_auth::UserSession;
@@ -16,6 +21,7 @@ use super::session_auth::UserSession;
 pub struct SessionLoginHandler<T: LoadUserService, U> {
     user_service: Arc<T>,
     mfa_condition: Arc<Option<fn(&U, &HttpRequest) -> bool>>,
+    is_with_mfa: bool,
 }
 
 impl<T, U> SessionLoginHandler<T, U>
@@ -26,6 +32,7 @@ where
         Self {
             user_service: Arc::new(user_service),
             mfa_condition: Arc::new(None),
+            is_with_mfa: false,
         }
     }
 
@@ -36,7 +43,67 @@ where
         Self {
             user_service: Arc::new(user_service),
             mfa_condition: Arc::new(Some(mfa_condition)),
+            is_with_mfa: true,
         }
+    }
+
+    pub fn is_with_mfa(&self) -> bool {
+        self.is_with_mfa
+    }
+}
+#[derive(Serialize)]
+pub struct ErrorResponse {
+    pub message: String,
+    #[serde(rename = "finallyRejected")]
+    pub finally_rejected: bool,
+}
+
+impl From<CheckCodeError> for ErrorResponse {
+    fn from(value: CheckCodeError) -> Self {
+        let msg = "invalid code";
+        match value {
+            CheckCodeError::InvalidCode => Self {
+                message: msg.to_owned(),
+                finally_rejected: false,
+            },
+            CheckCodeError::FinallyRejected => Self {
+                message: msg.to_owned(),
+                finally_rejected: true,
+            },
+            CheckCodeError::UnknownError(message) => Self {
+                message,
+                finally_rejected: true,
+            },
+        }
+    }
+}
+#[derive(Deserialize)]
+pub struct MfaRequestBody {
+    code: String,
+}
+
+impl MfaRequestBody {
+    pub fn get_code(&self) -> &str {
+        &self.code
+    }
+}
+
+async fn mfa_route(
+    factor: MfaRegistry,
+    body: Json<MfaRequestBody>,
+    req: HttpRequest,
+    session: UserSession,
+) -> impl Responder {
+    if let Some(f) = factor.get_value() {
+        match f.check_code(body.get_code(), &req).await {
+            Ok(_) => {
+                session.mfa_challenge_done();
+                HttpResponse::Ok().finish()
+            }
+            Err(e) => HttpResponse::Unauthorized().json(ErrorResponse::from(e)),
+        }
+    } else {
+        HttpResponse::Unauthorized().finish()
     }
 }
 
@@ -51,6 +118,7 @@ fn generate_code_if_mfa_necessary<U: Serialize>(
     session: &UserSession,
 ) -> Result<bool, Error> {
     let mut mfa_needed = false;
+
     if let Some(factor) = mfa_registry.get_value() {
         let is_condition_met = if let Some(condition) = condition {
             (condition)(user, req)
@@ -89,6 +157,7 @@ async fn login<T: LoadUserService<User = U>, U: Serialize>(
                 &req,
                 &session,
             )? {
+                // only call success handler if no mfa is required
                 user_service.on_success_handler(&req, &user).await?;
             }
 
@@ -105,21 +174,45 @@ async fn login<T: LoadUserService<User = U>, U: Serialize>(
 impl<T, U> HttpServiceFactory for SessionLoginHandler<T, U>
 where
     T: LoadUserService<User = U> + 'static,
-    U: Serialize + 'static,
+    U: Serialize + DeserializeOwned + Clone + 'static,
 {
     fn register(self, __config: &mut AppService) {
-        let __resource = Resource::new("/login")
+        let login_resource = Resource::new(LOGIN_ROUTE)
             .name("login")
             .guard(Post())
             .app_data(Data::new(Arc::clone(&self.user_service)))
             .app_data(Data::new(Arc::clone(&self.mfa_condition)))
             .to(login::<T, U>);
-        HttpServiceFactory::register(__resource, __config);
+        HttpServiceFactory::register(login_resource, __config);
+
+        let logout_resource = Resource::new(LOGOUT_ROUTE)
+            .name("logout")
+            .guard(Get())
+            .to(logout::<U>);
+        HttpServiceFactory::register(logout_resource, __config);
+
+        if self.is_with_mfa() {
+            let mfa_resource = Resource::new(MFA_ROUTE)
+                .name("mfa")
+                .guard(Post())
+                .to(mfa_route);
+            HttpServiceFactory::register(mfa_resource, __config);
+        }
     }
 }
 
-pub fn login_config<L: LoadUserService<User = U> + 'static, U: Serialize + 'static>(login_handler: SessionLoginHandler<L, U>) -> impl FnOnce(&mut ServiceConfig) { 
-    |config: &mut ServiceConfig| { 
+async fn logout<U: DeserializeOwned + Clone>(token: AuthToken<U>) -> impl Responder {
+    token.invalidate();
+    HttpResponse::Ok()
+}
+
+pub fn login_config<
+    L: LoadUserService<User = U> + 'static,
+    U: Serialize + DeserializeOwned + Clone + 'static,
+>(
+    login_handler: SessionLoginHandler<L, U>,
+) -> impl FnOnce(&mut ServiceConfig) {
+    |config: &mut ServiceConfig| {
         config.service(login_handler);
     }
 }
