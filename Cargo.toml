@@ -32,7 +32,8 @@ rqrr = "0.9.0"
 image = "0.25.5"
 
 # to make integration tests work
-auth-middleware-for-actix-web = { path = ".", features = ["google_auth"] } 
+auth-middleware-for-actix-web = { path = ".", features = ["google_auth", "mfa_send_code"] } 
 
 [features]
 google_auth = ["dep:google-authenticator", "dep:qrcode-generator", "dep:rand", "dep:base32"]
+mfa_send_code = []

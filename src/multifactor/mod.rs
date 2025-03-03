@@ -1,5 +1,7 @@
 #[cfg(feature = "google_auth")]
 pub mod google_auth;
+#[cfg(feature = "mfa_send_code")]
+pub mod send_random_code;
 
 use std::{
     error::Error as StdError,
