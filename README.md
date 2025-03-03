@@ -3,7 +3,7 @@
 
 This library provides a middleware for [Actix Web](https://github.com/actix/actix-web) to secure routes based on [Actix-Session](https://github.com/actix/actix-extras/tree/master/actix-session). It provides an extractor to retrieve the logged in user and it provides mfa-functionality.
 
-*Not published yet*
+*Not yet published*
 
 First test version `0.1.0-alpha.1`:
 - [x] Implementation on top of Actix-Session

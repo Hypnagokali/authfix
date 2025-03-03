@@ -93,36 +93,7 @@ fn transform_to_encoded_regex(input: &str) -> String {
 /// after the `AuthMiddleware`, so that the session is created/handled before the `AuthMiddleware`.
 ///  
 /// # Examples
-/// ```no_run
-/// use actix_session::{storage::CookieSessionStore, SessionMiddleware};
-/// use actix_web::{cookie::Key, App, HttpServer};
-/// use auth_middleware_for_actix_web::{middleware::{AuthMiddleware, PathMatcher}, session::session_auth::{SessionAuthProvider}};
-/// use serde::{Deserialize, Serialize};
-///
-/// fn create_actix_session_middleware() -> SessionMiddleware<CookieSessionStore> {
-///     let key = Key::generate();
-///    
-///     SessionMiddleware::new(CookieSessionStore::default(), key.clone())
-/// }
-/// #[actix_web::main]
-/// async fn main() -> std::io::Result<()> {
-///     HttpServer::new(move || {
-///         App::new()
-///           .wrap(AuthMiddleware::<_, User>::new(SessionAuthProvider, PathMatcher::default()))
-///             .wrap(create_actix_session_middleware())
-///     })
-///     .bind(("127.0.0.1", 8080))?
-///     .run()
-///     .await
-/// }
-///
-/// // The user needs the traits Serialize and Deserialize and Clone
-/// #[derive(Serialize, Deserialize, Clone)]
-/// pub struct User {
-///    pub email: String,
-///    pub name: String,
-/// }
-/// ```
+/// coming soon after applying lib in a reference project
 ///
 ///
 #[derive(Clone)]
