@@ -1,7 +1,8 @@
-use std::future::Future;
+use std::{future::Future, time::SystemTime};
 
-use actix_session::SessionExt;
+use actix_session::{Session, SessionExt};
 use actix_web::HttpRequest;
+use serde::{Deserialize, Serialize};
 
 use super::{CheckCodeError, Factor, GenerateCodeError};
 
@@ -9,31 +10,63 @@ const MFA_RANDOM_CODE_KEY: &str = "mfa_random_code";
 
 pub trait CodeSender {
     type Error: std::error::Error + 'static;
-    fn send_code(&self, code: &str) -> Result<(), Self::Error>;
+    fn send_code(&self, code: &str, valid_until: &SystemTime) -> Result<(), Self::Error>;
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct RandomCode {
+    value: String,
+    valid_until: SystemTime,
+}
+
+impl RandomCode {
+    pub fn new(value: &str, valid_until: SystemTime) -> Self {
+        Self {
+            value: value.to_owned(),
+            valid_until,
+        }
+    }
+
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+    pub fn valid_until(&self) -> &SystemTime {
+        &self.valid_until
+    }
 }
 
 pub struct MfaRandomCode<T: CodeSender> {
-    code_generator: fn() -> String,
+    code_generator: fn() -> RandomCode,
     code_sender: T,
+}
+
+
+fn cleanup_and_unknown_error(session: &Session, msg: &str, e: impl std::error::Error + 'static) -> GenerateCodeError {
+    session.purge();
+    GenerateCodeError::new_with_cause(msg, e)
+}
+
+fn cleanup_and_unknown_code_error(session: &Session, msg: &str) -> CheckCodeError {
+    session.purge();
+    CheckCodeError::UnknownError(msg.to_owned())
+}
+fn cleanup_and_time_is_up_error(session: &Session) -> CheckCodeError {
+    session.purge();
+    CheckCodeError::TimeIsUp("Code is no longer valid".to_owned())
 }
 
 impl<T: CodeSender> Factor for MfaRandomCode<T> {
     fn generate_code(&self, req: &HttpRequest) -> Result<(), GenerateCodeError> {
-        let code = (self.code_generator)();
-        // Currently using session. Maybe 
+        let random_code = (self.code_generator)();
         let session = req.get_session();
-        match session.insert(MFA_RANDOM_CODE_KEY, code.clone()) {
-            Ok(_) => {
-                match self.code_sender.send_code(&code) {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        session.remove(MFA_RANDOM_CODE_KEY);
-                        Err(GenerateCodeError::new_with_cause("Could not send code to user", e))
-                    },
-                }
-            },
-            Err(e) => Err(GenerateCodeError::new_with_cause("Could not insert random code for mfa into session", e)),
-        }
+
+        session.insert(MFA_RANDOM_CODE_KEY, random_code.clone())
+            .map_err(|e| cleanup_and_unknown_error(&session, "Could not insert mfa code into session", e))?;
+
+        self.code_sender.send_code(random_code.value(), random_code.valid_until())
+            .map_err(|e| cleanup_and_unknown_error(&session,"Could not send code to user", e))?;
+
+        Ok(())
     }
 
     fn get_unique_id(&self) -> String {
@@ -47,19 +80,26 @@ impl<T: CodeSender> Factor for MfaRandomCode<T> {
     ) -> std::pin::Pin<Box<dyn Future<Output = Result<(), CheckCodeError>>>> {
         let session = req.get_session();
         let owned_code = code.to_owned();
-        match session.get::<String>(MFA_RANDOM_CODE_KEY) {
-            Ok(Some(saved_code)) => {
-                Box::pin(async move { 
-                    if saved_code == owned_code {
-                        Ok(())
-                    } else {
-                        Err(CheckCodeError::InvalidCode)
-                    }
-                })
-            },
-            _ => Box::pin(async {
-                Err(CheckCodeError::UnknownError("Could not check code. There is no code saved in the session".to_owned()))
-            }),
-        }
+        
+        Box::pin(async move {
+            let random_code = session.get::<RandomCode>(MFA_RANDOM_CODE_KEY)
+                .map_err(|_| cleanup_and_unknown_code_error(&session, "Could not load random code from session"))?;
+
+            if let Some(random_code) = random_code {
+                let now = SystemTime::now();
+                if &now >= random_code.valid_until() {
+                    return Err(cleanup_and_time_is_up_error(&session))
+                }
+
+                if owned_code != random_code.value() {
+                    // ToDo: here we need to cound the attempts and reject finally with cleanup
+                    return Err(CheckCodeError::InvalidCode);
+                }
+
+                Ok(())
+            } else {
+                Err(cleanup_and_unknown_code_error(&session, "No random code in session"))            
+            }
+        })
     }
 }
