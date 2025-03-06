@@ -3,7 +3,6 @@ use std::{future::ready, net::SocketAddr, sync::Arc, thread};
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
 use actix_web::{cookie::Key, get, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use auth_middleware_for_actix_web::{
-    login::{HandlerError, LoadUserError, LoadUserService, LoginToken},
     middleware::{AuthMiddleware, PathMatcher},
     multifactor::{google_auth::GoogleAuthFactor, TotpSecretRepository},
     session::{
@@ -13,56 +12,18 @@ use auth_middleware_for_actix_web::{
     AuthToken,
 };
 
-use futures::future::LocalBoxFuture;
 use google_authenticator::GoogleAuthenticator;
 use reqwest::{Client, StatusCode};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use test_utils::{HardCodedLoadUserService, User};
 use thiserror::Error;
+
+mod test_utils;
 
 const SECRET: &str = "I3VFM3JKMNDJCDH5BMBEEQAW6KJ6NOE3";
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct User {
-    pub email: String,
-    pub name: String,
-}
-
 fn mfa_condition(user: &User, _req: &HttpRequest) -> bool {
     user.name == "anna"
-}
-
-pub struct HardCodedLoadUserService {}
-
-impl LoadUserService for HardCodedLoadUserService {
-    type User = User;
-
-    fn load_user(
-        &self,
-        login_token: &LoginToken,
-    ) -> LocalBoxFuture<'_, Result<Self::User, LoadUserError>> {
-        if (login_token.username == "anna" || login_token.username == "bob")
-            && login_token.password == "test123"
-        {
-            Box::pin(ready(Ok(User {
-                name: login_token.username.to_owned(),
-                email: format!("{}@example.org", login_token.username),
-            })))
-        } else {
-            Box::pin(ready(Err(LoadUserError::LoginFailed)))
-        }
-    }
-
-    fn on_success_handler(
-        &self,
-        _req: &HttpRequest,
-        _user: &Self::User,
-    ) -> LocalBoxFuture<'_, Result<(), HandlerError>> {
-        Box::pin(ready(Ok(())))
-    }
-
-    fn on_error_handler(&self, _req: &HttpRequest) -> LocalBoxFuture<'_, Result<(), HandlerError>> {
-        Box::pin(ready(Ok(())))
-    }
 }
 
 struct TotpTestRepo;

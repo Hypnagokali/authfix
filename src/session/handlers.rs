@@ -32,6 +32,16 @@ where
         }
     }
 
+    pub fn with_mfa(
+        user_service: T,
+    ) -> Self {
+        Self {
+            user_service: Arc::new(user_service),
+            mfa_condition: Arc::new(None),
+            is_with_mfa: true,
+        }
+    }
+
     pub fn with_mfa_condition(
         user_service: T,
         mfa_condition: fn(&U, &HttpRequest) -> bool,

@@ -10,7 +10,7 @@ const MFA_RANDOM_CODE_KEY: &str = "mfa_random_code";
 
 pub trait CodeSender {
     type Error: std::error::Error + 'static;
-    fn send_code(&self, code: &str, valid_until: &SystemTime) -> Result<(), Self::Error>;
+    fn send_code(&self, random_code: RandomCode) -> Result<(), Self::Error>;
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -40,6 +40,16 @@ pub struct MfaRandomCode<T: CodeSender> {
     code_sender: T,
 }
 
+impl<T: CodeSender> MfaRandomCode<T> {
+    pub fn new(code_generator: fn() -> RandomCode, code_sender: T) -> Self {
+        Self {
+            code_generator,
+            code_sender
+
+        }
+    }
+}
+
 
 fn cleanup_and_unknown_error(session: &Session, msg: &str, e: impl std::error::Error + 'static) -> GenerateCodeError {
     session.purge();
@@ -63,7 +73,7 @@ impl<T: CodeSender> Factor for MfaRandomCode<T> {
         session.insert(MFA_RANDOM_CODE_KEY, random_code.clone())
             .map_err(|e| cleanup_and_unknown_error(&session, "Could not insert mfa code into session", e))?;
 
-        self.code_sender.send_code(random_code.value(), random_code.valid_until())
+        self.code_sender.send_code(random_code)
             .map_err(|e| cleanup_and_unknown_error(&session,"Could not send code to user", e))?;
 
         Ok(())
