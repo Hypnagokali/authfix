@@ -1,11 +1,12 @@
 use std::future::ready;
 
 use actix_web::HttpRequest;
-use auth_middleware_for_actix_web::login::{HandlerError, LoadUserError, LoadUserService, LoginToken};
+use auth_middleware_for_actix_web::login::{
+    HandlerError, LoadUserError, LoadUserService, LoginToken,
+};
 use futures::future::LocalBoxFuture;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
 
 // I am really not sure why cargo suddenly complains that TEST_OUT and test_out_path is not used. For now I mark it as allow(dead_code)
 #[allow(dead_code)]
@@ -15,7 +16,6 @@ pub const TEST_OUT: &str = "test-out";
 pub fn test_out_path(path: &str) -> String {
     format!("{TEST_OUT}/{path}")
 }
-
 
 // A standard error for tests
 #[derive(Error, Debug)]

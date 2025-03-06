@@ -44,14 +44,16 @@ impl<T: CodeSender> MfaRandomCode<T> {
     pub fn new(code_generator: fn() -> RandomCode, code_sender: T) -> Self {
         Self {
             code_generator,
-            code_sender
-
+            code_sender,
         }
     }
 }
 
-
-fn cleanup_and_unknown_error(session: &Session, msg: &str, e: impl std::error::Error + 'static) -> GenerateCodeError {
+fn cleanup_and_unknown_error(
+    session: &Session,
+    msg: &str,
+    e: impl std::error::Error + 'static,
+) -> GenerateCodeError {
     session.purge();
     GenerateCodeError::new_with_cause(msg, e)
 }
@@ -70,11 +72,15 @@ impl<T: CodeSender> Factor for MfaRandomCode<T> {
         let random_code = (self.code_generator)();
         let session = req.get_session();
 
-        session.insert(MFA_RANDOM_CODE_KEY, random_code.clone())
-            .map_err(|e| cleanup_and_unknown_error(&session, "Could not insert mfa code into session", e))?;
+        session
+            .insert(MFA_RANDOM_CODE_KEY, random_code.clone())
+            .map_err(|e| {
+                cleanup_and_unknown_error(&session, "Could not insert mfa code into session", e)
+            })?;
 
-        self.code_sender.send_code(random_code)
-            .map_err(|e| cleanup_and_unknown_error(&session,"Could not send code to user", e))?;
+        self.code_sender
+            .send_code(random_code)
+            .map_err(|e| cleanup_and_unknown_error(&session, "Could not send code to user", e))?;
 
         Ok(())
     }
@@ -90,15 +96,21 @@ impl<T: CodeSender> Factor for MfaRandomCode<T> {
     ) -> std::pin::Pin<Box<dyn Future<Output = Result<(), CheckCodeError>>>> {
         let session = req.get_session();
         let owned_code = code.to_owned();
-        
+
         Box::pin(async move {
-            let random_code = session.get::<RandomCode>(MFA_RANDOM_CODE_KEY)
-                .map_err(|_| cleanup_and_unknown_code_error(&session, "Could not load random code from session"))?;
+            let random_code = session
+                .get::<RandomCode>(MFA_RANDOM_CODE_KEY)
+                .map_err(|_| {
+                    cleanup_and_unknown_code_error(
+                        &session,
+                        "Could not load random code from session",
+                    )
+                })?;
 
             if let Some(random_code) = random_code {
                 let now = SystemTime::now();
                 if &now >= random_code.valid_until() {
-                    return Err(cleanup_and_time_is_up_error(&session))
+                    return Err(cleanup_and_time_is_up_error(&session));
                 }
 
                 if owned_code != random_code.value() {
@@ -108,7 +120,10 @@ impl<T: CodeSender> Factor for MfaRandomCode<T> {
 
                 Ok(())
             } else {
-                Err(cleanup_and_unknown_code_error(&session, "No random code in session"))            
+                Err(cleanup_and_unknown_code_error(
+                    &session,
+                    "No random code in session",
+                ))
             }
         })
     }

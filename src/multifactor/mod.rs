@@ -10,7 +10,10 @@ use std::{
     rc::Rc,
 };
 
-use actix_web::{dev::Payload, http::StatusCode, FromRequest, HttpMessage, HttpRequest, HttpResponse, ResponseError};
+use actix_web::{
+    dev::Payload, http::StatusCode, FromRequest, HttpMessage, HttpRequest, HttpResponse,
+    ResponseError,
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
 
@@ -134,7 +137,7 @@ impl MfaError {
         Self {
             error: error.to_owned(),
             message: message.to_owned(),
-            retry
+            retry,
         }
     }
 }
@@ -143,18 +146,27 @@ impl ResponseError for CheckCodeError {
     fn status_code(&self) -> StatusCode {
         match self {
             CheckCodeError::UnknownError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            _ => StatusCode::UNAUTHORIZED
+            _ => StatusCode::UNAUTHORIZED,
         }
     }
     fn error_response(&self) -> HttpResponse {
         match self {
-            CheckCodeError::UnknownError(m) => HttpResponse::InternalServerError().json(MfaError::new("unknown_error", m, false)),
-            CheckCodeError::TimeIsUp(m) => HttpResponse::Unauthorized().json(MfaError::new("time_is_up", m, false)),
-            CheckCodeError::InvalidCode => HttpResponse::Unauthorized().json(MfaError::new("code_invalid", "", true)),
-            CheckCodeError::FinallyRejected => HttpResponse::Unauthorized().json(MfaError::new("login_finally_rejected", "", false)),
+            CheckCodeError::UnknownError(m) => {
+                HttpResponse::InternalServerError().json(MfaError::new("unknown_error", m, false))
+            }
+            CheckCodeError::TimeIsUp(m) => {
+                HttpResponse::Unauthorized().json(MfaError::new("time_is_up", m, false))
+            }
+            CheckCodeError::InvalidCode => {
+                HttpResponse::Unauthorized().json(MfaError::new("code_invalid", "", true))
+            }
+            CheckCodeError::FinallyRejected => HttpResponse::Unauthorized().json(MfaError::new(
+                "login_finally_rejected",
+                "",
+                false,
+            )),
         }
     }
-
 }
 
 #[cfg(test)]

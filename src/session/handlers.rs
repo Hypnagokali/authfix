@@ -1,7 +1,11 @@
 use std::sync::Arc;
 
 use actix_web::{
-    dev::{AppService, HttpServiceFactory}, guard::{Get, Post}, web::{Data, Json, ServiceConfig}, Error, HttpRequest, HttpResponse, Resource, Responder};
+    dev::{AppService, HttpServiceFactory},
+    guard::{Get, Post},
+    web::{Data, Json, ServiceConfig},
+    Error, HttpRequest, HttpResponse, Resource, Responder,
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -32,9 +36,7 @@ where
         }
     }
 
-    pub fn with_mfa(
-        user_service: T,
-    ) -> Self {
+    pub fn with_mfa(user_service: T) -> Self {
         Self {
             user_service: Arc::new(user_service),
             mfa_condition: Arc::new(None),
@@ -76,11 +78,9 @@ async fn mfa_route(
     session: UserSession,
 ) -> Result<impl Responder, CheckCodeError> {
     if let Some(f) = factor.get_value() {
-
         f.check_code(body.get_code(), &req).await?;
         session.mfa_challenge_done();
         Ok(HttpResponse::Ok().finish())
-
     } else {
         Ok(HttpResponse::Unauthorized().finish())
     }
