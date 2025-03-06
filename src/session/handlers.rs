@@ -36,6 +36,14 @@ where
         }
     }
 
+    pub fn with_mfa(user_service: T) -> Self {
+        Self {
+            user_service: Arc::new(user_service),
+            mfa_condition: Arc::new(None),
+            is_with_mfa: true,
+        }
+    }
+
     pub fn with_mfa_condition(
         user_service: T,
         mfa_condition: fn(&U, &HttpRequest) -> bool,
@@ -51,32 +59,7 @@ where
         self.is_with_mfa
     }
 }
-#[derive(Serialize)]
-pub struct ErrorResponse {
-    pub message: String,
-    #[serde(rename = "finallyRejected")]
-    pub finally_rejected: bool,
-}
 
-impl From<CheckCodeError> for ErrorResponse {
-    fn from(value: CheckCodeError) -> Self {
-        let msg = "invalid code";
-        match value {
-            CheckCodeError::InvalidCode => Self {
-                message: msg.to_owned(),
-                finally_rejected: false,
-            },
-            CheckCodeError::FinallyRejected => Self {
-                message: msg.to_owned(),
-                finally_rejected: true,
-            },
-            CheckCodeError::UnknownError(message) => Self {
-                message,
-                finally_rejected: true,
-            },
-        }
-    }
-}
 #[derive(Deserialize)]
 pub struct MfaRequestBody {
     code: String,
@@ -93,17 +76,13 @@ async fn mfa_route(
     body: Json<MfaRequestBody>,
     req: HttpRequest,
     session: UserSession,
-) -> impl Responder {
+) -> Result<impl Responder, CheckCodeError> {
     if let Some(f) = factor.get_value() {
-        match f.check_code(body.get_code(), &req).await {
-            Ok(_) => {
-                session.mfa_challenge_done();
-                HttpResponse::Ok().finish()
-            }
-            Err(e) => HttpResponse::Unauthorized().json(ErrorResponse::from(e)),
-        }
+        f.check_code(body.get_code(), &req).await?;
+        session.mfa_challenge_done();
+        Ok(HttpResponse::Ok().finish())
     } else {
-        HttpResponse::Unauthorized().finish()
+        Ok(HttpResponse::Unauthorized().finish())
     }
 }
 

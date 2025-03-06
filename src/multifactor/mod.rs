@@ -1,5 +1,7 @@
 #[cfg(feature = "google_auth")]
 pub mod google_auth;
+#[cfg(feature = "mfa_send_code")]
+pub mod send_random_code;
 
 use std::{
     error::Error as StdError,
@@ -8,8 +10,11 @@ use std::{
     rc::Rc,
 };
 
-use actix_web::{dev::Payload, FromRequest, HttpMessage, HttpRequest, HttpResponse, ResponseError};
-use serde::de::DeserializeOwned;
+use actix_web::{
+    dev::Payload, http::StatusCode, FromRequest, HttpMessage, HttpRequest, HttpResponse,
+    ResponseError,
+};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
 
 /// When TOTP is used, the secret needs to be stored somewhere
@@ -112,10 +117,56 @@ impl GenerateCodeError {
 pub enum CheckCodeError {
     #[error("unknown server error: {0}")]
     UnknownError(String),
+    #[error("Time is up: {0}")]
+    TimeIsUp(String),
     #[error("invalid code")]
     InvalidCode,
     #[error("login rejected. unauthorized")]
     FinallyRejected,
+}
+
+#[derive(Serialize, Deserialize)]
+struct MfaError {
+    pub error: String,
+    pub message: String,
+    pub retry: bool,
+}
+
+impl MfaError {
+    pub fn new(error: &str, message: &str, retry: bool) -> Self {
+        Self {
+            error: error.to_owned(),
+            message: message.to_owned(),
+            retry,
+        }
+    }
+}
+
+impl ResponseError for CheckCodeError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            CheckCodeError::UnknownError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            _ => StatusCode::UNAUTHORIZED,
+        }
+    }
+    fn error_response(&self) -> HttpResponse {
+        match self {
+            CheckCodeError::UnknownError(m) => {
+                HttpResponse::InternalServerError().json(MfaError::new("unknown_error", m, false))
+            }
+            CheckCodeError::TimeIsUp(m) => {
+                HttpResponse::Unauthorized().json(MfaError::new("time_is_up", m, false))
+            }
+            CheckCodeError::InvalidCode => {
+                HttpResponse::Unauthorized().json(MfaError::new("code_invalid", "", true))
+            }
+            CheckCodeError::FinallyRejected => HttpResponse::Unauthorized().json(MfaError::new(
+                "login_finally_rejected",
+                "",
+                false,
+            )),
+        }
+    }
 }
 
 #[cfg(test)]
