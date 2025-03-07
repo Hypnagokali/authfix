@@ -11,7 +11,7 @@ First test version `0.1.0-alpha.1`:
     - [x] Secured routes
     - [x] Logout
     - [x] Mfa with an authenticator
-    - [ ] Mfa with random code and E-Mail-/SMS-Sender
+    - [x] Mfa with random code and E-Mail-/SMS-Sender
     - [ ] Publish to crates.io
     - [ ] Reference project
     - [ ] Docs and Readme with examples
