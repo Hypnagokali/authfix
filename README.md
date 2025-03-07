@@ -11,7 +11,7 @@ First test version `0.1.0-alpha.1`:
     - [x] Secured routes
     - [x] Logout
     - [x] Mfa with an authenticator
-    - [x] Mfa with random code and E-Mail-/SMS-Sender
+    - [x] Mfa with random code that can be sent by mail or sms
     - [ ] Publish to crates.io
     - [ ] Reference project
     - [ ] Docs and Readme with examples
@@ -20,6 +20,7 @@ Planning:
 - [ ] Implementation for OIDC
     - [ ] Expecting a valid token from another service / front-end
     - [ ] Provide OIDC Login(?)
+    - [ ] WebAuthn (?)
 
 ## Examples coming soon
 
