@@ -4,7 +4,7 @@ use actix_session::{storage::CookieSessionStore, SessionMiddleware};
 use actix_web::{cookie::Key, get, App, HttpResponse, HttpServer, Responder};
 use auth_middleware_for_actix_web::{
     middleware::{AuthMiddleware, PathMatcher},
-    multifactor::send_random_code::{CodeSender, MfaRandomCode, RandomCode},
+    multifactor::random_code_auth::{CodeSender, MfaRandomCode, RandomCode},
     session::{
         handlers::{login_config, SessionLoginHandler},
         session_auth::SessionAuthProvider,
