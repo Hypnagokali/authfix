@@ -13,6 +13,7 @@ use crate::{AuthState, AuthToken, AuthenticationProvider, UnauthorizedError};
 
 const SESSION_KEY_USER: &str = "user";
 const SESSION_KEY_NEED_MFA: &str = "needs_mfa";
+const SESSION_KEY_LOGIN_VALID_UNTIL: &str = "login_valid_until";
 
 /// Provider for session based authentication.
 ///
@@ -84,11 +85,11 @@ struct SessionBasedLoginState {
 ///     return HttpResponse::Ok();
 /// }
 /// ```
-pub struct UserSession {
+pub struct LoginSession {
     session: Session,
 }
 
-impl UserSession {
+impl LoginSession {
     pub(crate) fn new(session: Session) -> Self {
         Self { session }
     }
@@ -105,18 +106,37 @@ impl UserSession {
         self.session.insert(SESSION_KEY_USER, user)
     }
 
+    pub fn valid_until(&self, valid_until: SystemTime) -> Result<(), SessionInsertError> {
+        self.session
+            .insert(SESSION_KEY_LOGIN_VALID_UNTIL, valid_until)
+    }
+
+    pub fn no_longer_valid(&self) -> bool {
+        match self
+            .session
+            .get::<SystemTime>(SESSION_KEY_LOGIN_VALID_UNTIL)
+        {
+            Ok(Some(valid_until)) => SystemTime::now() > valid_until,
+            _ => true,
+        }
+    }
+
     pub fn reset(&self) {
         self.session.renew();
         self.session.clear();
     }
+
+    pub fn destroy(&self) {
+        self.session.purge();
+    }
 }
 
-impl FromRequest for UserSession {
+impl FromRequest for LoginSession {
     type Error = Error;
-    type Future = Ready<Result<UserSession, Error>>;
+    type Future = Ready<Result<LoginSession, Error>>;
 
     fn from_request(req: &HttpRequest, _payload: &mut actix_web::dev::Payload) -> Self::Future {
         let session = req.get_session();
-        ready(Ok(UserSession::new(session)))
+        ready(Ok(LoginSession::new(session)))
     }
 }

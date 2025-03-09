@@ -4,7 +4,7 @@ use actix_session::{storage::CookieSessionStore, SessionMiddleware};
 use actix_web::{cookie::Key, get, post, App, HttpResponse, HttpServer, Responder};
 use auth_middleware_for_actix_web::{
     middleware::{AuthMiddleware, PathMatcher},
-    session::session_auth::{SessionAuthProvider, UserSession},
+    session::session_auth::{LoginSession, SessionAuthProvider},
     AuthToken,
 };
 use reqwest::{Client, StatusCode};
@@ -39,7 +39,7 @@ pub async fn logout(token: AuthToken<User>) -> impl Responder {
 }
 
 #[post("/login")]
-async fn login(session: UserSession) -> impl Responder {
+async fn login(session: LoginSession) -> impl Responder {
     // For session based authentication we need to manually check user and password and save the user in the session
     let user = User {
         email: "jenny@example.org".to_owned(),

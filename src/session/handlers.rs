@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
 use actix_web::{
     dev::{AppService, HttpServiceFactory},
@@ -15,7 +18,7 @@ use crate::{
     AuthToken,
 };
 
-use super::session_auth::UserSession;
+use super::session_auth::LoginSession;
 
 #[allow(clippy::type_complexity)]
 pub struct SessionLoginHandler<T: LoadUserService, U> {
@@ -75,8 +78,13 @@ async fn mfa_route(
     factor: MfaRegistry,
     body: Json<MfaRequestBody>,
     req: HttpRequest,
-    session: UserSession,
+    session: LoginSession,
 ) -> Result<impl Responder, CheckCodeError> {
+    if session.no_longer_valid() {
+        session.destroy();
+        return Err(CheckCodeError::FinallyRejected);
+    }
+
     if let Some(f) = factor.get_value() {
         f.check_code(body.get_code(), &req).await?;
         session.mfa_challenge_done();
@@ -94,7 +102,7 @@ fn generate_code_if_mfa_necessary<U: Serialize>(
     mfa_registry: &MfaRegistry,
     condition: &Option<fn(&U, &HttpRequest) -> bool>,
     req: &HttpRequest,
-    session: &UserSession,
+    session: &LoginSession,
 ) -> Result<bool, Error> {
     let mut mfa_needed = false;
 
@@ -113,8 +121,6 @@ fn generate_code_if_mfa_necessary<U: Serialize>(
         }
     }
 
-    session.set_user(user)?;
-
     Ok(mfa_needed)
 }
 
@@ -124,7 +130,7 @@ async fn login<T: LoadUserService<User = U>, U: Serialize>(
     user_service: Data<Arc<T>>,
     mfa_condition: Data<Arc<Option<fn(&U, &HttpRequest) -> bool>>>,
     mfa_registry: MfaRegistry,
-    session: UserSession,
+    session: LoginSession,
     req: HttpRequest,
 ) -> Result<impl Responder, Error> {
     session.reset();
@@ -138,8 +144,15 @@ async fn login<T: LoadUserService<User = U>, U: Serialize>(
                 &req,
                 &session,
             )? {
-                // only call success handler if no mfa is required
+                // MFA not needed, call success handler
                 user_service.on_success_handler(&req, &user).await?;
+            } else {
+                // set timeout for login session
+                if let Some(validity) = SystemTime::now().checked_add(Duration::from_secs(60 * 5)) {
+                    session.valid_until(validity)?;
+                } else {
+                    return Ok(HttpResponse::InternalServerError());
+                }
             }
 
             session.set_user(user)?;
@@ -147,6 +160,7 @@ async fn login<T: LoadUserService<User = U>, U: Serialize>(
         }
         Err(e) => {
             user_service.on_error_handler(&req).await?;
+            session.destroy();
             Err(e.into())
         }
     }
