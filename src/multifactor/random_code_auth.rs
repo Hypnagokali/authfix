@@ -134,4 +134,3 @@ fn cleanup_and_time_is_up_error(session: &Session) -> CheckCodeError {
     session.purge();
     CheckCodeError::TimeIsUp("Code is no longer valid".to_owned())
 }
-

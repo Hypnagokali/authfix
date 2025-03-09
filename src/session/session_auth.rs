@@ -104,6 +104,11 @@ impl UserSession {
     pub fn set_user<U: Serialize>(&self, user: U) -> Result<(), SessionInsertError> {
         self.session.insert(SESSION_KEY_USER, user)
     }
+
+    pub fn reset(&self) {
+        self.session.renew();
+        self.session.clear();
+    }
 }
 
 impl FromRequest for UserSession {

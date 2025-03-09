@@ -12,15 +12,15 @@ First test version `0.1.0-alpha.1`:
     - [x] Logout
     - [x] Mfa with an authenticator
     - [x] Mfa with random code that can be sent by mail or sms
+    - [ ] Possibility to setup max attempts for user/password and MFA (maybe with disabling account for a certain time)
     - [ ] Publish to crates.io
     - [ ] Reference project
     - [ ] Docs and Readme with examples
 
 Planning:
 - [ ] Implementation for OIDC
-    - [ ] Expecting a valid token from another service / front-end
-    - [ ] Provide OIDC Login(?)
-    - [ ] WebAuthn (?)
+    - [ ] Login with Google, GitHub, etc...
+- [ ] WebAuthn(?)
 
 ## Examples coming soon
 

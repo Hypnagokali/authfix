@@ -84,14 +84,6 @@ where
 ///     ))
 /// }
 /// ```
-/// You can also initiate a logout with:
-/// ```ignore
-/// #[post("/logout")]
-/// pub async fn logout(token: AuthToken<User>) -> impl Responder {
-///     token.invalidate();
-///     HttpResponse::Ok()
-/// }
-/// ```
 #[derive(Clone)]
 pub struct AuthToken<U>
 where

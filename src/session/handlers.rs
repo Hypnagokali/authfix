@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use actix_web::{
     dev::{AppService, HttpServiceFactory},
-    guard::{Get, Post},
+    guard::Post,
     web::{Data, Json, ServiceConfig},
     Error, HttpRequest, HttpResponse, Resource, Responder,
 };
@@ -127,6 +127,8 @@ async fn login<T: LoadUserService<User = U>, U: Serialize>(
     session: UserSession,
     req: HttpRequest,
 ) -> Result<impl Responder, Error> {
+    session.reset();
+
     match user_service.load_user(&login_token).await {
         Ok(user) => {
             if !generate_code_if_mfa_necessary(
@@ -166,7 +168,7 @@ where
 
         let logout_resource = Resource::new(LOGOUT_ROUTE)
             .name("logout")
-            .guard(Get())
+            .guard(Post())
             .to(logout::<U>);
         HttpServiceFactory::register(logout_resource, __config);
 

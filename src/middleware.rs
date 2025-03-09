@@ -27,7 +27,7 @@ const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 /// In the most cases it is desired to exclude paths from authentication, so that every path is secured but e.g. /login, /register are reachable for
 /// the user. For this default configuration where all paths are secured except `/login` and `/register` use [`PathMatcher::default`]
 ///
-/// But if you would like to secure just some paths just set the `is_exclusion_list` flag to `false` and specify the paths with:
+/// But if you have more public pages and you would like to secure just a few paths, you can set the `is_exclusion_list` flag to `false` to specify only the secured paths.
 /// ```ignore
 /// PathMatcher::new(vec!["/my-secure-route", "another-secure-route"], false)
 /// ```
