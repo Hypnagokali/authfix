@@ -85,7 +85,7 @@ struct SessionBasedLoginState {
 ///     return HttpResponse::Ok();
 /// }
 /// ```
-pub struct LoginSession {
+pub(crate) struct LoginSession {
     session: Session,
 }
 
