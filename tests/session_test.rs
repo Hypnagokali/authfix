@@ -1,23 +1,17 @@
 use std::{net::SocketAddr, thread};
 
-use actix_session::{storage::CookieSessionStore, SessionMiddleware};
-use actix_web::{
-    body::MessageBody,
-    cookie::Key,
-    dev::{ServiceFactory, ServiceRequest, ServiceResponse},
-    get, App, Error, HttpResponse, HttpServer, Responder,
-};
+use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
 use auth_middleware_for_actix_web::{
     login::LoadUserService,
     middleware::{AuthMiddleware, PathMatcher},
     session::{
-        handlers::{login_config, SessionLoginHandler},
-        session_auth::SessionAuthProvider,
+        handlers::SessionLoginHandler,
+        session_auth::{session_login_factory, SessionAuthProvider},
     },
-    AuthToken, AuthenticationProvider,
+    AuthToken,
 };
 use reqwest::{Client, StatusCode};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct User {
@@ -171,30 +165,6 @@ async fn logout_should_invalidate_session() {
     assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 }
 
-fn session_login_factory<U: Serialize + DeserializeOwned + Clone + 'static>(
-    login_handler: SessionLoginHandler<impl LoadUserService<User = U> + 'static, U>,
-    auth_middleware: AuthMiddleware<impl AuthenticationProvider<U> + Clone + 'static, U>,
-) -> App<
-    impl ServiceFactory<
-        ServiceRequest,
-        Response = ServiceResponse<impl MessageBody>,
-        Config = (),
-        InitError = (),
-        Error = Error,
-    >,
-> {
-    App::new()
-        .configure(login_config(login_handler))
-        .wrap(auth_middleware)
-        .wrap(create_actix_session_middleware())
-}
-
-fn create_actix_session_middleware() -> SessionMiddleware<CookieSessionStore> {
-    let key = Key::generate();
-
-    SessionMiddleware::new(CookieSessionStore::default(), key.clone())
-}
-
 fn start_test_server(addr: SocketAddr) {
     thread::spawn(move || {
         actix_rt::System::new()
@@ -206,6 +176,7 @@ fn start_test_server(addr: SocketAddr) {
                             SessionAuthProvider,
                             PathMatcher::new(vec!["/login", "/public-route"], true),
                         ),
+                        Key::generate(),
                     )
                     .service(secured_route)
                     .service(public_route)

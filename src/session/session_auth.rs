@@ -4,12 +4,24 @@ use std::{
     time::SystemTime,
 };
 
-use actix_session::{Session, SessionExt, SessionInsertError};
-use actix_web::{Error, FromRequest, HttpRequest};
+use actix_session::{
+    storage::CookieSessionStore, Session, SessionExt, SessionInsertError, SessionMiddleware,
+};
+use actix_web::{
+    body::MessageBody,
+    cookie::Key,
+    dev::{ServiceFactory, ServiceRequest, ServiceResponse},
+    App, Error, FromRequest, HttpRequest,
+};
 use log::error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::{AuthState, AuthToken, AuthenticationProvider, UnauthorizedError};
+use crate::{
+    login::LoadUserService, middleware::AuthMiddleware, AuthState, AuthToken,
+    AuthenticationProvider, UnauthorizedError,
+};
+
+use super::handlers::{login_config, SessionLoginHandler};
 
 const SESSION_KEY_USER: &str = "user";
 const SESSION_KEY_NEED_MFA: &str = "needs_mfa";
@@ -139,4 +151,28 @@ impl FromRequest for LoginSession {
         let session = req.get_session();
         ready(Ok(LoginSession::new(session)))
     }
+}
+
+/// Factory function to generate an actix_web::App instance with session login
+pub fn session_login_factory<U: Serialize + DeserializeOwned + Clone + 'static>(
+    login_handler: SessionLoginHandler<impl LoadUserService<User = U> + 'static, U>,
+    auth_middleware: AuthMiddleware<impl AuthenticationProvider<U> + Clone + 'static, U>,
+    session_key: Key,
+) -> App<
+    impl ServiceFactory<
+        ServiceRequest,
+        Response = ServiceResponse<impl MessageBody>,
+        Config = (),
+        InitError = (),
+        Error = Error,
+    >,
+> {
+    App::new()
+        .configure(login_config(login_handler))
+        .wrap(auth_middleware)
+        .wrap(create_actix_session_middleware(session_key.clone()))
+}
+
+fn create_actix_session_middleware(key: Key) -> SessionMiddleware<CookieSessionStore> {
+    SessionMiddleware::new(CookieSessionStore::default(), key)
 }
