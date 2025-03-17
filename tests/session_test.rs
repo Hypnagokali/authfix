@@ -1,5 +1,6 @@
 use std::{net::SocketAddr, thread};
 
+use actix_session::storage::CookieSessionStore;
 use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
 use auth_middleware_for_actix_web::{
     login::LoadUserService,
@@ -176,6 +177,7 @@ fn start_test_server(addr: SocketAddr) {
                             SessionAuthProvider,
                             PathMatcher::new(vec!["/login", "/public-route"], true),
                         ),
+                        CookieSessionStore::default(),
                         Key::generate(),
                     )
                     .service(secured_route)

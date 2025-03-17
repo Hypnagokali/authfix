@@ -20,6 +20,7 @@ use crate::{
 
 use super::session_auth::LoginSession;
 
+/// An [Actix Web handler](https://actix.rs/docs/handlers/) for login, logout and multi factor auth validation
 #[allow(clippy::type_complexity)]
 pub struct SessionLoginHandler<T: LoadUserService, U> {
     user_service: Arc<T>,
@@ -31,6 +32,7 @@ impl<T, U> SessionLoginHandler<T, U>
 where
     T: LoadUserService,
 {
+    /// Creates a handler only for login without mfa
     pub fn new(user_service: T) -> Self {
         Self {
             user_service: Arc::new(user_service),
@@ -39,6 +41,7 @@ where
         }
     }
 
+    // Creates a login handler with mfa and validation of the factor at each login
     pub fn with_mfa(user_service: T) -> Self {
         Self {
             user_service: Arc::new(user_service),
@@ -47,6 +50,7 @@ where
         }
     }
 
+    // Creates a login handler with mfa that will be triggered when the given condition is met
     pub fn with_mfa_condition(
         user_service: T,
         mfa_condition: fn(&U, &HttpRequest) -> bool,
@@ -63,6 +67,7 @@ where
     }
 }
 
+/// Request for validating the code
 #[derive(Deserialize)]
 pub struct MfaRequestBody {
     code: String,
@@ -201,6 +206,14 @@ async fn logout<U: DeserializeOwned + Clone>(token: AuthToken<U>) -> impl Respon
     HttpResponse::Ok()
 }
 
+/// Configuration function to setup a [SessionLoginHandler]
+///
+/// # Examples
+///
+/// ```ignore
+/// App::new()
+///   .configure(login_config(SessionLoginHandler::new(YourLoadUserService {})))
+/// ```
 pub fn login_config<
     L: LoadUserService<User = U> + 'static,
     U: Serialize + DeserializeOwned + Clone + 'static,

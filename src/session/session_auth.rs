@@ -5,7 +5,7 @@ use std::{
 };
 
 use actix_session::{
-    storage::CookieSessionStore, Session, SessionExt, SessionInsertError, SessionMiddleware,
+    storage::SessionStore, Session, SessionExt, SessionInsertError, SessionMiddleware,
 };
 use actix_web::{
     body::MessageBody,
@@ -157,7 +157,8 @@ impl FromRequest for LoginSession {
 pub fn session_login_factory<U: Serialize + DeserializeOwned + Clone + 'static>(
     login_handler: SessionLoginHandler<impl LoadUserService<User = U> + 'static, U>,
     auth_middleware: AuthMiddleware<impl AuthenticationProvider<U> + Clone + 'static, U>,
-    session_key: Key,
+    session_store: impl SessionStore + 'static,
+    key: Key,
 ) -> App<
     impl ServiceFactory<
         ServiceRequest,
@@ -170,9 +171,5 @@ pub fn session_login_factory<U: Serialize + DeserializeOwned + Clone + 'static>(
     App::new()
         .configure(login_config(login_handler))
         .wrap(auth_middleware)
-        .wrap(create_actix_session_middleware(session_key.clone()))
-}
-
-fn create_actix_session_middleware(key: Key) -> SessionMiddleware<CookieSessionStore> {
-    SessionMiddleware::new(CookieSessionStore::default(), key)
+        .wrap(SessionMiddleware::new(session_store, key))
 }
