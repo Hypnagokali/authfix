@@ -14,7 +14,7 @@ use actix_web::{
     App, Error, FromRequest, HttpRequest,
 };
 use log::error;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     login::LoadUserService, middleware::AuthMiddleware, AuthState, AuthToken,
@@ -71,32 +71,6 @@ where
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct SessionBasedLoginState {
-    authenticated: bool,                  // if true, is fully authenticated for app
-    factors_already_checked: Vec<String>, // IDs of checked factors
-    needs_mfa_with_id: Option<String>,    // ID of next factor
-    mfa_code: Option<String>,
-    valid_unti: SystemTime, // after this timestamp LoginState is discarded
-}
-
-/// Extractor to set the user into the current session
-///
-/// It is needed to set the user after a successfull login.
-/// Currently this crate does not provide traits and structs for the login process.
-///
-/// # Examples:
-/// ```ignore
-/// #[post("/login")]
-/// async fn login(session: UserSession) -> impl Responder {
-///     // here goes the login logic. If successfull:
-///     let user = User { email: "jenny@example.org".to_owned(), name: "Jenny B.".to_owned() };
-///
-///     session.set_user(user).expect("User could not be set in session");
-///     // if not succesfull return 401.
-///     return HttpResponse::Ok();
-/// }
-/// ```
 pub(crate) struct LoginSession {
     session: Session,
 }
