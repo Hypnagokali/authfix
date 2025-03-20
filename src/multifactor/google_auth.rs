@@ -16,6 +16,22 @@ use crate::{
     AuthToken,
 };
 
+/// Authenticator authentication
+///
+/// Uses [TotpSecretRepository<U>] to retrieve the shared secret
+/// Set discrepancy (in seconds) to accept codes from another time slice, for example in the case of possible clock differences
+///
+/// # Examples
+/// ```ignore
+/// App::new()
+///    //...
+///   .wrap(AuthMiddleware::<_, User>::new_with_factor(
+///     SessionAuthProvider,
+///     PathMatcher::default(),
+///     Box::new(GoogleAuthFactor::<_, User>::new(Arc::clone(&your_totp_repository))),
+///   )
+/// )
+/// ```
 pub struct GoogleAuthFactor<T, U>
 where
     T: TotpSecretRepository<U>,
@@ -97,6 +113,9 @@ where
     }
 }
 
+/// Helper to generate a valid shared secret and QR Code
+///
+/// Currently it generates only a secret with a length of 20 bytes
 pub struct TotpSecretGenerator;
 
 impl TotpSecretGenerator {
