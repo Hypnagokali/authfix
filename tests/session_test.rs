@@ -2,7 +2,7 @@ use std::{net::SocketAddr, thread};
 
 use actix_session::storage::CookieSessionStore;
 use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
-use auth_middleware_for_actix_web::{
+use authfix::{
     login::LoadUserService,
     middleware::{AuthMiddleware, PathMatcher},
     session::{
@@ -27,11 +27,9 @@ impl LoadUserService for AcceptEveryoneLoginService {
 
     fn load_user(
         &self,
-        _: &auth_middleware_for_actix_web::login::LoginToken,
-    ) -> futures::future::LocalBoxFuture<
-        '_,
-        Result<Self::User, auth_middleware_for_actix_web::login::LoadUserError>,
-    > {
+        _: &authfix::login::LoginToken,
+    ) -> futures::future::LocalBoxFuture<'_, Result<Self::User, authfix::login::LoadUserError>>
+    {
         Box::pin(async {
             Ok(User {
                 email: "test@example.org".to_owned(),
@@ -44,20 +42,14 @@ impl LoadUserService for AcceptEveryoneLoginService {
         &self,
         _: &actix_web::HttpRequest,
         _: &Self::User,
-    ) -> futures::future::LocalBoxFuture<
-        '_,
-        Result<(), auth_middleware_for_actix_web::login::HandlerError>,
-    > {
+    ) -> futures::future::LocalBoxFuture<'_, Result<(), authfix::login::HandlerError>> {
         Box::pin(async { Ok(()) })
     }
 
     fn on_error_handler(
         &self,
         _: &actix_web::HttpRequest,
-    ) -> futures::future::LocalBoxFuture<
-        '_,
-        Result<(), auth_middleware_for_actix_web::login::HandlerError>,
-    > {
+    ) -> futures::future::LocalBoxFuture<'_, Result<(), authfix::login::HandlerError>> {
         Box::pin(async { Ok(()) })
     }
 }

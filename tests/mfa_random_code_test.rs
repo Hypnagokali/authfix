@@ -2,7 +2,7 @@ use std::{net::SocketAddr, thread};
 
 use actix_session::{storage::CookieSessionStore, SessionExt, SessionMiddleware};
 use actix_web::{cookie::Key, get, App, HttpRequest, HttpResponse, HttpServer, Responder};
-use auth_middleware_for_actix_web::{
+use authfix::{
     middleware::{AuthMiddleware, PathMatcher},
     multifactor::random_code_auth::{CodeSender, MfaRandomCode, RandomCode},
     session::{

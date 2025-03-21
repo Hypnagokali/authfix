@@ -1,5 +1,5 @@
-# auth-middleware-for-actix-web
-> Actix Web Middleware for securing routes with session based authentication and mfa. Based on Actix-Session
+# Authfix
+> Authfix is an Actix Web Middleware for securing routes with session based authentication and mfa. Its currently based on Actix-Session
 
 This library provides a middleware for [Actix Web](https://github.com/actix/actix-web) to secure routes based on [Actix-Session](https://github.com/actix/actix-extras/tree/master/actix-session). It provides an extractor to retrieve the logged in user and it provides mfa-functionality.
 

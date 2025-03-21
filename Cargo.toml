@@ -1,5 +1,5 @@
 [package]
-name = "auth-middleware-for-actix-web"
+name = "authfix"
 authors = ["Stefan Simon <stefan.j.c.simon@gmail.com>"]
 keywords = ["authentication", "session", "actix", "actix-web", "middleware", "auth", "web", "login", "user", "users"]
 exclude = [".gitignore"]
@@ -33,7 +33,7 @@ image = "0.25.5"
 chrono = "0.4.40"
 
 # to make integration tests work
-auth-middleware-for-actix-web = { path = ".", features = ["google_auth", "mfa_send_code"] } 
+authfix = { path = ".", features = ["google_auth", "mfa_send_code"] } 
 
 [features]
 google_auth = ["dep:google-authenticator", "dep:qrcode-generator", "dep:rand", "dep:base32"]

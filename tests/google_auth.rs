@@ -1,6 +1,6 @@
 use std::fs;
 
-use auth_middleware_for_actix_web::multifactor::google_auth::TotpSecretGenerator;
+use authfix::multifactor::google_auth::TotpSecretGenerator;
 use image::GrayImage;
 use resvg::{tiny_skia, usvg};
 use test_utils::{test_out_path, TEST_OUT};

@@ -1,9 +1,7 @@
 use std::future::ready;
 
 use actix_web::HttpRequest;
-use auth_middleware_for_actix_web::login::{
-    HandlerError, LoadUserError, LoadUserService, LoginToken,
-};
+use authfix::login::{HandlerError, LoadUserError, LoadUserService, LoginToken};
 use futures::future::LocalBoxFuture;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

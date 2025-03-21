@@ -1,5 +1,8 @@
 //! Authentication middleware for Actix Web.
 //!
+//! *Warning: this library has been created for the purpose to setup a quick authentication for private projects and to get the authenticated in user in `Actix Web` handlers easily.
+//! It has hardly been tested so far and might contain serious security issues. So its currently not an option for using in production. Help is always welcome :)*
+//!
 //! `auth-middleware-for-actix-web` makes it easy to configure authentication in Actix Web.
 //! It provides a middleware with which secured paths can be defined globally and it provides an extractor [AuthToken] that can be used, to
 //! retrieve the currently logged in user.
@@ -9,7 +12,7 @@
 //! ```no_run
 //! use actix_session::{storage::CookieSessionStore, SessionMiddleware};
 //! use actix_web::{cookie::Key, App, HttpServer};
-//! use auth_middleware_for_actix_web::{middleware::{AuthMiddleware, PathMatcher}, session::session_auth::{SessionAuthProvider}};
+//! use authfix::{middleware::{AuthMiddleware, PathMatcher}, session::session_auth::{SessionAuthProvider}};
 //! use serde::{Deserialize, Serialize};
 //!
 //! fn create_actix_session_middleware() -> SessionMiddleware<CookieSessionStore> {
