@@ -55,7 +55,7 @@ impl PathMatcher {
         }
     }
 
-    pub fn matches(&self, path: &str) -> bool {
+    pub (crate) fn matches(&self, path: &str) -> bool {
         let encoded_path = transform_to_encoded_regex(path);
         let mut path_regex_iter = self.path_regex_list.iter();
 
