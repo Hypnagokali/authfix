@@ -14,7 +14,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::{
     login::{LoadUserService, LoginToken},
     multifactor::{CheckCodeError, MfaRegistry},
-    web::{LOGIN_ROUTE, LOGOUT_ROUTE, MFA_ROUTE},
+    config::{LOGIN_ROUTE, LOGOUT_ROUTE, MFA_ROUTE},
     AuthToken,
 };
 

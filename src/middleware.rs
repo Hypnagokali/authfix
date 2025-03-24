@@ -16,7 +16,7 @@ use serde::de::DeserializeOwned;
 use urlencoding::encode;
 
 use crate::{
-    multifactor::Factor, web::MFA_ROUTE, AuthToken, AuthenticationProvider, UnauthorizedError,
+    multifactor::Factor, config::MFA_ROUTE, AuthToken, AuthenticationProvider, UnauthorizedError,
 };
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
