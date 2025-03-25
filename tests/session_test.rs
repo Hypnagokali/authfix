@@ -7,7 +7,7 @@ use authfix::{
     middleware::{AuthMiddleware, PathMatcher},
     session::{
         handlers::SessionLoginHandler,
-        session_auth::{session_login_factory, SessionAuthProvider},
+        session_auth::{default_session_login_factory, SessionAuthProvider},
     },
     AuthToken,
 };
@@ -163,7 +163,7 @@ fn start_test_server(addr: SocketAddr) {
         actix_rt::System::new()
             .block_on(async {
                 HttpServer::new(move || {
-                    session_login_factory(
+                    default_session_login_factory(
                         SessionLoginHandler::new(AcceptEveryoneLoginService {}),
                         AuthMiddleware::<_, User>::new(
                             SessionAuthProvider,

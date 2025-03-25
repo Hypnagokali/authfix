@@ -12,9 +12,9 @@ use actix_web::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
+    config::{LOGIN_ROUTE, LOGOUT_ROUTE, MFA_ROUTE},
     login::{LoadUserService, LoginToken},
     multifactor::{CheckCodeError, MfaRegistry},
-    config::{LOGIN_ROUTE, LOGOUT_ROUTE, MFA_ROUTE},
     AuthToken,
 };
 

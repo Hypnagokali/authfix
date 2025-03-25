@@ -16,7 +16,7 @@ use serde::de::DeserializeOwned;
 use urlencoding::encode;
 
 use crate::{
-    multifactor::Factor, config::MFA_ROUTE, AuthToken, AuthenticationProvider, UnauthorizedError,
+    config::MFA_ROUTE, multifactor::Factor, AuthToken, AuthenticationProvider, UnauthorizedError,
 };
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
@@ -55,7 +55,7 @@ impl PathMatcher {
         }
     }
 
-    pub (crate) fn matches(&self, path: &str) -> bool {
+    pub(crate) fn matches(&self, path: &str) -> bool {
         let encoded_path = transform_to_encoded_regex(path);
         let mut path_regex_iter = self.path_regex_list.iter();
 

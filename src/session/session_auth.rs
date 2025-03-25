@@ -127,8 +127,31 @@ impl FromRequest for LoginSession {
     }
 }
 
-/// Factory function to generate an actix_web::App instance with session login
-pub fn session_login_factory<U: Serialize + DeserializeOwned + Clone + 'static>(
+/// Factory for an [actix_web::App] with [actix_session::SessionMiddleware] as parameter
+pub fn session_login_factory<
+    U: Serialize + DeserializeOwned + Clone + 'static,
+    S: SessionStore + 'static,
+>(
+    login_handler: SessionLoginHandler<impl LoadUserService<User = U> + 'static, U>,
+    auth_middleware: AuthMiddleware<impl AuthenticationProvider<U> + Clone + 'static, U>,
+    session_middleware: SessionMiddleware<S>,
+) -> App<
+    impl ServiceFactory<
+        ServiceRequest,
+        Response = ServiceResponse<impl MessageBody>,
+        Config = (),
+        InitError = (),
+        Error = Error,
+    >,
+> {
+    App::new()
+        .configure(login_config(login_handler))
+        .wrap(auth_middleware)
+        .wrap(session_middleware)
+}
+
+/// Factory for an [actix_web::App] with a default [actix_session::SessionMiddleware]
+pub fn default_session_login_factory<U: Serialize + DeserializeOwned + Clone + 'static>(
     login_handler: SessionLoginHandler<impl LoadUserService<User = U> + 'static, U>,
     auth_middleware: AuthMiddleware<impl AuthenticationProvider<U> + Clone + 'static, U>,
     session_store: impl SessionStore + 'static,
