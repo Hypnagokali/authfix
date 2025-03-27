@@ -32,10 +32,25 @@ impl<T, U> SessionLoginHandler<T, U>
 where
     T: LoadUserService,
 {
-    /// Creates a handler only for login without mfa
+
+    /// Creates a handler that owns the [LoadUserService]
+    /// 
+    /// It can be used, if the [LoadUserService] is only needed for login handling.
     pub fn new(user_service: T) -> Self {
         Self {
             user_service: Arc::new(user_service),
+            mfa_condition: Arc::new(None),
+            is_with_mfa: false,
+        }
+    }
+
+
+    /// Creates a handler with a shared [LoadUserService]
+    /// 
+    /// This method can be used, if the [LoadUserService] is a shared service.
+    pub fn new_from_shared(user_service: Arc<T>) -> Self {
+        Self {
+            user_service: Arc::clone(&user_service),
             mfa_condition: Arc::new(None),
             is_with_mfa: false,
         }
