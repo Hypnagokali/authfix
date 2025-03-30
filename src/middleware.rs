@@ -6,7 +6,7 @@ use std::{
 
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    error::ErrorBadRequest,
+    web::Data,
     Error, HttpMessage,
 };
 use futures::future::LocalBoxFuture;
@@ -16,7 +16,7 @@ use serde::de::DeserializeOwned;
 use urlencoding::encode;
 
 use crate::{
-    config::MFA_ROUTE, multifactor::Factor, AuthToken, AuthenticationProvider, UnauthorizedError,
+    config::Routes, multifactor::Factor, AuthToken, AuthenticationProvider, UnauthorizedError,
 };
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
@@ -169,9 +169,13 @@ where
         let service = Rc::clone(&self.service);
         let auth_provider = Rc::clone(&self.auth_provider);
         let factor = Rc::clone(&self.factor);
+        let mut mfa_route_option = None;
+        if let Some(routes) = req.app_data::<Data<Routes>>() {
+            mfa_route_option = Some(routes.get_mfa().to_owned())
+        }
 
         {
-            // ToDo: Just a quick fix. Dont use an extra scope
+            // Add the given factor to the extensions, to be able to retrieve it later in a handler
             let mut extensions = req.extensions_mut();
             extensions.insert(factor);
         }
@@ -183,12 +187,16 @@ where
                 // Before Request
                 match auth_provider.get_auth_token(req.request()).await {
                     Ok(token) => {
+                        let mut is_valid_mfa_req = false;
                         // ToDo: currently hardcoded: needs to be configurable
-                        if request_path.to_lowercase() == MFA_ROUTE {
-                            if !token.needs_mfa() {
-                                return Err(ErrorBadRequest("No mfa needed"));
-                            }
-                        } else if !token.is_authenticated() {
+                        if token.needs_mfa()
+                            && mfa_route_option.is_some()
+                            && mfa_route_option.unwrap() == request_path
+                        {
+                            is_valid_mfa_req = true;
+                        }
+
+                        if !is_valid_mfa_req && !token.is_authenticated() {
                             return Err(UnauthorizedError::default().into());
                         }
 
