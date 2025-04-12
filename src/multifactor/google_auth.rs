@@ -116,30 +116,41 @@ where
 /// Helper to generate a valid shared secret and QR Code
 ///
 /// Currently it generates only a secret with a length of 20 bytes
-pub struct TotpSecretGenerator;
+pub struct TotpSecretGenerator {
+    secret: String,
+    app_name: String,
+    users_email: String,
+}
 
 impl TotpSecretGenerator {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
-        Self
+    pub fn new(app_name: &str, users_email: &str) -> Self {
+        Self {
+            secret: Self::create_secret(),
+            app_name: app_name.to_owned(),
+            users_email: users_email.to_owned(),
+        }
     }
 
     /// Currently uses a fixed size of 20 bytes
-    pub fn create_secret(&self) -> String {
+    fn create_secret() -> String {
         let mut secret_bytes = [0u8; 20];
         rand::rng().fill_bytes(&mut secret_bytes);
 
         base32::encode(base32::Alphabet::Rfc4648 { padding: false }, &secret_bytes)
     }
 
+    pub fn get_secret(&self) -> &str {
+        &self.secret
+    }
+
     /// Generate a QR-Code as SVG for 6 digit codes
-    pub fn create_qr_code(
-        secret: &str,
-        app_name: &str,
-        users_email: &str,
-    ) -> Result<String, SecretCodeGenerationError> {
+    pub fn get_qr_code(&self) -> Result<String, SecretCodeGenerationError> {
         let otpauth_value = format!(
-            "otpauth://totp/{app_name}:{users_email}?secret={secret}&issuer={app_name}&digits=6"
+            "otpauth://totp/{}:{}?secret={}&issuer={}&digits=6",
+            self.app_name,
+            self.users_email,
+            self.secret,
+            self.app_name
         );
         qrcode_generator::to_svg_to_string(
             otpauth_value,
@@ -163,28 +174,27 @@ pub mod tests {
 
     #[test]
     fn twenty_bytes_should_have_32_chars_in_base32() {
-        let gen = TotpSecretGenerator::new();
-        let code = gen.create_secret();
+        let gen = TotpSecretGenerator::new("my_app", "johnson");
+        let code = gen.get_secret();
 
         assert_eq!(code.len(), 32);
     }
 
     #[test]
     fn codes_should_not_be_equal() {
-        let gen = TotpSecretGenerator::new();
-        let code1 = gen.create_secret();
-        let code2 = gen.create_secret();
+        let gen = TotpSecretGenerator::new("my_app", "eli");
+        let code1 = gen.get_secret();
+
+        let gen2 = TotpSecretGenerator::new("my_app", "eli");
+        let code2 = gen2.get_secret();
 
         assert_ne!(code1, code2);
     }
 
     #[test]
     fn should_generate_svg_with_200px() {
-        let gen = TotpSecretGenerator::new();
-        let secret = gen.create_secret();
-        let qr_code =
-            TotpSecretGenerator::create_qr_code(&secret, "TestApp", "john.doe@example.org")
-                .unwrap();
+        let gen = TotpSecretGenerator::new("TestApp", "john.doe@example.org");
+        let qr_code = gen.get_qr_code().unwrap();
 
         let start_svg =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg width=\"200\" height=\"200\"";

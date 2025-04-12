@@ -9,10 +9,9 @@ mod test_utils;
 
 #[test]
 fn should_contain_valid_url() {
-    let gen = TotpSecretGenerator::new();
-    let secret = gen.create_secret();
-    let qr_code =
-        TotpSecretGenerator::create_qr_code(&secret, "TestApp", "john.doe@example.org").unwrap();
+    let gen = TotpSecretGenerator::new("TestApp", "john.doe@example.org");
+    let secret = gen.get_secret();
+    let qr_code = gen.get_qr_code().unwrap();
 
     let options = usvg::Options::default();
     let tree = usvg::Tree::from_str(&qr_code, &options).unwrap();
