@@ -108,6 +108,27 @@ async fn should_return_401_if_calling_mfa_without_login() {
 }
 
 #[actix_rt::test]
+async fn should_respond_mfa_needed_for_login_status() {
+    let addr = actix_test::unused_addr();
+    start_test_server(addr);
+
+    let client = Client::builder().cookie_store(true).build().unwrap();
+
+    let login_res = client
+        .post(format!("http://{addr}/login"))
+        .body("{ \"username\": \"anna\", \"password\": \"test123\" }")
+        .header("Content-Type", "application/json")
+        .send()
+        .await
+        .unwrap();
+
+    let body = login_res.text().await.unwrap().replace(" ", "");
+
+    assert!(body.contains(r#"status":"MfaNeeded"#));
+    assert!(body.contains(r#"mfaId":"TOTP_MFA"#));
+}
+
+#[actix_rt::test]
 async fn should_be_logged_in_after_mfa() {
     let addr = actix_test::unused_addr();
     start_test_server(addr);

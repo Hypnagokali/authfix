@@ -9,6 +9,7 @@ use actix_web::{
     web::{self, Data, Json, ServiceConfig},
     Error, HttpRequest, HttpResponse, Resource, Responder,
 };
+use log::error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -19,6 +20,38 @@ use crate::{
 };
 
 use super::session_auth::LoginSession;
+
+#[derive(Serialize)]
+enum LoginSessionStatus {
+    Success,
+    MfaNeeded,
+}
+
+/// The response informs for example the SPA if the login was successfull or if an mfa challenge is needed
+///
+/// To render the correct form, the frontend will need the mfa_id, that has to be globally unique
+#[derive(Serialize)]
+struct LoginSessionResponse {
+    status: LoginSessionStatus,
+    #[serde(rename = "mfaId")]
+    mfa_id: Option<String>,
+}
+
+impl LoginSessionResponse {
+    pub fn success() -> Self {
+        Self {
+            status: LoginSessionStatus::Success,
+            mfa_id: None,
+        }
+    }
+
+    pub fn needs_mfa(mfa_id: &str) -> Self {
+        Self {
+            status: LoginSessionStatus::MfaNeeded,
+            mfa_id: Some(mfa_id.to_owned()),
+        }
+    }
+}
 
 /// An [Actix Web handler](https://actix.rs/docs/handlers/) for login, logout and multi factor auth validation
 #[allow(clippy::type_complexity)]
@@ -164,6 +197,8 @@ async fn login<T: LoadUserService<User = U>, U: Serialize>(
 
     match user_service.load_user(&login_token).await {
         Ok(user) => {
+            let mut login_res = LoginSessionResponse::success();
+
             if !generate_code_if_mfa_necessary(
                 &user,
                 &mfa_registry,
@@ -177,13 +212,19 @@ async fn login<T: LoadUserService<User = U>, U: Serialize>(
                 // set timeout for login session
                 if let Some(validity) = SystemTime::now().checked_add(Duration::from_secs(60 * 5)) {
                     session.valid_until(validity)?;
+                    if let Some(mfa_id) = session.get_mfa_id() {
+                        login_res = LoginSessionResponse::needs_mfa(&mfa_id);
+                    } else {
+                        error!("Generate MFA challenge error: No mfa_id in session found");
+                    }
                 } else {
-                    return Ok(HttpResponse::InternalServerError());
+                    error!("Generate MFA challenge error: Cannot create validity");
+                    return Ok(HttpResponse::InternalServerError().finish());
                 }
             }
 
             session.set_user(user)?;
-            Ok(HttpResponse::Ok())
+            Ok(HttpResponse::Ok().json(login_res))
         }
         Err(e) => {
             user_service.on_error_handler(&req).await?;

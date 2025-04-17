@@ -6,6 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use super::{CheckCodeError, Factor, GenerateCodeError};
 
+/// ID to reference random code mfa
+pub const MFA_ID_RANDOM_CODE: &str = "RNDCODE";
+
 const MFA_RANDOM_CODE_KEY: &str = "mfa_random_code";
 
 /// Interface for sending the code to the user
@@ -74,7 +77,7 @@ impl<T: CodeSender> Factor for MfaRandomCode<T> {
     }
 
     fn get_unique_id(&self) -> String {
-        "RNDCODE".to_owned()
+        MFA_ID_RANDOM_CODE.to_owned()
     }
 
     fn check_code(

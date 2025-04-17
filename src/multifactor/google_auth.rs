@@ -16,6 +16,9 @@ use crate::{
     AuthToken,
 };
 
+/// ID to reference authenticator mfa
+pub const MFA_ID_AUTHENTICATOR_TOTP: &str = "TOTP_MFA";
+
 /// Authenticator authentication
 ///
 /// Uses [TotpSecretRepository<U>] to retrieve the shared secret
@@ -109,7 +112,7 @@ where
     }
 
     fn get_unique_id(&self) -> String {
-        "GAUTH".to_owned()
+        MFA_ID_AUTHENTICATOR_TOTP.to_owned()
     }
 }
 
@@ -147,10 +150,7 @@ impl TotpSecretGenerator {
     pub fn get_qr_code(&self) -> Result<String, SecretCodeGenerationError> {
         let otpauth_value = format!(
             "otpauth://totp/{}:{}?secret={}&issuer={}&digits=6",
-            self.app_name,
-            self.users_email,
-            self.secret,
-            self.app_name
+            self.app_name, self.users_email, self.secret, self.app_name
         );
         qrcode_generator::to_svg_to_string(
             otpauth_value,

@@ -129,6 +129,27 @@ async fn should_return_401_when_not_authenticated() {
 }
 
 #[actix_rt::test]
+async fn should_respond_success_for_login_status() {
+    let addr = actix_test::unused_addr();
+    start_test_server(addr);
+
+    let client = Client::builder().cookie_store(true).build().unwrap();
+
+    let login_res = client
+        .post(format!("http://{addr}/login"))
+        .body("{ \"username\": \"any\", \"password\": \"none\" }")
+        .header("Content-Type", "application/json")
+        .send()
+        .await
+        .unwrap();
+
+    let body = login_res.text().await.unwrap().replace(" ", "");
+
+    assert!(body.contains(r#"status":"Success"#));
+    assert!(body.contains(r#"mfaId":null"#));
+}
+
+#[actix_rt::test]
 async fn logout_should_invalidate_session() {
     let addr = actix_test::unused_addr();
     start_test_server(addr);

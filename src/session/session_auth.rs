@@ -107,6 +107,13 @@ impl LoginSession {
         }
     }
 
+    pub fn get_mfa_id(&self) -> Option<String> {
+        match self.session.get::<String>(SESSION_KEY_NEED_MFA) {
+            Ok(mfa_id) => mfa_id,
+            Err(_) => None,
+        }
+    }
+
     pub fn reset(&self) {
         self.session.renew();
         self.session.clear();
