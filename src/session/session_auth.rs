@@ -23,9 +23,9 @@ use crate::{
 
 use super::handlers::{login_config, SessionLoginHandler};
 
-const SESSION_KEY_USER: &str = "user";
-const SESSION_KEY_NEED_MFA: &str = "needs_mfa";
-const SESSION_KEY_LOGIN_VALID_UNTIL: &str = "login_valid_until";
+const SESSION_KEY_USER: &str = "authfix__user";
+const SESSION_KEY_NEED_MFA: &str = "authfix__needs_mfa";
+const SESSION_KEY_LOGIN_VALID_UNTIL: &str = "authfix__login_valid_until";
 
 /// Provider for session based authentication.
 ///
