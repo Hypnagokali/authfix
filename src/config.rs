@@ -36,11 +36,15 @@ impl Default for Routes {
 }
 
 fn create_uri(prefix: &str, endpoint: &str) -> String {
-    format!(
-        "{}{}",
-        normalize_uri_part(prefix),
+    if prefix.trim() == "" || prefix.trim() == "/" {
         normalize_uri_part(endpoint)
-    )
+    } else {
+        format!(
+            "{}{}",
+            normalize_uri_part(prefix),
+            normalize_uri_part(endpoint)
+        )
+    }
 }
 
 fn normalize_uri_part(part: &str) -> String {
@@ -57,11 +61,27 @@ fn normalize_uri_part(part: &str) -> String {
     normalized
 }
 
-#[test]
-fn normalize_uri_part_test() {
-    assert_eq!("/login/mfa", normalize_uri_part("/login/mfa/"));
-    assert_eq!("/login/mfa", normalize_uri_part("login/mfa/"));
-    assert_eq!("/login/mfa", normalize_uri_part("login/mfa"));
-    assert_eq!("/", normalize_uri_part("/"));
-    assert_eq!("/", normalize_uri_part(""));
+#[cfg(test)]
+mod test {
+    use crate::config::normalize_uri_part;
+    use super::Routes;
+
+
+    #[test]
+    fn should_ignore_empty_prefix() {
+        let routes = Routes::new("", "/login", "/mfa", "/logout");
+
+        assert_eq!(routes.get_login(), "/login");
+    }
+
+    #[test]
+    fn normalize_uri_part_test() {
+        assert_eq!("/login/mfa", normalize_uri_part("/login/mfa/"));
+        assert_eq!("/login/mfa", normalize_uri_part("login/mfa/"));
+        assert_eq!("/login/mfa", normalize_uri_part("login/mfa"));
+        assert_eq!("/", normalize_uri_part("/"));
+        assert_eq!("/", normalize_uri_part(""));
+    }
+
 }
+
