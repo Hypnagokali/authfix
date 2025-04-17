@@ -39,20 +39,30 @@ const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 #[derive(Clone)]
 pub struct PathMatcher {
     is_exclusion_list: bool,
-    path_regex_list: Vec<(&'static str, Regex)>,
+    path_regex_list: Vec<(String, Regex)>,
+}
+
+fn add_path_to_list(path_list: &Vec<&str>, list: &mut Vec<(String, Regex)>) {
+    for &pattern in path_list.into_iter() {
+        let regex_pattern = format!("^{}$", transform_to_encoded_regex(pattern));
+        list.push((pattern.to_owned(), Regex::new(&regex_pattern).unwrap()));
+    }
 }
 
 impl PathMatcher {
-    pub fn new(path_list: Vec<&'static str>, is_exclusion_list: bool) -> Self {
+    pub fn new(path_list: Vec<&str>, is_exclusion_list: bool) -> Self {
         let mut path_regex_list = Vec::new();
-        for pattern in path_list.into_iter() {
-            let regex_pattern = format!("^{}$", transform_to_encoded_regex(pattern));
-            path_regex_list.push((pattern, Regex::new(&regex_pattern).unwrap()));
-        }
+
+        add_path_to_list(&path_list, &mut path_regex_list);
+        
         Self {
             is_exclusion_list,
             path_regex_list,
         }
+    }
+
+    pub fn add(&mut self, path_list: Vec<&str>) {
+        add_path_to_list(&path_list, &mut self.path_regex_list);
     }
 
     pub(crate) fn matches(&self, path: &str) -> bool {
@@ -64,6 +74,12 @@ impl PathMatcher {
         } else {
             path_regex_iter.any(|p| p.1.is_match(&encoded_path))
         }
+    }
+}
+
+impl From<Routes> for PathMatcher {
+    fn from(value: Routes) -> Self {
+        PathMatcher::new(vec![value.get_login()], true)
     }
 }
 
@@ -265,7 +281,31 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::config::Routes;
+
     use super::PathMatcher;
+
+    #[test]
+    fn should_be_able_to_add_routes_to_path_matcher()  {
+        let routes = Routes::new("", "/custom-login", "/custom-mfa", "/logout");
+
+        let mut path_matcher: PathMatcher = routes.into();
+        path_matcher.add(vec!["/public"]);
+
+        assert!(!path_matcher.matches("/custom-login"));
+        assert!(!path_matcher.matches("/public"));
+    }
+
+    #[test]
+    fn path_matcher_can_be_created_from_routes()  {
+        let routes = Routes::new("", "/custom-login", "/custom-mfa", "/logout");
+
+        let path_matcher: PathMatcher = routes.into();
+
+        assert!(!path_matcher.matches("/custom-login"));
+        assert!(path_matcher.matches("/custom-mfa"));
+        assert!(path_matcher.matches("/logout"));
+    }
 
     #[test]
     fn path_matcher_should_match_wildcard() {
