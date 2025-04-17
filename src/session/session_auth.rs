@@ -108,10 +108,7 @@ impl LoginSession {
     }
 
     pub fn get_mfa_id(&self) -> Option<String> {
-        match self.session.get::<String>(SESSION_KEY_NEED_MFA) {
-            Ok(mfa_id) => mfa_id,
-            Err(_) => None,
-        }
+        self.session.get::<String>(SESSION_KEY_NEED_MFA).unwrap_or_default()
     }
 
     pub fn reset(&self) {
