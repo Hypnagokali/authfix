@@ -21,14 +21,20 @@ pub trait LoadUserService: Send + Sync {
     ) -> LocalBoxFuture<'_, Result<Self::User, LoadUserError>>;
 
     /// Is called after the user has successfully completed authentication
+    #[allow(unused)]
     fn on_success_handler(
         &self,
         req: &HttpRequest,
         user: &Self::User,
-    ) -> LocalBoxFuture<'_, Result<(), HandlerError>>;
+    ) -> LocalBoxFuture<'_, Result<(), HandlerError>> {
+        Box::pin(async { Ok(()) })
+    }
 
     /// Is called when the login fails
-    fn on_error_handler(&self, req: &HttpRequest) -> LocalBoxFuture<'_, Result<(), HandlerError>>;
+    #[allow(unused)]
+    fn on_error_handler(&self, req: &HttpRequest) -> LocalBoxFuture<'_, Result<(), HandlerError>> {
+        Box::pin(async { Ok(()) })
+    }
 }
 
 #[derive(Error, Debug)]
