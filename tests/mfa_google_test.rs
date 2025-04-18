@@ -212,10 +212,12 @@ fn start_test_server(addr: SocketAddr) {
                             mfa_condition,
                         )))
                         .wrap(AuthMiddleware::<_, User>::new(
-                            SessionAuthProvider::new( Box::new(GoogleAuthFactor::<_, User>::with_discrepancy(
-                                Arc::clone(&totp_secret_repo),
-                                3,
-                            ))),
+                            SessionAuthProvider::new(Box::new(
+                                GoogleAuthFactor::<_, User>::with_discrepancy(
+                                    Arc::clone(&totp_secret_repo),
+                                    3,
+                                ),
+                            )),
                             PathMatcher::default(),
                         ))
                         .wrap(create_actix_session_middleware())

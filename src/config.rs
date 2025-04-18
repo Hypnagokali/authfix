@@ -63,9 +63,8 @@ fn normalize_uri_part(part: &str) -> String {
 
 #[cfg(test)]
 mod test {
-    use crate::config::normalize_uri_part;
     use super::Routes;
-
+    use crate::config::normalize_uri_part;
 
     #[test]
     fn should_ignore_empty_prefix() {
@@ -82,6 +81,4 @@ mod test {
         assert_eq!("/", normalize_uri_part("/"));
         assert_eq!("/", normalize_uri_part(""));
     }
-
 }
-

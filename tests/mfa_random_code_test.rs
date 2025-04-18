@@ -21,10 +21,13 @@ static _INIT_LOGGER: Once = Once::new();
 
 fn _setup_logger() {
     _INIT_LOGGER.call_once(|| {
-        env_logger::builder().is_test(true).filter_level(log::LevelFilter::Debug).try_init().unwrap();
+        env_logger::builder()
+            .is_test(true)
+            .filter_level(log::LevelFilter::Debug)
+            .try_init()
+            .unwrap();
     });
 }
-
 
 #[actix_rt::test]
 async fn should_be_able_to_logout() {
@@ -314,8 +317,11 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
                             HardCodedLoadUserService {},
                         )))
                         .wrap(AuthMiddleware::<_, User>::new(
-                            SessionAuthProvider::new(Box::new(MfaRandomCode::new(generator, DummySender {}))),
-                            PathMatcher::new(vec!["/login", "/unsecure/*"], true)
+                            SessionAuthProvider::new(Box::new(MfaRandomCode::new(
+                                generator,
+                                DummySender {},
+                            ))),
+                            PathMatcher::new(vec!["/login", "/unsecure/*"], true),
                         ))
                         .wrap(create_actix_session_middleware())
                 })

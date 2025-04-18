@@ -14,9 +14,7 @@ use regex::Regex;
 use serde::de::DeserializeOwned;
 use urlencoding::encode;
 
-use crate::{
-    config::Routes, AuthToken, AuthenticationProvider
-};
+use crate::{config::Routes, AuthToken, AuthenticationProvider};
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 
@@ -53,7 +51,7 @@ impl PathMatcher {
         let mut path_regex_list = Vec::new();
 
         add_path_to_list(&path_list, &mut path_regex_list);
-        
+
         Self {
             is_exclusion_list,
             path_regex_list,
@@ -172,7 +170,7 @@ where
             let mut extensions = req.extensions_mut();
             auth_provider.configure_provider(&mut extensions);
         }
-        
+
         if self.path_matcher.matches(&request_path) {
             debug!("Secured route: '{}'", debug_path);
 
@@ -239,7 +237,7 @@ mod tests {
     use super::PathMatcher;
 
     #[test]
-    fn should_be_able_to_add_routes_to_path_matcher()  {
+    fn should_be_able_to_add_routes_to_path_matcher() {
         let routes = Routes::new("", "/custom-login", "/custom-mfa", "/logout");
 
         let mut path_matcher: PathMatcher = routes.into();
@@ -250,7 +248,7 @@ mod tests {
     }
 
     #[test]
-    fn path_matcher_can_be_created_from_routes()  {
+    fn path_matcher_can_be_created_from_routes() {
         let routes = Routes::new("", "/custom-login", "/custom-mfa", "/logout");
 
         let path_matcher: PathMatcher = routes.into();

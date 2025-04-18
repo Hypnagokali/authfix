@@ -40,7 +40,10 @@
 //! }
 //! ```
 
-use actix_web::{dev::{Extensions, ServiceRequest}, Error, FromRequest, HttpMessage, HttpRequest};
+use actix_web::{
+    dev::{Extensions, ServiceRequest},
+    Error, FromRequest, HttpMessage, HttpRequest,
+};
 use errors::UnauthorizedError;
 use serde::de::DeserializeOwned;
 use std::{
@@ -73,14 +76,15 @@ where
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
 
     /// Configure the authentication provider for request.
-    /// 
+    ///
     /// This method configures the extensions for all routes, secured and not secured ones.
     #[allow(unused)]
-    fn configure_provider(&self, extensions: &mut Extensions) {
-    }
+    fn configure_provider(&self, extensions: &mut Extensions) {}
 
-    fn is_user_authorized_for_request(&self, service_request: ServiceRequest) -> Pin<Box<dyn Future<Output = Result<ServiceRequest, UnauthorizedError>>>>;
-
+    fn is_user_authorized_for_request(
+        &self,
+        service_request: ServiceRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<ServiceRequest, UnauthorizedError>>>>;
 }
 
 /// Extractor that holds the authenticated user
