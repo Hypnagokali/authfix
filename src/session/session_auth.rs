@@ -223,7 +223,7 @@ pub fn session_login_factory<
     U: Serialize + DeserializeOwned + Clone + 'static,
     S: SessionStore + 'static,
 >(
-    login_handler: SessionLoginHandler<impl LoadUserService<User = U> + 'static, U>,
+    login_handler: impl LoadUserService<User = U> + 'static,
     auth_middleware: AuthMiddleware<impl AuthenticationProvider<U> + Clone + 'static, U>,
     session_middleware: SessionMiddleware<S>,
 ) -> App<
@@ -236,14 +236,14 @@ pub fn session_login_factory<
     >,
 > {
     App::new()
-        .configure(login_config(login_handler))
+        .configure(login_config(SessionLoginHandler::new(login_handler)))
         .wrap(auth_middleware)
         .wrap(session_middleware)
 }
 
 /// Factory for an [actix_web::App] with a default [actix_session::SessionMiddleware]
 pub fn default_session_login_factory<U: Serialize + DeserializeOwned + Clone + 'static>(
-    login_handler: SessionLoginHandler<impl LoadUserService<User = U> + 'static, U>,
+    login_handler: impl LoadUserService<User = U> + 'static,
     auth_middleware: AuthMiddleware<impl AuthenticationProvider<U> + Clone + 'static, U>,
     session_store: impl SessionStore + 'static,
     key: Key,
@@ -257,7 +257,7 @@ pub fn default_session_login_factory<U: Serialize + DeserializeOwned + Clone + '
     >,
 > {
     App::new()
-        .configure(login_config(login_handler))
+        .configure(login_config(SessionLoginHandler::new(login_handler)))
         .wrap(auth_middleware)
         .wrap(SessionMiddleware::new(session_store, key))
 }

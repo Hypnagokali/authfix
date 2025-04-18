@@ -5,10 +5,7 @@ use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
 use authfix::{
     login::LoadUserService,
     middleware::{AuthMiddleware, PathMatcher},
-    session::{
-        handlers::SessionLoginHandler,
-        session_auth::{default_session_login_factory, SessionAuthProvider},
-    },
+    session::session_auth::{default_session_login_factory, SessionAuthProvider},
     AuthToken,
 };
 use reqwest::{Client, StatusCode};
@@ -185,7 +182,7 @@ fn start_test_server(addr: SocketAddr) {
             .block_on(async {
                 HttpServer::new(move || {
                     default_session_login_factory(
-                        SessionLoginHandler::new(AcceptEveryoneLoginService {}),
+                        AcceptEveryoneLoginService {},
                         AuthMiddleware::<_, User>::new(
                             SessionAuthProvider::default(),
                             PathMatcher::new(vec!["/login", "/public-route"], true),
