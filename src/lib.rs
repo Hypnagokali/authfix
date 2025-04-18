@@ -24,7 +24,7 @@
 //! async fn main() -> std::io::Result<()> {
 //!     HttpServer::new(move || {
 //!         App::new()
-//!           .wrap(AuthMiddleware::<_, User>::new(SessionAuthProvider, PathMatcher::default()))
+//!           .wrap(AuthMiddleware::<_, User>::new(SessionAuthProvider::default(), PathMatcher::default()))
 //!             .wrap(create_actix_session_middleware())
 //!     })
 //!     .bind(("127.0.0.1", 8080))?
@@ -40,7 +40,7 @@
 //! }
 //! ```
 
-use actix_web::{Error, FromRequest, HttpMessage, HttpRequest};
+use actix_web::{dev::{Extensions, ServiceRequest}, Error, FromRequest, HttpMessage, HttpRequest};
 use errors::UnauthorizedError;
 use serde::de::DeserializeOwned;
 use std::{
@@ -71,6 +71,16 @@ where
         req: &HttpRequest,
     ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
+
+    /// Configure the authentication provider for request.
+    /// 
+    /// This method configures the extensions for all routes, secured and not secured ones.
+    #[allow(unused)]
+    fn configure_provider(&self, extensions: &mut Extensions) {
+    }
+
+    fn is_user_authorized_for_request(&self, service_request: ServiceRequest) -> Pin<Box<dyn Future<Output = Result<ServiceRequest, UnauthorizedError>>>>;
+
 }
 
 /// Extractor that holds the authenticated user

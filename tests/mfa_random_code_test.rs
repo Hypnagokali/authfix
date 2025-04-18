@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, thread};
+use std::{net::SocketAddr, sync::Once, thread};
 
 use actix_session::{storage::CookieSessionStore, SessionExt, SessionMiddleware};
 use actix_web::{cookie::Key, get, App, HttpRequest, HttpResponse, HttpServer, Responder};
@@ -16,6 +16,15 @@ use reqwest::{Client, StatusCode};
 use test_utils::{CustomError, HardCodedLoadUserService, User};
 
 mod test_utils;
+
+static _INIT_LOGGER: Once = Once::new();
+
+fn _setup_logger() {
+    _INIT_LOGGER.call_once(|| {
+        env_logger::builder().is_test(true).filter_level(log::LevelFilter::Debug).try_init().unwrap();
+    });
+}
+
 
 #[actix_rt::test]
 async fn should_be_able_to_logout() {
@@ -304,10 +313,9 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
                         .configure(login_config(SessionLoginHandler::with_mfa(
                             HardCodedLoadUserService {},
                         )))
-                        .wrap(AuthMiddleware::<_, User>::new_with_factor(
-                            SessionAuthProvider,
-                            PathMatcher::new(vec!["/login", "/unsecure/*"], true),
-                            Box::new(MfaRandomCode::new(generator, DummySender {})),
+                        .wrap(AuthMiddleware::<_, User>::new(
+                            SessionAuthProvider::new(Box::new(MfaRandomCode::new(generator, DummySender {}))),
+                            PathMatcher::new(vec!["/login", "/unsecure/*"], true)
                         ))
                         .wrap(create_actix_session_middleware())
                 })

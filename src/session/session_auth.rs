@@ -1,24 +1,18 @@
 use std::{
-    future::{ready, Future, Ready},
-    pin::Pin,
-    time::SystemTime,
+    future::{ready, Future, Ready}, marker::PhantomData, pin::Pin, rc::Rc, time::SystemTime
 };
 
 use actix_session::{
     storage::SessionStore, Session, SessionExt, SessionInsertError, SessionMiddleware,
 };
 use actix_web::{
-    body::MessageBody,
-    cookie::Key,
-    dev::{ServiceFactory, ServiceRequest, ServiceResponse},
-    App, Error, FromRequest, HttpRequest,
+    body::MessageBody, cookie::Key, dev::{ServiceFactory, ServiceRequest, ServiceResponse}, web::Data, App, Error, FromRequest, HttpMessage, HttpRequest
 };
 use log::error;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    login::LoadUserService, middleware::AuthMiddleware, AuthState, AuthToken,
-    AuthenticationProvider, UnauthorizedError,
+    config::Routes, login::LoadUserService, middleware::AuthMiddleware, multifactor::Factor, AuthState, AuthToken, AuthenticationProvider, UnauthorizedError
 };
 
 use super::handlers::{login_config, SessionLoginHandler};
@@ -33,9 +27,36 @@ const SESSION_KEY_LOGIN_VALID_UNTIL: &str = "authfix__login_valid_until";
 /// # Examples
 /// See crate example.
 #[derive(Clone)]
-pub struct SessionAuthProvider;
+pub struct SessionAuthProvider<U> 
+where
+    U: DeserializeOwned + Clone + 'static
+{
+    additional_factor: Rc<Option<Box<dyn Factor>>>,
+    phantom_data: PhantomData<U>
+}
 
-impl<U> AuthenticationProvider<U> for SessionAuthProvider
+impl<U> SessionAuthProvider<U>
+where
+    U: DeserializeOwned + Clone + 'static {
+    
+    pub fn new(factor: Box<dyn Factor>) -> Self {
+        Self {
+            additional_factor: Rc::new(Some(factor)),
+            phantom_data: PhantomData,
+        }
+    }
+}
+
+impl<U> Default for SessionAuthProvider<U> 
+where
+    U: DeserializeOwned + Clone + 'static 
+{
+    fn default() -> Self {
+        Self { additional_factor: Rc::new(None), phantom_data: PhantomData }
+    }
+}
+
+impl<U> AuthenticationProvider<U> for SessionAuthProvider<U>
 where
     U: DeserializeOwned + Clone + 'static,
 {
@@ -48,14 +69,17 @@ where
         // ToDo: refactor: remove the matches here
         let user = match s.get::<U>(SESSION_KEY_USER) {
             Ok(Some(user)) => user,
-            _ => return Box::pin(ready(Err(UnauthorizedError::default()))),
+            _ => {
+                error!("No user in session. Cannot read {}", SESSION_KEY_USER);
+                return Box::pin(ready(Err(UnauthorizedError::default())));
+            }
         };
 
         let state = match s.get::<String>(SESSION_KEY_NEED_MFA) {
             Ok(Some(_mfa_id)) => AuthState::NeedsMfa,
             Ok(None) => AuthState::Authenticated,
             Err(_) => {
-                error!("Cannot read `need_mfa' value from session");
+                error!("Cannot read '{}' value from session", SESSION_KEY_NEED_MFA);
                 return Box::pin(ready(Err(UnauthorizedError::default())));
             }
         };
@@ -68,6 +92,45 @@ where
         s.purge();
 
         Box::pin(async {})
+    }
+
+    fn configure_provider(&self, extensions: &mut actix_web::dev::Extensions) {
+        extensions.insert(Rc::clone(&self.additional_factor));
+    }
+        
+    fn is_user_authorized_for_request(&self, req: ServiceRequest) -> Pin<Box<dyn Future<Output = Result<ServiceRequest, UnauthorizedError>>>> {
+        let request_path = req.request().path().to_owned();
+        let mut mfa_route_option = None;
+
+        if let Some(routes) = req.app_data::<Data<Routes>>() {
+            mfa_route_option = Some(routes.get_mfa().to_owned());
+        }
+
+        let auth_token_req = self.get_auth_token(req.request());
+        Box::pin(async move {
+            let token = auth_token_req.await?;
+
+            let mut is_valid_mfa_req = false;
+            if token.needs_mfa()
+                && mfa_route_option.is_some()
+                && mfa_route_option.unwrap() == request_path
+            {
+                is_valid_mfa_req = true;
+            }
+
+            if !is_valid_mfa_req && !token.is_authenticated() {
+                return Err(UnauthorizedError::default());
+            }
+
+            {
+                let mut extensions = req.extensions_mut();
+                extensions.insert(token);
+            }
+            
+            // is it really needed on each secured route? or only on /mfa and /login?
+
+            Ok(req)
+        })
     }
 }
 
@@ -88,6 +151,10 @@ impl LoginSession {
         self.session.insert(SESSION_KEY_NEED_MFA, mfa_id)
     }
 
+    pub fn is_mfa_needed(&self) -> bool {
+        matches!(self.session.get::<String>(SESSION_KEY_NEED_MFA), Ok(Some(_)))
+    }
+
     pub fn set_user<U: Serialize>(&self, user: U) -> Result<(), SessionInsertError> {
         self.session.insert(SESSION_KEY_USER, user)
     }
@@ -103,7 +170,7 @@ impl LoginSession {
             .get::<SystemTime>(SESSION_KEY_LOGIN_VALID_UNTIL)
         {
             Ok(Some(valid_until)) => SystemTime::now() > valid_until,
-            _ => true,
+            _=> true
         }
     }
 
