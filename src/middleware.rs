@@ -6,7 +6,6 @@ use std::{
 
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    web::Data,
     Error, HttpMessage,
 };
 use futures::future::LocalBoxFuture;
@@ -15,9 +14,7 @@ use regex::Regex;
 use serde::de::DeserializeOwned;
 use urlencoding::encode;
 
-use crate::{
-    config::Routes, multifactor::Factor, AuthToken, AuthenticationProvider, UnauthorizedError,
-};
+use crate::{config::Routes, AuthToken, AuthenticationProvider};
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 
@@ -43,7 +40,7 @@ pub struct PathMatcher {
 }
 
 fn add_path_to_list(path_list: &Vec<&str>, list: &mut Vec<(String, Regex)>) {
-    for &pattern in path_list.into_iter() {
+    for &pattern in path_list.iter() {
         let regex_pattern = format!("^{}$", transform_to_encoded_regex(pattern));
         list.push((pattern.to_owned(), Regex::new(&regex_pattern).unwrap()));
     }
@@ -54,7 +51,7 @@ impl PathMatcher {
         let mut path_regex_list = Vec::new();
 
         add_path_to_list(&path_list, &mut path_regex_list);
-        
+
         Self {
             is_exclusion_list,
             path_regex_list,
@@ -120,7 +117,6 @@ where
 {
     auth_provider: Rc<AuthProvider>,
     path_matcher: Rc<PathMatcher>,
-    additional_factor: Rc<Option<Box<dyn Factor>>>,
     user_type: PhantomData<U>,
 }
 
@@ -133,20 +129,6 @@ where
         AuthMiddleware {
             auth_provider: Rc::new(auth_provider),
             path_matcher: Rc::new(path_matcher),
-            additional_factor: Rc::new(None),
-            user_type: PhantomData,
-        }
-    }
-
-    pub fn new_with_factor(
-        auth_provider: AuthProvider,
-        path_matcher: PathMatcher,
-        factor: Box<dyn Factor>,
-    ) -> Self {
-        AuthMiddleware {
-            auth_provider: Rc::new(auth_provider),
-            path_matcher: Rc::new(path_matcher),
-            additional_factor: Rc::new(Some(factor)),
             user_type: PhantomData,
         }
     }
@@ -160,7 +142,6 @@ where
     service: Rc<S>,
     auth_provider: Rc<AuthProvider>,
     path_matcher: Rc<PathMatcher>,
-    factor: Rc<Option<Box<dyn Factor>>>,
     user_type: PhantomData<U>,
 }
 
@@ -184,16 +165,10 @@ where
         let debug_path = req.path().to_owned();
         let service = Rc::clone(&self.service);
         let auth_provider = Rc::clone(&self.auth_provider);
-        let factor = Rc::clone(&self.factor);
-        let mut mfa_route_option = None;
-        if let Some(routes) = req.app_data::<Data<Routes>>() {
-            mfa_route_option = Some(routes.get_mfa().to_owned())
-        }
 
         {
-            // Add the given factor to the extensions, to be able to retrieve it later in a handler
             let mut extensions = req.extensions_mut();
-            extensions.insert(factor);
+            auth_provider.configure_provider(&mut extensions);
         }
 
         if self.path_matcher.matches(&request_path) {
@@ -201,34 +176,11 @@ where
 
             Box::pin(async move {
                 // Before Request
-                match auth_provider.get_auth_token(req.request()).await {
-                    Ok(token) => {
-                        let mut is_valid_mfa_req = false;
-                        // ToDo: currently hardcoded: needs to be configurable
-                        if token.needs_mfa()
-                            && mfa_route_option.is_some()
-                            && mfa_route_option.unwrap() == request_path
-                        {
-                            is_valid_mfa_req = true;
-                        }
+                let processed_request = auth_provider.is_user_authorized_for_request(req).await?;
 
-                        if !is_valid_mfa_req && !token.is_authenticated() {
-                            return Err(UnauthorizedError::default().into());
-                        }
+                let res = service.call(processed_request).await?;
 
-                        let mut extensions = req.extensions_mut();
-                        extensions.insert(token);
-                        // is it really needed on each secured route? or only on /mfa and /login?
-                    }
-                    Err(_) => {
-                        debug!("No authenticated user found");
-                        return Err(UnauthorizedError::default().into());
-                    }
-                }
-
-                let res = service.call(req).await?;
-
-                // After Request:
+                // Process logout logic after request
                 let token_valid = {
                     let extensions = res.request().extensions();
                     if let Some(token) = extensions.get::<AuthToken<U>>() {
@@ -272,7 +224,6 @@ where
         ready(Ok(AuthMiddlewareInner {
             service: Rc::new(service),
             path_matcher: Rc::clone(&self.path_matcher),
-            factor: Rc::clone(&self.additional_factor),
             auth_provider: Rc::clone(&self.auth_provider),
             user_type: PhantomData,
         }))
@@ -286,7 +237,7 @@ mod tests {
     use super::PathMatcher;
 
     #[test]
-    fn should_be_able_to_add_routes_to_path_matcher()  {
+    fn should_be_able_to_add_routes_to_path_matcher() {
         let routes = Routes::new("", "/custom-login", "/custom-mfa", "/logout");
 
         let mut path_matcher: PathMatcher = routes.into();
@@ -297,7 +248,7 @@ mod tests {
     }
 
     #[test]
-    fn path_matcher_can_be_created_from_routes()  {
+    fn path_matcher_can_be_created_from_routes() {
         let routes = Routes::new("", "/custom-login", "/custom-mfa", "/logout");
 
         let path_matcher: PathMatcher = routes.into();

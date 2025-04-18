@@ -187,7 +187,7 @@ fn start_test_server(addr: SocketAddr) {
                     default_session_login_factory(
                         SessionLoginHandler::new(AcceptEveryoneLoginService {}),
                         AuthMiddleware::<_, User>::new(
-                            SessionAuthProvider,
+                            SessionAuthProvider::default(),
                             PathMatcher::new(vec!["/login", "/public-route"], true),
                         ),
                         CookieSessionStore::default(),

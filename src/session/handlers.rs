@@ -9,7 +9,7 @@ use actix_web::{
     web::{self, Data, Json, ServiceConfig},
     Error, HttpRequest, HttpResponse, Resource, Responder,
 };
-use log::error;
+use log::{error, warn};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -140,6 +140,11 @@ async fn mfa_route(
     req: HttpRequest,
     session: LoginSession,
 ) -> Result<impl Responder, CheckCodeError> {
+    if !session.is_mfa_needed() {
+        warn!("Mfa route called although no mfa check is needed");
+        return Ok(HttpResponse::BadRequest().finish());
+    }
+
     if session.no_longer_valid() {
         session.destroy();
         return Err(CheckCodeError::FinallyRejected);

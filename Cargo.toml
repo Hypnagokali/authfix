@@ -31,6 +31,7 @@ resvg = "0.45.0"
 rqrr = "0.9.0"
 image = "0.25.5"
 chrono = "0.4.40"
+env_logger = "0.11.8"
 
 # to make integration tests work
 authfix = { path = ".", features = ["google_auth", "mfa_send_code"] } 
