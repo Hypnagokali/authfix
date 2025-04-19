@@ -24,7 +24,7 @@ use crate::{
     AuthState, AuthToken, AuthenticationProvider, UnauthorizedError,
 };
 
-use super::handlers::{login_config, SessionLoginHandler};
+use super::handlers::SessionLoginHandler;
 
 const SESSION_KEY_USER: &str = "authfix__user";
 const SESSION_KEY_NEED_MFA: &str = "authfix__needs_mfa";
@@ -236,7 +236,7 @@ pub fn session_login_factory<
     >,
 > {
     App::new()
-        .configure(login_config(SessionLoginHandler::new(login_handler)))
+        .configure(SessionLoginHandler::new(login_handler).get_config())
         .wrap(auth_middleware)
         .wrap(session_middleware)
 }
@@ -257,7 +257,7 @@ pub fn default_session_login_factory<U: Serialize + DeserializeOwned + Clone + '
     >,
 > {
     App::new()
-        .configure(login_config(SessionLoginHandler::new(login_handler)))
+        .configure(SessionLoginHandler::new(login_handler).get_config())
         .wrap(auth_middleware)
         .wrap(SessionMiddleware::new(session_store, key))
 }

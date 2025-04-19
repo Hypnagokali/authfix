@@ -55,16 +55,17 @@ impl LoginSessionResponse {
 
 /// An [Actix Web handler](https://actix.rs/docs/handlers/) for login, logout and multi factor auth validation
 #[allow(clippy::type_complexity)]
-pub struct SessionLoginHandler<T: LoadUserService, U> {
+pub struct SessionLoginHandler<T: LoadUserService<User = U>, U> {
     user_service: Arc<T>,
-    mfa_condition: Arc<Option<fn(&U, &HttpRequest) -> bool>>,
-    is_with_mfa: bool,
+    mfa_condition: Option<fn(&U, &HttpRequest) -> bool>,
+    with_mfa: bool,
     routes: Routes,
 }
 
 impl<T, U> SessionLoginHandler<T, U>
 where
-    T: LoadUserService,
+    U: DeserializeOwned + Serialize + Clone + 'static,
+    T: LoadUserService<User = U> + 'static,
 {
     /// Creates a handler that owns the [LoadUserService]
     ///
@@ -72,8 +73,8 @@ where
     pub fn new(user_service: T) -> Self {
         Self {
             user_service: Arc::new(user_service),
-            mfa_condition: Arc::new(None),
-            is_with_mfa: false,
+            mfa_condition: None,
+            with_mfa: false,
             routes: Routes::default(),
         }
     }
@@ -84,8 +85,8 @@ where
     pub fn new_from_shared(user_service: Arc<T>) -> Self {
         Self {
             user_service: Arc::clone(&user_service),
-            mfa_condition: Arc::new(None),
-            is_with_mfa: false,
+            mfa_condition: None,
+            with_mfa: false,
             routes: Routes::default(),
         }
     }
@@ -94,8 +95,8 @@ where
     pub fn with_mfa(user_service: T) -> Self {
         Self {
             user_service: Arc::new(user_service),
-            mfa_condition: Arc::new(None),
-            is_with_mfa: true,
+            mfa_condition: None,
+            with_mfa: true,
             routes: Routes::default(),
         }
     }
@@ -107,8 +108,8 @@ where
     ) -> Self {
         Self {
             user_service: Arc::new(user_service),
-            mfa_condition: Arc::new(Some(mfa_condition)),
-            is_with_mfa: true,
+            mfa_condition: Some(mfa_condition),
+            with_mfa: true,
             routes: Routes::default(),
         }
     }
@@ -118,8 +119,21 @@ where
     }
 
     pub fn is_with_mfa(&self) -> bool {
-        self.is_with_mfa
+        self.with_mfa
     }
+
+    /// Configuration function to setup a [SessionLoginHandler]
+    pub fn get_config(
+        self,
+     ) -> impl FnOnce(&mut ServiceConfig) {
+        let routes = web::Data::new(self.routes.clone());
+
+        |config: &mut ServiceConfig| {
+            config.service(self);
+            config.app_data(routes);
+        }
+    }
+
 }
 
 /// Request for validating the code
@@ -193,7 +207,7 @@ fn generate_code_if_mfa_necessary<U: Serialize>(
 async fn login<T: LoadUserService<User = U>, U: Serialize>(
     login_token: Json<LoginToken>,
     user_service: Data<Arc<T>>,
-    mfa_condition: Data<Arc<Option<fn(&U, &HttpRequest) -> bool>>>,
+    mfa_condition: Data<Option<fn(&U, &HttpRequest) -> bool>>,
     mfa_registry: MfaRegistry,
     session: LoginSession,
     req: HttpRequest,
@@ -245,11 +259,19 @@ where
     U: Serialize + DeserializeOwned + Clone + 'static,
 {
     fn register(self, __config: &mut AppService) {
+        if self.is_with_mfa() {
+            let mfa_resource = Resource::new(self.routes.get_mfa())
+                .name("mfa")
+                .guard(Post())
+                .to(mfa_route);
+            HttpServiceFactory::register(mfa_resource, __config);
+        }
+
         let login_resource = Resource::new(self.routes.get_login())
             .name("login")
             .guard(Post())
-            .app_data(Data::new(Arc::clone(&self.user_service)))
-            .app_data(Data::new(Arc::clone(&self.mfa_condition)))
+            .app_data(Data::new(self.user_service))
+            .app_data(Data::new(self.mfa_condition))
             .to(login::<T, U>);
         HttpServiceFactory::register(login_resource, __config);
 
@@ -258,14 +280,6 @@ where
             .guard(Post())
             .to(logout::<U>);
         HttpServiceFactory::register(logout_resource, __config);
-
-        if self.is_with_mfa() {
-            let mfa_resource = Resource::new(self.routes.get_mfa())
-                .name("mfa")
-                .guard(Post())
-                .to(mfa_route);
-            HttpServiceFactory::register(mfa_resource, __config);
-        }
     }
 }
 
@@ -274,24 +288,4 @@ async fn logout<U: DeserializeOwned + Clone>(token: AuthToken<U>) -> impl Respon
     HttpResponse::Ok()
 }
 
-/// Configuration function to setup a [SessionLoginHandler]
-///
-/// # Examples
-///
-/// ```ignore
-/// App::new()
-///   .configure(login_config(SessionLoginHandler::new(YourLoadUserService {})))
-/// ```
-pub fn login_config<
-    L: LoadUserService<User = U> + 'static,
-    U: Serialize + DeserializeOwned + Clone + 'static,
->(
-    login_handler: SessionLoginHandler<L, U>,
-) -> impl FnOnce(&mut ServiceConfig) {
-    let routes = web::Data::new(login_handler.routes.clone());
 
-    |config: &mut ServiceConfig| {
-        config.service(login_handler);
-        config.app_data(routes);
-    }
-}
