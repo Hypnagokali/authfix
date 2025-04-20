@@ -310,9 +310,9 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
                 HttpServer::new(move || {
                     App::new()
                         .service(secured_route)
-                        .configure(SessionLoginHandler::with_mfa(
-                            HardCodedLoadUserService {},
-                        ).get_config())
+                        .configure(
+                            SessionLoginHandler::with_mfa(HardCodedLoadUserService {}).get_config(),
+                        )
                         .wrap(AuthMiddleware::<_, User>::new(
                             SessionAuthProvider::new(Box::new(MfaRandomCode::new(
                                 generator,

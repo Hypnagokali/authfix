@@ -123,9 +123,7 @@ where
     }
 
     /// Configuration function to setup a [SessionLoginHandler]
-    pub fn get_config(
-        self,
-     ) -> impl FnOnce(&mut ServiceConfig) {
+    pub fn get_config(self) -> impl FnOnce(&mut ServiceConfig) {
         let routes = web::Data::new(self.routes.clone());
 
         |config: &mut ServiceConfig| {
@@ -133,7 +131,6 @@ where
             config.app_data(routes);
         }
     }
-
 }
 
 /// Request for validating the code
@@ -287,5 +284,3 @@ async fn logout<U: DeserializeOwned + Clone>(token: AuthToken<U>) -> impl Respon
     token.invalidate();
     HttpResponse::Ok()
 }
-
-

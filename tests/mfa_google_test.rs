@@ -5,10 +5,7 @@ use actix_web::{cookie::Key, get, App, HttpRequest, HttpResponse, HttpServer, Re
 use authfix::{
     middleware::{AuthMiddleware, PathMatcher},
     multifactor::{google_auth::GoogleAuthFactor, TotpSecretRepository},
-    session::{
-        handlers::SessionLoginHandler,
-        session_auth::SessionAuthProvider,
-    },
+    session::{handlers::SessionLoginHandler, session_auth::SessionAuthProvider},
     AuthToken,
 };
 
@@ -207,10 +204,13 @@ fn start_test_server(addr: SocketAddr) {
                 HttpServer::new(move || {
                     App::new()
                         .service(secured_route)
-                        .configure(SessionLoginHandler::with_mfa_condition(
-                            HardCodedLoadUserService {},
-                            mfa_condition,
-                        ).get_config())
+                        .configure(
+                            SessionLoginHandler::with_mfa_condition(
+                                HardCodedLoadUserService {},
+                                mfa_condition,
+                            )
+                            .get_config(),
+                        )
                         .wrap(AuthMiddleware::<_, User>::new(
                             SessionAuthProvider::new(Box::new(
                                 GoogleAuthFactor::<_, User>::with_discrepancy(
