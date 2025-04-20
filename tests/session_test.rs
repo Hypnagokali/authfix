@@ -3,10 +3,7 @@ use std::{net::SocketAddr, thread};
 use actix_session::storage::CookieSessionStore;
 use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
 use authfix::{
-    login::LoadUserService,
-    middleware::{AuthMiddleware, PathMatcher},
-    session::session_auth::{default_session_login_factory, SessionAuthProvider},
-    AuthToken,
+    config::Routes, login::LoadUserService, middleware::{AuthMiddleware, PathMatcher}, session::{app_builder::SessionLoginBuilder, session_auth::{default_session_login_factory, SessionAuthProvider}}, AuthToken
 };
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -181,17 +178,11 @@ fn start_test_server(addr: SocketAddr) {
         actix_rt::System::new()
             .block_on(async {
                 HttpServer::new(move || {
-                    default_session_login_factory(
-                        AcceptEveryoneLoginService {},
-                        AuthMiddleware::<_, User>::new(
-                            SessionAuthProvider::default(),
-                            PathMatcher::new(vec!["/login", "/public-route"], true),
-                        ),
-                        CookieSessionStore::default(),
-                        Key::generate(),
-                    )
-                    .service(secured_route)
-                    .service(public_route)
+                    SessionLoginBuilder::default(AcceptEveryoneLoginService{})
+                        .set_login_and_unsecured_routes(Routes::default(), vec!["/public-route"])
+                        .build()                    
+                        .service(secured_route)
+                        .service(public_route)
                 })
                 .bind(format!("{addr}"))
                 .unwrap()
