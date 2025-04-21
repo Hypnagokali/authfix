@@ -45,7 +45,6 @@ where
         factor: Box<dyn Factor>,
         condition: fn(&U, &HttpRequest) -> bool,
     ) -> SessionLoginBuilder<U, S, ST> {
-        // self.session_login_handler.set_mfa(true);
         Self {
             path_matcher: self.path_matcher,
             session_store: self.session_store,
@@ -58,7 +57,6 @@ where
     }
 
     pub fn set_mfa(self, factor: Box<dyn Factor>) -> SessionLoginBuilder<U, S, ST> {
-        // self.session_login_handler.set_mfa(true);
         Self {
             path_matcher: self.path_matcher,
             session_store: self.session_store,
