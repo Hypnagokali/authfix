@@ -1,11 +1,9 @@
 use std::{future::ready, net::SocketAddr, sync::Arc, thread};
 
-use actix_session::{storage::CookieSessionStore, SessionMiddleware};
-use actix_web::{cookie::Key, get, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{get, HttpRequest, HttpResponse, HttpServer, Responder};
 use authfix::{
-    middleware::{AuthMiddleware, PathMatcher},
-    multifactor::{google_auth::GoogleAuthFactor, TotpSecretRepository},
-    session::{handlers::SessionLoginHandler, session_auth::SessionAuthProvider},
+    multifactor::{google_auth::GoogleAuthFactor, Factor, TotpSecretRepository},
+    session::app_builder::SessionLoginAppBuilder,
     AuthToken,
 };
 
@@ -49,12 +47,6 @@ pub async fn secured_route(token: AuthToken<User>) -> impl Responder {
         "Request from user: {}",
         token.get_authenticated_user().email
     ))
-}
-
-fn create_actix_session_middleware() -> SessionMiddleware<CookieSessionStore> {
-    let key = Key::generate();
-
-    SessionMiddleware::new(CookieSessionStore::default(), key.clone())
 }
 
 #[actix_rt::test]
@@ -201,31 +193,24 @@ fn start_test_server(addr: SocketAddr) {
             .block_on(async {
                 let totp_secret_repo = Arc::new(TotpTestRepo);
 
-                HttpServer::new(move || {
-                    App::new()
+                let app_closure = move || {
+                    let factor: Box<dyn Factor> =
+                        Box::new(GoogleAuthFactor::<_, User>::with_discrepancy(
+                            Arc::clone(&totp_secret_repo),
+                            3,
+                        ));
+
+                    SessionLoginAppBuilder::default(HardCodedLoadUserService {})
+                        .set_mfa_with_condition(factor, mfa_condition)
+                        .build()
                         .service(secured_route)
-                        .configure(
-                            SessionLoginHandler::with_mfa_condition(
-                                HardCodedLoadUserService {},
-                                mfa_condition,
-                            )
-                            .get_config(),
-                        )
-                        .wrap(AuthMiddleware::<_, User>::new(
-                            SessionAuthProvider::new(Box::new(
-                                GoogleAuthFactor::<_, User>::with_discrepancy(
-                                    Arc::clone(&totp_secret_repo),
-                                    3,
-                                ),
-                            )),
-                            PathMatcher::default(),
-                        ))
-                        .wrap(create_actix_session_middleware())
-                })
-                .bind(format!("{addr}"))
-                .unwrap()
-                .run()
-                .await
+                };
+
+                HttpServer::new(app_closure)
+                    .bind(format!("{addr}"))
+                    .unwrap()
+                    .run()
+                    .await
             })
             .unwrap();
     });

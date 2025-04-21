@@ -2,7 +2,7 @@ use std::{net::SocketAddr, thread};
 
 use actix_web::{get, HttpResponse, HttpServer, Responder};
 use authfix::{
-    config::Routes, login::LoadUserService, session::app_builder::SessionLoginBuilder, AuthToken,
+    config::Routes, login::LoadUserService, session::app_builder::SessionLoginAppBuilder, AuthToken,
 };
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -177,7 +177,7 @@ fn start_test_server(addr: SocketAddr) {
         actix_rt::System::new()
             .block_on(async {
                 HttpServer::new(move || {
-                    SessionLoginBuilder::default(AcceptEveryoneLoginService {})
+                    SessionLoginAppBuilder::default(AcceptEveryoneLoginService {})
                         .set_login_and_unsecured_routes(Routes::default(), vec!["/public-route"])
                         .build()
                         .service(secured_route)

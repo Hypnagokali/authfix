@@ -19,7 +19,7 @@ use crate::{
 
 use super::{handlers::SessionLoginHandler, session_auth::SessionAuthProvider};
 
-pub struct SessionLoginBuilder<U, S, ST>
+pub struct SessionLoginAppBuilder<U, S, ST>
 where
     U: Serialize + DeserializeOwned + Clone + 'static,
     S: LoadUserService<User = U> + 'static,
@@ -34,7 +34,7 @@ where
     key: Key,
 }
 
-impl<U, S, ST> SessionLoginBuilder<U, S, ST>
+impl<U, S, ST> SessionLoginAppBuilder<U, S, ST>
 where
     U: Serialize + DeserializeOwned + Clone + 'static,
     S: LoadUserService<User = U> + 'static,
@@ -44,7 +44,7 @@ where
         self,
         factor: Box<dyn Factor>,
         condition: fn(&U, &HttpRequest) -> bool,
-    ) -> SessionLoginBuilder<U, S, ST> {
+    ) -> SessionLoginAppBuilder<U, S, ST> {
         Self {
             path_matcher: self.path_matcher,
             session_store: self.session_store,
@@ -56,7 +56,7 @@ where
         }
     }
 
-    pub fn set_mfa(self, factor: Box<dyn Factor>) -> SessionLoginBuilder<U, S, ST> {
+    pub fn set_mfa(self, factor: Box<dyn Factor>) -> SessionLoginAppBuilder<U, S, ST> {
         Self {
             path_matcher: self.path_matcher,
             session_store: self.session_store,
@@ -72,7 +72,7 @@ where
         self,
         login_routes: Routes,
         unsecured: Vec<&str>,
-    ) -> SessionLoginBuilder<U, S, ST> {
+    ) -> SessionLoginAppBuilder<U, S, ST> {
         let mut path_matcher: PathMatcher = login_routes.clone().into();
         path_matcher.add(unsecured);
 
@@ -87,7 +87,7 @@ where
         }
     }
 
-    pub fn set_session_key(self, key: Key) -> SessionLoginBuilder<U, S, ST> {
+    pub fn set_session_key(self, key: Key) -> SessionLoginAppBuilder<U, S, ST> {
         Self {
             path_matcher: self.path_matcher,
             session_store: self.session_store,
@@ -99,7 +99,7 @@ where
         }
     }
 
-    pub fn set_session_store(self, session_store: ST) -> SessionLoginBuilder<U, S, ST> {
+    pub fn set_session_store(self, session_store: ST) -> SessionLoginAppBuilder<U, S, ST> {
         Self {
             path_matcher: self.path_matcher,
             session_store,
@@ -112,7 +112,7 @@ where
     }
 }
 
-impl<U, S, ST> SessionLoginBuilder<U, S, ST>
+impl<U, S, ST> SessionLoginAppBuilder<U, S, ST>
 where
     U: Serialize + DeserializeOwned + Clone + 'static,
     S: LoadUserService<User = U> + 'static,
@@ -158,7 +158,7 @@ where
     }
 }
 
-impl<U, S> SessionLoginBuilder<U, S, CookieSessionStore>
+impl<U, S> SessionLoginAppBuilder<U, S, CookieSessionStore>
 where
     U: Serialize + DeserializeOwned + Clone + 'static,
     S: LoadUserService<User = U> + 'static,
