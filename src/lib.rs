@@ -60,6 +60,9 @@ pub mod middleware;
 pub mod multifactor;
 pub mod session;
 
+// re-exports
+pub use actix_session;
+
 /// This trait is used to retrieve the logged in user.
 /// If no user was found (e.g. in Actix-Session) it will return an Err.
 ///
