@@ -178,7 +178,7 @@ fn start_test_server(addr: SocketAddr) {
             .block_on(async {
                 HttpServer::new(move || {
                     SessionLoginAppBuilder::default(AcceptEveryoneLoginService {})
-                        .set_login_and_unsecured_routes(Routes::default(), vec!["/public-route"])
+                        .set_routes_and_unsecured_paths(Routes::default(), vec!["/public-route"])
                         .build()
                         .service(secured_route)
                         .service(public_route)

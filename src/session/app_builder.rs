@@ -68,13 +68,35 @@ where
         }
     }
 
-    pub fn set_login_and_unsecured_routes(
+    pub fn set_routes_and_secured_paths(
         self,
         login_routes: Routes,
-        unsecured: Vec<&str>,
+        secured_paths: Vec<&str>,
+    ) -> SessionLoginAppBuilder<U, S, ST> {
+        let mut path_matcher: PathMatcher = PathMatcher::new(
+            vec![login_routes.get_logout(), login_routes.get_mfa()],
+            false,
+        );
+        path_matcher.add(secured_paths);
+
+        Self {
+            path_matcher,
+            session_store: self.session_store,
+            mfa_condition: None,
+            factor: None,
+            routes: login_routes,
+            load_user_service: self.load_user_service,
+            key: self.key,
+        }
+    }
+
+    pub fn set_routes_and_unsecured_paths(
+        self,
+        login_routes: Routes,
+        unsecured_paths: Vec<&str>,
     ) -> SessionLoginAppBuilder<U, S, ST> {
         let mut path_matcher: PathMatcher = login_routes.clone().into();
-        path_matcher.add(unsecured);
+        path_matcher.add(unsecured_paths);
 
         Self {
             path_matcher,
