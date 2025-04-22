@@ -62,6 +62,7 @@ pub mod session;
 
 // re-exports
 pub use actix_session;
+pub use async_trait;
 
 /// This trait is used to retrieve the logged in user.
 /// If no user was found (e.g. in Actix-Session) it will return an Err.
