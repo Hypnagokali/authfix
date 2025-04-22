@@ -1,6 +1,7 @@
 use std::{net::SocketAddr, thread};
 
 use actix_web::{get, HttpResponse, HttpServer, Responder};
+use async_trait::async_trait;
 use authfix::{
     config::Routes, login::LoadUserService, session::app_builder::SessionLoginAppBuilder, AuthToken,
 };
@@ -15,35 +16,18 @@ pub struct User {
 
 struct AcceptEveryoneLoginService {}
 
+#[async_trait]
 impl LoadUserService for AcceptEveryoneLoginService {
     type User = User;
 
-    fn load_user(
+    async fn load_user(
         &self,
         _: &authfix::login::LoginToken,
-    ) -> futures::future::LocalBoxFuture<'_, Result<Self::User, authfix::login::LoadUserError>>
-    {
-        Box::pin(async {
-            Ok(User {
-                email: "test@example.org".to_owned(),
-                name: "Test User".to_owned(),
-            })
+    ) -> Result<Self::User, authfix::login::LoadUserError> {
+        Ok(User {
+            email: "test@example.org".to_owned(),
+            name: "Test User".to_owned(),
         })
-    }
-
-    fn on_success_handler(
-        &self,
-        _: &actix_web::HttpRequest,
-        _: &Self::User,
-    ) -> futures::future::LocalBoxFuture<'_, Result<(), authfix::login::HandlerError>> {
-        Box::pin(async { Ok(()) })
-    }
-
-    fn on_error_handler(
-        &self,
-        _: &actix_web::HttpRequest,
-    ) -> futures::future::LocalBoxFuture<'_, Result<(), authfix::login::HandlerError>> {
-        Box::pin(async { Ok(()) })
     }
 }
 

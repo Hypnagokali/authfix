@@ -104,7 +104,10 @@ where
         }
     }
 
-    pub fn set_session_middleware(self, session_middleware: SessionMiddleware<ST>) -> SessionLoginAppBuilder<U, S, ST> {
+    pub fn set_session_middleware(
+        self,
+        session_middleware: SessionMiddleware<ST>,
+    ) -> SessionLoginAppBuilder<U, S, ST> {
         Self {
             path_matcher: self.path_matcher,
             session_middleware,
@@ -170,7 +173,10 @@ where
     pub fn default(load_user_service: S) -> Self {
         Self {
             path_matcher: Routes::default().into(),
-            session_middleware: SessionMiddleware::new(CookieSessionStore::default(), Key::generate()),
+            session_middleware: SessionMiddleware::new(
+                CookieSessionStore::default(),
+                Key::generate(),
+            ),
             load_user_service,
             mfa_condition: None,
             factor: None,

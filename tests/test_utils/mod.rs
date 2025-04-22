@@ -1,8 +1,5 @@
-use std::future::ready;
-
-use actix_web::HttpRequest;
-use authfix::login::{HandlerError, LoadUserError, LoadUserService, LoginToken};
-use futures::future::LocalBoxFuture;
+use async_trait::async_trait;
+use authfix::login::{LoadUserError, LoadUserService, LoginToken};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -34,34 +31,20 @@ pub struct User {
 
 pub struct HardCodedLoadUserService {}
 
+#[async_trait]
 impl LoadUserService for HardCodedLoadUserService {
     type User = User;
 
-    fn load_user(
-        &self,
-        login_token: &LoginToken,
-    ) -> LocalBoxFuture<'_, Result<Self::User, LoadUserError>> {
+    async fn load_user(&self, login_token: &LoginToken) -> Result<Self::User, LoadUserError> {
         if (login_token.username == "anna" || login_token.username == "bob")
             && login_token.password == "test123"
         {
-            Box::pin(ready(Ok(User {
+            Ok(User {
                 name: login_token.username.to_owned(),
                 email: format!("{}@example.org", login_token.username),
-            })))
+            })
         } else {
-            Box::pin(ready(Err(LoadUserError::LoginFailed)))
+            Err(LoadUserError::LoginFailed)
         }
-    }
-
-    fn on_success_handler(
-        &self,
-        _req: &HttpRequest,
-        _user: &Self::User,
-    ) -> LocalBoxFuture<'_, Result<(), HandlerError>> {
-        Box::pin(ready(Ok(())))
-    }
-
-    fn on_error_handler(&self, _req: &HttpRequest) -> LocalBoxFuture<'_, Result<(), HandlerError>> {
-        Box::pin(ready(Ok(())))
     }
 }
