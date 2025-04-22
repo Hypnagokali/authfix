@@ -6,25 +6,15 @@ use std::{
     time::SystemTime,
 };
 
-use actix_session::{
-    storage::SessionStore, Session, SessionExt, SessionInsertError, SessionMiddleware,
-};
-use actix_web::{
-    body::MessageBody,
-    cookie::Key,
-    dev::{ServiceFactory, ServiceRequest, ServiceResponse},
-    web::Data,
-    App, Error, FromRequest, HttpMessage, HttpRequest,
-};
+use actix_session::{Session, SessionExt, SessionInsertError};
+use actix_web::{dev::ServiceRequest, web::Data, Error, FromRequest, HttpMessage, HttpRequest};
 use log::error;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    config::Routes, login::LoadUserService, middleware::AuthMiddleware, multifactor::Factor,
-    AuthState, AuthToken, AuthenticationProvider, UnauthorizedError,
+    config::Routes, multifactor::Factor, AuthState, AuthToken, AuthenticationProvider,
+    UnauthorizedError,
 };
-
-use super::handlers::SessionLoginHandler;
 
 const SESSION_KEY_USER: &str = "authfix__user";
 const SESSION_KEY_NEED_MFA: &str = "authfix__needs_mfa";
@@ -216,48 +206,4 @@ impl FromRequest for LoginSession {
         let session = req.get_session();
         ready(Ok(LoginSession::new(session)))
     }
-}
-
-/// Factory for an [actix_web::App] with [actix_session::SessionMiddleware] as parameter
-pub fn session_login_factory<
-    U: Serialize + DeserializeOwned + Clone + 'static,
-    S: SessionStore + 'static,
->(
-    login_handler: impl LoadUserService<User = U> + 'static,
-    auth_middleware: AuthMiddleware<impl AuthenticationProvider<U> + Clone + 'static, U>,
-    session_middleware: SessionMiddleware<S>,
-) -> App<
-    impl ServiceFactory<
-        ServiceRequest,
-        Response = ServiceResponse<impl MessageBody>,
-        Config = (),
-        InitError = (),
-        Error = Error,
-    >,
-> {
-    App::new()
-        .configure(SessionLoginHandler::new(login_handler).get_config())
-        .wrap(auth_middleware)
-        .wrap(session_middleware)
-}
-
-/// Factory for an [actix_web::App] with a default [actix_session::SessionMiddleware]
-pub fn default_session_login_factory<U: Serialize + DeserializeOwned + Clone + 'static>(
-    login_handler: impl LoadUserService<User = U> + 'static,
-    auth_middleware: AuthMiddleware<impl AuthenticationProvider<U> + Clone + 'static, U>,
-    session_store: impl SessionStore + 'static,
-    key: Key,
-) -> App<
-    impl ServiceFactory<
-        ServiceRequest,
-        Response = ServiceResponse<impl MessageBody>,
-        Config = (),
-        InitError = (),
-        Error = Error,
-    >,
-> {
-    App::new()
-        .configure(SessionLoginHandler::new(login_handler).get_config())
-        .wrap(auth_middleware)
-        .wrap(SessionMiddleware::new(session_store, key))
 }
