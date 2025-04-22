@@ -25,13 +25,12 @@ where
     S: LoadUserService<User = U> + 'static,
     ST: SessionStore,
 {
-    session_store: ST,
+    session_middleware: SessionMiddleware<ST>,
     path_matcher: PathMatcher,
     load_user_service: S,
     factor: Option<Box<dyn Factor>>,
     mfa_condition: Option<fn(&U, &HttpRequest) -> bool>,
     routes: Routes,
-    key: Key,
 }
 
 impl<U, S, ST> SessionLoginAppBuilder<U, S, ST>
@@ -47,24 +46,22 @@ where
     ) -> SessionLoginAppBuilder<U, S, ST> {
         Self {
             path_matcher: self.path_matcher,
-            session_store: self.session_store,
             factor: Some(factor),
             mfa_condition: Some(condition),
             routes: self.routes,
             load_user_service: self.load_user_service,
-            key: self.key,
+            session_middleware: self.session_middleware,
         }
     }
 
     pub fn set_mfa(self, factor: Box<dyn Factor>) -> SessionLoginAppBuilder<U, S, ST> {
         Self {
             path_matcher: self.path_matcher,
-            session_store: self.session_store,
             factor: Some(factor),
             mfa_condition: None,
             routes: self.routes,
             load_user_service: self.load_user_service,
-            key: self.key,
+            session_middleware: self.session_middleware,
         }
     }
 
@@ -81,12 +78,11 @@ where
 
         Self {
             path_matcher,
-            session_store: self.session_store,
+            session_middleware: self.session_middleware,
             mfa_condition: None,
             factor: None,
             routes: login_routes,
             load_user_service: self.load_user_service,
-            key: self.key,
         }
     }
 
@@ -100,36 +96,22 @@ where
 
         Self {
             path_matcher,
-            session_store: self.session_store,
+            session_middleware: self.session_middleware,
             mfa_condition: None,
             factor: None,
             routes: login_routes,
             load_user_service: self.load_user_service,
-            key: self.key,
         }
     }
 
-    pub fn set_session_key(self, key: Key) -> SessionLoginAppBuilder<U, S, ST> {
+    pub fn set_session_middleware(self, session_middleware: SessionMiddleware<ST>) -> SessionLoginAppBuilder<U, S, ST> {
         Self {
             path_matcher: self.path_matcher,
-            session_store: self.session_store,
+            session_middleware,
             mfa_condition: None,
             factor: None,
             routes: self.routes,
             load_user_service: self.load_user_service,
-            key,
-        }
-    }
-
-    pub fn set_session_store(self, session_store: ST) -> SessionLoginAppBuilder<U, S, ST> {
-        Self {
-            path_matcher: self.path_matcher,
-            session_store,
-            mfa_condition: None,
-            factor: None,
-            routes: self.routes,
-            load_user_service: self.load_user_service,
-            key: self.key,
         }
     }
 }
@@ -176,7 +158,7 @@ where
         App::new()
             .configure(login_handler_and_provider.0.get_config())
             .wrap(middleware)
-            .wrap(SessionMiddleware::new(self.session_store, self.key))
+            .wrap(self.session_middleware)
     }
 }
 
@@ -188,12 +170,11 @@ where
     pub fn default(load_user_service: S) -> Self {
         Self {
             path_matcher: Routes::default().into(),
-            session_store: CookieSessionStore::default(),
+            session_middleware: SessionMiddleware::new(CookieSessionStore::default(), Key::generate()),
             load_user_service,
             mfa_condition: None,
             factor: None,
             routes: Routes::default(),
-            key: Key::generate(),
         }
     }
 }
