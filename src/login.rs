@@ -1,5 +1,5 @@
 use actix_web::{HttpRequest, HttpResponse, ResponseError};
-use futures::future::LocalBoxFuture;
+use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
 
@@ -11,29 +11,27 @@ pub struct LoginToken {
 }
 
 /// Trait that handles the loading of a user and executes a success and error handler
+#[async_trait]
 pub trait LoadUserService: Send + Sync {
     type User: DeserializeOwned + Serialize + Clone;
 
     /// Gets a [LoginToken] and returns a user if credentials are correct a [LoadUserError] otherwise
-    fn load_user(
-        &self,
-        login_token: &LoginToken,
-    ) -> LocalBoxFuture<'_, Result<Self::User, LoadUserError>>;
+    async fn load_user(&self, login_token: &LoginToken) -> Result<Self::User, LoadUserError>;
 
     /// Is called after the user has successfully completed authentication
     #[allow(unused)]
-    fn on_success_handler(
+    async fn on_success_handler(
         &self,
         req: &HttpRequest,
         user: &Self::User,
-    ) -> LocalBoxFuture<'_, Result<(), HandlerError>> {
-        Box::pin(async { Ok(()) })
+    ) -> Result<(), HandlerError> {
+        Ok(())
     }
 
     /// Is called when the login fails
     #[allow(unused)]
-    fn on_error_handler(&self, req: &HttpRequest) -> LocalBoxFuture<'_, Result<(), HandlerError>> {
-        Box::pin(async { Ok(()) })
+    async fn on_error_handler(&self, req: &HttpRequest) -> Result<(), HandlerError> {
+        Ok(())
     }
 }
 

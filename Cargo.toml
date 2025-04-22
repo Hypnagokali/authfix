@@ -16,6 +16,8 @@ futures = "0.3"
 regex = "1.11"
 urlencoding = "2.1"
 thiserror = "2.0"
+# used for public api like the trait `LoadUserService`
+async-trait = "0.1.88"
 
 # feature: google_auth
 google-authenticator = { version = "0.4", optional = true }
