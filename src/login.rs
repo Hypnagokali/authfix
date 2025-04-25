@@ -3,10 +3,10 @@ use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
 
-/// The unencrypted credentials coming directly from the request
+/// Credentials comming from the login request
 #[derive(Deserialize)]
 pub struct LoginToken {
-    pub username: String,
+    pub email: String,
     pub password: String,
 }
 
