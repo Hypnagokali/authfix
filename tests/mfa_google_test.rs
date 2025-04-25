@@ -58,7 +58,7 @@ async fn should_not_be_logged_in_without_mfa() {
 
     let mut res = client
         .post(format!("http://{addr}/login"))
-        .body("{ \"username\": \"anna\", \"password\": \"test123\" }")
+        .body(r#"{ "email": "anna", "password": "test123" }"#)
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -105,7 +105,7 @@ async fn should_respond_mfa_needed_for_login_status() {
 
     let login_res = client
         .post(format!("http://{addr}/login"))
-        .body("{ \"username\": \"anna\", \"password\": \"test123\" }")
+        .body(r#"{ "email": "anna", "password": "test123" }"#)
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -130,7 +130,7 @@ async fn should_be_logged_in_after_mfa() {
 
     client
         .post(format!("http://{addr}/login"))
-        .body("{ \"username\": \"anna\", \"password\": \"test123\" }")
+        .body(r#"{ "email": "anna", "password": "test123" }"#)
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -163,7 +163,7 @@ async fn should_be_not_logged_in_if_mfa_fails() {
 
     client
         .post(format!("http://{addr}/login"))
-        .body("{ \"username\": \"anna\", \"password\": \"test123\" }")
+        .body(r#"{ "email": "anna", "password": "test123" }"#)
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -200,7 +200,7 @@ fn start_test_server(addr: SocketAddr) {
                             3,
                         ));
 
-                    SessionLoginAppBuilder::default(HardCodedLoadUserService {})
+                    SessionLoginAppBuilder::default(HardCodedLoadUserService)
                         .set_mfa_with_condition(factor, mfa_condition)
                         .build()
                         .service(secured_route)
