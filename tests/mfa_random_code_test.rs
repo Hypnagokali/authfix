@@ -35,7 +35,7 @@ async fn should_be_able_to_logout() {
 
     client
         .post(format!("http://{addr}/login"))
-        .body("{ \"username\": \"anna\", \"password\": \"test123\" }")
+        .body(r#"{ "email": "anna", "password": "test123" }"#)
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -73,7 +73,7 @@ async fn should_be_possible_to_try_mfa_again() {
 
     client
         .post(format!("http://{addr}/login"))
-        .body("{ \"username\": \"anna\", \"password\": \"test123\" }")
+        .body(r#"{ "email": "anna", "password": "test123" }"#)
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -113,7 +113,7 @@ async fn should_be_possible_to_login_again_before_mfa_has_been_passed() {
 
     client
         .post(format!("http://{addr}/login"))
-        .body("{ \"username\": \"anna\", \"password\": \"test123\" }")
+        .body(r#"{ "email": "anna", "password": "test123" }"#)
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -129,7 +129,7 @@ async fn should_be_possible_to_login_again_before_mfa_has_been_passed() {
     // now, login with bob:
     client
         .post(format!("http://{addr}/login"))
-        .body("{ \"username\": \"bob\", \"password\": \"test123\" }")
+        .body(r#"{ "email": "bob", "password": "test123" }"#)
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -166,7 +166,7 @@ async fn should_not_be_logged_in_if_code_is_wrong() {
 
     client
         .post(format!("http://{addr}/login"))
-        .body("{ \"username\": \"anna\", \"password\": \"test123\" }")
+        .body(r#"{ "email": "anna", "password": "test123" }"#)
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -190,7 +190,7 @@ async fn should_be_logged_in_after_sending_correct_code() {
 
     client
         .post(format!("http://{addr}/login"))
-        .body("{ \"username\": \"anna\", \"password\": \"test123\" }")
+        .body(r#"{ "email": "anna", "password": "test123" }"#)
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -222,7 +222,7 @@ async fn should_not_be_logged_in_after_time_is_up() {
 
     client
         .post(format!("http://{addr}/login"))
-        .body("{ \"username\": \"anna\", \"password\": \"test123\" }")
+        .body(r#"{ "email": "anna", "password": "test123" }"#)
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -311,7 +311,7 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
                     App::new()
                         .service(secured_route)
                         .configure(
-                            SessionLoginHandler::with_mfa(HardCodedLoadUserService {}).get_config(),
+                            SessionLoginHandler::with_mfa(HardCodedLoadUserService).get_config(),
                         )
                         .wrap(AuthMiddleware::<_, User>::new(
                             SessionAuthProvider::new(Box::new(MfaRandomCode::new(

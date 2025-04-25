@@ -56,7 +56,7 @@ async fn should_can_login() {
 
     client
         .post(format!("http://{addr}/login"))
-        .body("{ \"username\": \"any\", \"password\": \"none\" }")
+        .body(r#"{ "email": "any", "password": "none" }"#)
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -114,7 +114,7 @@ async fn should_respond_success_for_login_status() {
 
     let login_res = client
         .post(format!("http://{addr}/login"))
-        .body("{ \"username\": \"any\", \"password\": \"none\" }")
+        .body(r#"{ "email": "any", "password": "none" }"#)
         .header("Content-Type", "application/json")
         .send()
         .await

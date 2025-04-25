@@ -29,19 +29,19 @@ pub struct User {
     pub name: String,
 }
 
-pub struct HardCodedLoadUserService {}
+pub struct HardCodedLoadUserService;
 
 #[async_trait]
 impl LoadUserService for HardCodedLoadUserService {
     type User = User;
 
     async fn load_user(&self, login_token: &LoginToken) -> Result<Self::User, LoadUserError> {
-        if (login_token.username == "anna" || login_token.username == "bob")
+        if (login_token.email == "anna" || login_token.email == "bob")
             && login_token.password == "test123"
         {
             Ok(User {
-                name: login_token.username.to_owned(),
-                email: format!("{}@example.org", login_token.username),
+                name: login_token.email.to_owned(),
+                email: format!("{}@example.org", login_token.email),
             })
         } else {
             Err(LoadUserError::LoginFailed)
