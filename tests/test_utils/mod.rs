@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use authfix::login::{LoadUserError, LoadUserService, LoginToken};
+use authfix::login::{LoadUserError, LoadUserByCredentials, LoginToken};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -32,7 +32,7 @@ pub struct User {
 pub struct HardCodedLoadUserService;
 
 #[async_trait]
-impl LoadUserService for HardCodedLoadUserService {
+impl LoadUserByCredentials for HardCodedLoadUserService {
     type User = User;
 
     async fn load_user(&self, login_token: &LoginToken) -> Result<Self::User, LoadUserError> {

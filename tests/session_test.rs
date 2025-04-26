@@ -3,7 +3,7 @@ use std::{net::SocketAddr, thread};
 use actix_web::{get, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    config::Routes, login::LoadUserService, session::app_builder::SessionLoginAppBuilder, AuthToken,
+    config::Routes, login::LoadUserByCredentials, session::app_builder::SessionLoginAppBuilder, AuthToken,
 };
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ pub struct User {
 struct AcceptEveryoneLoginService {}
 
 #[async_trait]
-impl LoadUserService for AcceptEveryoneLoginService {
+impl LoadUserByCredentials for AcceptEveryoneLoginService {
     type User = User;
 
     async fn load_user(
