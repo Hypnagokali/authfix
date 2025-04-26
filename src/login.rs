@@ -12,7 +12,7 @@ pub struct LoginToken {
 
 /// Trait that handles the loading of a user and executes a success and error handler
 #[async_trait]
-pub trait LoadUserService: Send + Sync {
+pub trait LoadUserByCredentials: Send + Sync {
     type User: DeserializeOwned + Serialize + Clone;
 
     /// Gets a [LoginToken] and returns a user if credentials are correct a [LoadUserError] otherwise

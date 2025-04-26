@@ -12,7 +12,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     config::Routes,
-    login::LoadUserService,
+    login::LoadUserByCredentials,
     middleware::{AuthMiddleware, PathMatcher},
     multifactor::Factor,
 };
@@ -22,7 +22,7 @@ use super::{handlers::SessionLoginHandler, session_auth::SessionAuthProvider};
 pub struct SessionLoginAppBuilder<U, S, ST>
 where
     U: Serialize + DeserializeOwned + Clone + 'static,
-    S: LoadUserService<User = U> + 'static,
+    S: LoadUserByCredentials<User = U> + 'static,
     ST: SessionStore,
 {
     session_middleware: SessionMiddleware<ST>,
@@ -36,7 +36,7 @@ where
 impl<U, S, ST> SessionLoginAppBuilder<U, S, ST>
 where
     U: Serialize + DeserializeOwned + Clone + 'static,
-    S: LoadUserService<User = U> + 'static,
+    S: LoadUserByCredentials<User = U> + 'static,
     ST: SessionStore,
 {
     pub fn set_mfa_with_condition(
@@ -122,7 +122,7 @@ where
 impl<U, S, ST> SessionLoginAppBuilder<U, S, ST>
 where
     U: Serialize + DeserializeOwned + Clone + 'static,
-    S: LoadUserService<User = U> + 'static,
+    S: LoadUserByCredentials<User = U> + 'static,
     ST: SessionStore + 'static,
 {
     pub fn build(
@@ -168,7 +168,7 @@ where
 impl<U, S> SessionLoginAppBuilder<U, S, CookieSessionStore>
 where
     U: Serialize + DeserializeOwned + Clone + 'static,
-    S: LoadUserService<User = U> + 'static,
+    S: LoadUserByCredentials<User = U> + 'static,
 {
     pub fn default(load_user_service: S) -> Self {
         Self {

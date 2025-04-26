@@ -14,7 +14,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     config::Routes,
-    login::{LoadUserService, LoginToken},
+    login::{LoadUserByCredentials, LoginToken},
     multifactor::{CheckCodeError, MfaRegistry},
     AuthToken,
 };
@@ -55,7 +55,7 @@ impl LoginSessionResponse {
 
 /// An [Actix Web handler](https://actix.rs/docs/handlers/) for login, logout and multi factor auth validation
 #[allow(clippy::type_complexity)]
-pub struct SessionLoginHandler<T: LoadUserService<User = U>, U> {
+pub struct SessionLoginHandler<T: LoadUserByCredentials<User = U>, U> {
     user_service: Arc<T>,
     mfa_condition: Option<fn(&U, &HttpRequest) -> bool>,
     with_mfa: bool,
@@ -65,7 +65,7 @@ pub struct SessionLoginHandler<T: LoadUserService<User = U>, U> {
 impl<T, U> SessionLoginHandler<T, U>
 where
     U: DeserializeOwned + Serialize + Clone + 'static,
-    T: LoadUserService<User = U> + 'static,
+    T: LoadUserByCredentials<User = U> + 'static,
 {
     /// Creates a handler that owns the [LoadUserService]
     ///
@@ -201,7 +201,7 @@ fn generate_code_if_mfa_necessary<U: Serialize>(
 }
 
 #[allow(clippy::type_complexity)]
-async fn login<T: LoadUserService<User = U>, U: Serialize>(
+async fn login<T: LoadUserByCredentials<User = U>, U: Serialize>(
     login_token: Json<LoginToken>,
     user_service: Data<Arc<T>>,
     mfa_condition: Data<Option<fn(&U, &HttpRequest) -> bool>>,
@@ -252,7 +252,7 @@ async fn login<T: LoadUserService<User = U>, U: Serialize>(
 
 impl<T, U> HttpServiceFactory for SessionLoginHandler<T, U>
 where
-    T: LoadUserService<User = U> + 'static,
+    T: LoadUserByCredentials<User = U> + 'static,
     U: Serialize + DeserializeOwned + Clone + 'static,
 {
     fn register(self, __config: &mut AppService) {
