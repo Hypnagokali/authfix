@@ -5,7 +5,7 @@ use actix_web::{cookie::Key, get, App, HttpRequest, HttpResponse, HttpServer, Re
 use authfix::{
     middleware::{AuthMiddleware, PathMatcher},
     multifactor::random_code_auth::{CodeSender, MfaRandomCode, RandomCode},
-    session::{handlers::SessionLoginHandler, session_auth::SessionAuthProvider},
+    session::{handlers::SessionApiHandlers, session_auth::SessionAuthProvider},
     AuthToken,
 };
 use chrono::{DateTime, Duration, Local, TimeDelta};
@@ -311,7 +311,9 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
                     App::new()
                         .service(secured_route)
                         .configure(
-                            SessionLoginHandler::with_mfa(HardCodedLoadUserService).get_config(),
+                            SessionApiHandlers::new(HardCodedLoadUserService)
+                                .with_mfa(true)
+                                .get_config(),
                         )
                         .wrap(AuthMiddleware::<_, User>::new(
                             SessionAuthProvider::new(Box::new(MfaRandomCode::new(

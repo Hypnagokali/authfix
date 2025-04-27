@@ -55,14 +55,15 @@ impl LoginSessionResponse {
 
 /// An [Actix Web handler](https://actix.rs/docs/handlers/) for login, logout and multi factor auth validation
 #[allow(clippy::type_complexity)]
-pub struct SessionLoginHandler<T: LoadUserByCredentials<User = U>, U> {
+#[derive(Clone)]
+pub struct SessionApiHandlers<T: LoadUserByCredentials<User = U>, U> {
     user_service: Arc<T>,
     mfa_condition: Option<fn(&U, &HttpRequest) -> bool>,
     with_mfa: bool,
     routes: Routes,
 }
 
-impl<T, U> SessionLoginHandler<T, U>
+impl<T, U> SessionApiHandlers<T, U>
 where
     U: DeserializeOwned + Serialize + Clone + 'static,
     T: LoadUserByCredentials<User = U> + 'static,
@@ -92,30 +93,32 @@ where
     }
 
     // Creates a login handler with mfa and validation of the factor at each login
-    pub fn with_mfa(user_service: T) -> Self {
+    pub fn with_mfa(self, mfa: bool) -> Self {
         Self {
-            user_service: Arc::new(user_service),
-            mfa_condition: None,
-            with_mfa: true,
-            routes: Routes::default(),
+            user_service: self.user_service,
+            mfa_condition: self.mfa_condition,
+            with_mfa: mfa,
+            routes: self.routes,
         }
     }
 
     // Creates a login handler with mfa that will be triggered when the given condition is met
-    pub fn with_mfa_condition(
-        user_service: T,
-        mfa_condition: fn(&U, &HttpRequest) -> bool,
-    ) -> Self {
+    pub fn with_mfa_condition(self, mfa_condition: fn(&U, &HttpRequest) -> bool) -> Self {
         Self {
-            user_service: Arc::new(user_service),
+            user_service: self.user_service,
             mfa_condition: Some(mfa_condition),
-            with_mfa: true,
-            routes: Routes::default(),
+            with_mfa: self.with_mfa,
+            routes: self.routes,
         }
     }
 
-    pub fn set_routes(&mut self, routes: Routes) {
-        self.routes = routes;
+    pub fn with_routes(self, routes: Routes) -> Self {
+        Self {
+            user_service: self.user_service,
+            mfa_condition: self.mfa_condition,
+            with_mfa: self.with_mfa,
+            routes,
+        }
     }
 
     pub fn is_with_mfa(&self) -> bool {
@@ -250,7 +253,7 @@ async fn login<T: LoadUserByCredentials<User = U>, U: Serialize>(
     }
 }
 
-impl<T, U> HttpServiceFactory for SessionLoginHandler<T, U>
+impl<T, U> HttpServiceFactory for SessionApiHandlers<T, U>
 where
     T: LoadUserByCredentials<User = U> + 'static,
     U: Serialize + DeserializeOwned + Clone + 'static,
