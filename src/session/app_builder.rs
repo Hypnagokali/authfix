@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use actix_session::{
     storage::{CookieSessionStore, SessionStore},
     SessionMiddleware,
@@ -17,7 +19,7 @@ use crate::{
     multifactor::Factor,
 };
 
-use super::{handlers::SessionLoginHandler, session_auth::SessionAuthProvider};
+use super::{handlers::SessionApiHandlers, session_auth::SessionAuthProvider};
 
 pub struct SessionLoginAppBuilder<U, S, ST>
 where
@@ -27,7 +29,7 @@ where
 {
     session_middleware: SessionMiddleware<ST>,
     path_matcher: PathMatcher,
-    load_user_service: S,
+    load_user_service: Arc<S>,
     factor: Option<Box<dyn Factor>>,
     mfa_condition: Option<fn(&U, &HttpRequest) -> bool>,
     routes: Routes,
@@ -136,30 +138,30 @@ where
             Error = Error,
         >,
     > {
-        let mut login_handler_and_provider = match self.factor {
+        let mut handler =
+            SessionApiHandlers::new_from_shared(self.load_user_service).with_routes(self.routes);
+
+        let provider = match self.factor {
             Some(factor) => {
                 let provider = SessionAuthProvider::new(factor);
-                let handler = match self.mfa_condition {
+                match self.mfa_condition {
                     Some(condition) => {
-                        SessionLoginHandler::with_mfa_condition(self.load_user_service, condition)
+                        handler = handler.with_mfa(true).with_mfa_condition(condition);
                     }
-                    None => SessionLoginHandler::with_mfa(self.load_user_service),
+                    None => {
+                        handler = handler.with_mfa(true);
+                    }
                 };
 
-                (handler, provider)
+                provider
             }
-            None => (
-                SessionLoginHandler::new(self.load_user_service),
-                SessionAuthProvider::default(),
-            ),
+            None => SessionAuthProvider::default(),
         };
 
-        login_handler_and_provider.0.set_routes(self.routes);
+        let middleware = AuthMiddleware::<_, U>::new(provider, self.path_matcher);
 
-        let middleware =
-            AuthMiddleware::<_, U>::new(login_handler_and_provider.1, self.path_matcher);
         App::new()
-            .configure(login_handler_and_provider.0.get_config())
+            .configure(handler.get_config())
             .wrap(middleware)
             .wrap(self.session_middleware)
     }
@@ -170,14 +172,18 @@ where
     U: Serialize + DeserializeOwned + Clone + 'static,
     S: LoadUserByCredentials<User = U> + 'static,
 {
-    pub fn default(load_user_service: S) -> Self {
+    pub fn create_from_owned(load_user_service: S) -> Self {
+        Self::create_from_shared(Arc::new(load_user_service))
+    }
+
+    pub fn create_from_shared(load_user_service: Arc<S>) -> Self {
         Self {
             path_matcher: Routes::default().into(),
             session_middleware: SessionMiddleware::new(
                 CookieSessionStore::default(),
                 Key::generate(),
             ),
-            load_user_service,
+            load_user_service: Arc::clone(&load_user_service),
             mfa_condition: None,
             factor: None,
             routes: Routes::default(),

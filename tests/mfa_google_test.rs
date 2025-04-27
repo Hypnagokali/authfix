@@ -200,7 +200,7 @@ fn start_test_server(addr: SocketAddr) {
                             3,
                         ));
 
-                    SessionLoginAppBuilder::default(HardCodedLoadUserService)
+                    SessionLoginAppBuilder::create_from_owned(HardCodedLoadUserService)
                         .set_mfa_with_condition(factor, mfa_condition)
                         .build()
                         .service(secured_route)

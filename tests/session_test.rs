@@ -3,7 +3,8 @@ use std::{net::SocketAddr, thread};
 use actix_web::{get, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    config::Routes, login::LoadUserByCredentials, session::app_builder::SessionLoginAppBuilder, AuthToken,
+    config::Routes, login::LoadUserByCredentials, session::app_builder::SessionLoginAppBuilder,
+    AuthToken,
 };
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -14,7 +15,7 @@ pub struct User {
     pub name: String,
 }
 
-struct AcceptEveryoneLoginService {}
+struct AcceptEveryoneLoginService;
 
 #[async_trait]
 impl LoadUserByCredentials for AcceptEveryoneLoginService {
@@ -161,7 +162,7 @@ fn start_test_server(addr: SocketAddr) {
         actix_rt::System::new()
             .block_on(async {
                 HttpServer::new(move || {
-                    SessionLoginAppBuilder::default(AcceptEveryoneLoginService {})
+                    SessionLoginAppBuilder::create_from_owned(AcceptEveryoneLoginService)
                         .set_routes_and_unsecured_paths(Routes::default(), vec!["/public-route"])
                         .build()
                         .service(secured_route)

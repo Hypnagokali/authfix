@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use authfix::login::{LoadUserError, LoadUserByCredentials, LoginToken};
+use authfix::login::{LoadUserByCredentials, LoadUserError, LoginToken};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
