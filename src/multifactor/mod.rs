@@ -3,17 +3,9 @@ pub mod google_auth;
 #[cfg(feature = "mfa_send_code")]
 pub mod random_code_auth;
 
-use std::{
-    error::Error as StdError,
-    future::{ready, Future, Ready},
-    pin::Pin,
-    rc::Rc,
-};
+use std::{error::Error as StdError, future::Future, pin::Pin};
 
-use actix_web::{
-    dev::Payload, http::StatusCode, FromRequest, HttpMessage, HttpRequest, HttpResponse,
-    ResponseError,
-};
+use actix_web::{http::StatusCode, HttpRequest, HttpResponse, ResponseError};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
 
@@ -47,34 +39,6 @@ pub trait Factor {
         code: &str,
         req: &HttpRequest,
     ) -> Pin<Box<dyn Future<Output = Result<(), CheckCodeError>>>>;
-}
-
-pub struct MfaRegistry {
-    value: Rc<Option<Box<dyn Factor>>>,
-}
-
-impl MfaRegistry {
-    pub fn get_value(&self) -> &Option<Box<dyn Factor>> {
-        self.value.as_ref()
-    }
-}
-
-impl FromRequest for MfaRegistry {
-    type Error = actix_web::Error;
-    type Future = Ready<Result<MfaRegistry, Self::Error>>;
-
-    fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
-        let extensions = req.extensions();
-        if let Some(factor) = extensions.get::<Rc<Option<Box<dyn Factor>>>>() {
-            ready(Ok(Self {
-                value: Rc::clone(factor),
-            }))
-        } else {
-            ready(Ok(Self {
-                value: Rc::new(None),
-            }))
-        }
-    }
 }
 
 #[derive(Error, Debug)]

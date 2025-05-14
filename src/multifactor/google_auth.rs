@@ -55,7 +55,7 @@ where
     }
     pub fn with_discrepancy(totp_secret_repo: Arc<T>, discrepancy: u64) -> Self {
         Self {
-            totp_secret_repo: Arc::clone(&totp_secret_repo),
+            totp_secret_repo,
             discrepancy,
             phantom_data_user: PhantomData,
         }
