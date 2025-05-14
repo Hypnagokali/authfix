@@ -3,21 +3,21 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use crate::{
+    config::Routes,
+    login::{LoadUserByCredentials, LoginToken},
+    mfa::MfaConfig,
+    multifactor::CheckCodeError,
+    AuthToken,
+};
 use actix_web::{
     dev::{AppService, HttpServiceFactory},
     guard::Post,
-    web::{self, Data, Json, ServiceConfig},
+    web::{self, Json, ReqData, ServiceConfig},
     Error, HttpRequest, HttpResponse, Resource, Responder,
 };
 use log::{error, warn};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
-use crate::{
-    config::Routes,
-    login::{LoadUserByCredentials, LoginToken},
-    multifactor::{CheckCodeError, MfaRegistry},
-    AuthToken,
-};
 
 use super::session_auth::LoginSession;
 
@@ -58,8 +58,6 @@ impl LoginSessionResponse {
 #[derive(Clone)]
 pub struct SessionApiHandlers<T: LoadUserByCredentials<User = U>, U> {
     user_service: Arc<T>,
-    mfa_condition: Option<fn(&U, &HttpRequest) -> bool>,
-    with_mfa: bool,
     routes: Routes,
 }
 
@@ -74,55 +72,25 @@ where
     pub fn new(user_service: T) -> Self {
         Self {
             user_service: Arc::new(user_service),
-            mfa_condition: None,
-            with_mfa: false,
             routes: Routes::default(),
         }
     }
 
-    /// Creates a handler with a shared [LoadUserService]
+    /// Creates a handler with a shared [LoadUserByCredentials] and standard [Routes]
     ///
-    /// This method can be used, if the [LoadUserService] is a shared service.
+    /// This method can be used, if the [LoadUserByCredentials] is a shared service.
     pub fn new_from_shared(user_service: Arc<T>) -> Self {
         Self {
-            user_service: Arc::clone(&user_service),
-            mfa_condition: None,
-            with_mfa: false,
+            user_service,
             routes: Routes::default(),
-        }
-    }
-
-    // Creates a login handler with mfa and validation of the factor at each login
-    pub fn with_mfa(self, mfa: bool) -> Self {
-        Self {
-            user_service: self.user_service,
-            mfa_condition: self.mfa_condition,
-            with_mfa: mfa,
-            routes: self.routes,
-        }
-    }
-
-    // Creates a login handler with mfa that will be triggered when the given condition is met
-    pub fn with_mfa_condition(self, mfa_condition: fn(&U, &HttpRequest) -> bool) -> Self {
-        Self {
-            user_service: self.user_service,
-            mfa_condition: Some(mfa_condition),
-            with_mfa: self.with_mfa,
-            routes: self.routes,
         }
     }
 
     pub fn with_routes(self, routes: Routes) -> Self {
         Self {
             user_service: self.user_service,
-            mfa_condition: self.mfa_condition,
-            with_mfa: self.with_mfa,
             routes,
         }
-    }
-
-    pub fn is_with_mfa(&self) -> bool {
-        self.with_mfa
     }
 
     /// Configuration function to setup a [SessionLoginHandler]
@@ -148,8 +116,8 @@ impl MfaRequestBody {
     }
 }
 
-async fn mfa_route(
-    factor: MfaRegistry,
+async fn mfa_route<U: Serialize + DeserializeOwned + Clone>(
+    mfa_config: MfaConfig<U>,
     body: Json<MfaRequestBody>,
     req: HttpRequest,
     session: LoginSession,
@@ -164,7 +132,14 @@ async fn mfa_route(
         return Err(CheckCodeError::FinallyRejected);
     }
 
-    if let Some(f) = factor.get_value() {
+    if session.get_user::<U>().is_none() {
+        error!("Mfa route called but no user was present in LoginSession");
+        return Ok(HttpResponse::BadRequest().finish());
+    }
+
+    let user: U = session.get_user().unwrap();
+
+    if let Some(f) = mfa_config.get_factor_by_user(&user).await {
         f.check_code(body.get_code(), &req).await?;
         session.mfa_challenge_done();
         Ok(HttpResponse::Ok().finish())
@@ -175,25 +150,21 @@ async fn mfa_route(
 
 /// Triggers the code generation and sets the login state to mfa needed
 /// Returns true if mfa needed
-fn generate_code_if_mfa_necessary<U: Serialize>(
+async fn generate_code_if_mfa_necessary<U: Serialize + DeserializeOwned + Clone>(
     // U will need a trait bound like 'HasFactor' -> user.get_factor() -> String
     user: &U,
-    mfa_registry: &MfaRegistry,
-    condition: &Option<fn(&U, &HttpRequest) -> bool>,
+    mfa_config: MfaConfig<U>,
     req: &HttpRequest,
     session: &LoginSession,
 ) -> Result<bool, Error> {
+    if !mfa_config.is_configured() {
+        return Ok(false);
+    }
+
     let mut mfa_needed = false;
 
-    if let Some(factor) = mfa_registry.get_value() {
-        let is_condition_met = if let Some(condition) = condition {
-            (condition)(user, req)
-        } else {
-            // if no condition is registered, mfa is necessary for every login
-            true
-        };
-
-        if is_condition_met {
+    if let Some(factor) = mfa_config.get_factor_by_user(user).await {
+        if mfa_config.is_condition_met(user, req) {
             factor.generate_code(req)?;
             session.needs_mfa(&factor.get_unique_id())?;
             mfa_needed = true;
@@ -204,27 +175,19 @@ fn generate_code_if_mfa_necessary<U: Serialize>(
 }
 
 #[allow(clippy::type_complexity)]
-async fn login<T: LoadUserByCredentials<User = U>, U: Serialize>(
+async fn login<T: LoadUserByCredentials<User = U>, U: Serialize + DeserializeOwned + Clone>(
     login_token: Json<LoginToken>,
-    user_service: Data<Arc<T>>,
-    mfa_condition: Data<Option<fn(&U, &HttpRequest) -> bool>>,
-    mfa_registry: MfaRegistry,
+    user_service: ReqData<Arc<T>>,
+    mfa_config: MfaConfig<U>,
     session: LoginSession,
     req: HttpRequest,
 ) -> Result<impl Responder, Error> {
     session.reset();
-
     match user_service.load_user(&login_token).await {
         Ok(user) => {
             let mut login_res = LoginSessionResponse::success();
 
-            if !generate_code_if_mfa_necessary(
-                &user,
-                &mfa_registry,
-                &mfa_condition,
-                &req,
-                &session,
-            )? {
+            if !generate_code_if_mfa_necessary(&user, mfa_config, &req, &session).await? {
                 // MFA not needed, call success handler
                 user_service.on_success_handler(&req, &user).await?;
             } else {
@@ -258,28 +221,24 @@ where
     T: LoadUserByCredentials<User = U> + 'static,
     U: Serialize + DeserializeOwned + Clone + 'static,
 {
-    fn register(self, __config: &mut AppService) {
-        if self.is_with_mfa() {
-            let mfa_resource = Resource::new(self.routes.get_mfa())
-                .name("mfa")
-                .guard(Post())
-                .to(mfa_route);
-            HttpServiceFactory::register(mfa_resource, __config);
-        }
+    fn register(self, config: &mut AppService) {
+        let mfa_resource = Resource::new(self.routes.get_mfa())
+            .name("mfa")
+            .guard(Post())
+            .to(mfa_route::<U>);
+        HttpServiceFactory::register(mfa_resource, config);
 
         let login_resource = Resource::new(self.routes.get_login())
             .name("login")
             .guard(Post())
-            .app_data(Data::new(self.user_service))
-            .app_data(Data::new(self.mfa_condition))
             .to(login::<T, U>);
-        HttpServiceFactory::register(login_resource, __config);
+        HttpServiceFactory::register(login_resource, config);
 
         let logout_resource = Resource::new(self.routes.get_logout())
             .name("logout")
             .guard(Post())
             .to(logout::<U>);
-        HttpServiceFactory::register(logout_resource, __config);
+        HttpServiceFactory::register(logout_resource, config);
     }
 }
 

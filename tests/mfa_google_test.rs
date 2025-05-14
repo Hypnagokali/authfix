@@ -1,8 +1,13 @@
 use std::{future::ready, net::SocketAddr, sync::Arc, thread};
 
 use actix_web::{get, HttpRequest, HttpResponse, HttpServer, Responder};
+use async_trait::async_trait;
 use authfix::{
-    multifactor::{google_auth::GoogleAuthFactor, Factor, TotpSecretRepository},
+    mfa::{MfaByUser, MfaConfig, MfaError},
+    multifactor::{
+        google_auth::{GoogleAuthFactor, MFA_ID_AUTHENTICATOR_TOTP},
+        Factor, TotpSecretRepository,
+    },
     session::app_builder::SessionLoginAppBuilder,
     AuthToken,
 };
@@ -22,6 +27,17 @@ fn mfa_condition(user: &User, _req: &HttpRequest) -> bool {
 }
 
 struct TotpTestRepo;
+
+struct OnlyAuthenticatorFactor;
+
+#[async_trait]
+impl MfaByUser for OnlyAuthenticatorFactor {
+    type User = User;
+
+    async fn get_mfa_id_by_user(&self, _: Self::User) -> Result<Option<String>, MfaError> {
+        Ok(Some(MFA_ID_AUTHENTICATOR_TOTP.to_owned()))
+    }
+}
 
 #[derive(Error, Debug)]
 #[error("No secret found in repo")]
@@ -200,8 +216,11 @@ fn start_test_server(addr: SocketAddr) {
                             3,
                         ));
 
-                    SessionLoginAppBuilder::create_from_owned(HardCodedLoadUserService)
-                        .set_mfa_with_condition(factor, mfa_condition)
+                    let mfa_config =
+                        MfaConfig::new(vec![factor], OnlyAuthenticatorFactor, mfa_condition);
+
+                    SessionLoginAppBuilder::create(HardCodedLoadUserService)
+                        .set_mfa(mfa_config)
                         .build()
                         .service(secured_route)
                 };

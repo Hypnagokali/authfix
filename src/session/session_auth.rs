@@ -3,17 +3,22 @@ use std::{
     marker::PhantomData,
     pin::Pin,
     rc::Rc,
+    sync::Arc,
     time::SystemTime,
 };
 
 use actix_session::{Session, SessionExt, SessionInsertError};
-use actix_web::{dev::ServiceRequest, web::Data, Error, FromRequest, HttpMessage, HttpRequest};
+use actix_web::{
+    dev::{Extensions, ServiceRequest},
+    web::Data,
+    Error, FromRequest, HttpMessage, HttpRequest,
+};
 use log::error;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    config::Routes, multifactor::Factor, AuthState, AuthToken, AuthenticationProvider,
-    UnauthorizedError,
+    config::Routes, login::LoadUserByCredentials, mfa::MfaConfig, AuthState, AuthToken,
+    AuthenticationProvider, UnauthorizedError,
 };
 
 const SESSION_KEY_USER: &str = "authfix__user";
@@ -23,53 +28,56 @@ const SESSION_KEY_LOGIN_VALID_UNTIL: &str = "authfix__login_valid_until";
 /// Provider for session based authentication.
 ///
 /// Uses [Actix-Session](https://docs.rs/actix-session/latest/actix_session/), so it must be set as middleware.
-/// # Examples
-/// See crate example.
 #[derive(Clone)]
-pub struct SessionAuthProvider<U>
+pub struct SessionAuthProvider<U, L>
 where
-    U: DeserializeOwned + Clone + 'static,
+    U: DeserializeOwned + Serialize + Clone + 'static,
+    L: LoadUserByCredentials<User = U> + 'static,
 {
-    additional_factor: Rc<Option<Box<dyn Factor>>>,
+    mfa_config: Rc<MfaConfig<U>>,
+    #[allow(dead_code)] // load_user will be registered as extension later
+    load_user: Arc<L>,
     phantom_data: PhantomData<U>,
 }
 
-impl<U> SessionAuthProvider<U>
+impl<U, L> SessionAuthProvider<U, L>
 where
-    U: DeserializeOwned + Clone + 'static,
+    U: DeserializeOwned + Serialize + Clone + 'static,
+    L: LoadUserByCredentials<User = U> + 'static,
 {
-    pub fn new(factor: Box<dyn Factor>) -> Self {
+    /// Creates a new SessionAuthProvider without mfa.
+    ///
+    /// Arc is used here because L could be a service that is shared across the application (e.g. UserService)
+    pub fn new(load_user: Arc<L>) -> Self {
         Self {
-            additional_factor: Rc::new(Some(factor)),
+            mfa_config: Rc::new(MfaConfig::empty()),
+            load_user,
+            phantom_data: PhantomData,
+        }
+    }
+
+    /// Creates a new SessionAuthProvider with mfa
+    pub fn new_with_mfa(load_user: Arc<L>, mfa_config: MfaConfig<U>) -> Self {
+        Self {
+            mfa_config: Rc::new(mfa_config),
+            load_user,
             phantom_data: PhantomData,
         }
     }
 }
 
-impl<U> Default for SessionAuthProvider<U>
+impl<U, L> AuthenticationProvider<U> for SessionAuthProvider<U, L>
 where
-    U: DeserializeOwned + Clone + 'static,
-{
-    fn default() -> Self {
-        Self {
-            additional_factor: Rc::new(None),
-            phantom_data: PhantomData,
-        }
-    }
-}
-
-impl<U> AuthenticationProvider<U> for SessionAuthProvider<U>
-where
-    U: DeserializeOwned + Clone + 'static,
+    U: DeserializeOwned + Serialize + Clone + 'static,
+    L: LoadUserByCredentials<User = U> + 'static,
 {
     fn get_auth_token(
         &self,
         req: &actix_web::HttpRequest,
     ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>> {
-        let s = req.get_session().clone();
+        let session = req.get_session().clone();
 
-        // ToDo: refactor: remove the matches here
-        let user = match s.get::<U>(SESSION_KEY_USER) {
+        let user = match session.get::<U>(SESSION_KEY_USER) {
             Ok(Some(user)) => user,
             _ => {
                 error!("No user in session. Cannot read {}", SESSION_KEY_USER);
@@ -77,7 +85,7 @@ where
             }
         };
 
-        let state = match s.get::<String>(SESSION_KEY_NEED_MFA) {
+        let state = match session.get::<String>(SESSION_KEY_NEED_MFA) {
             Ok(Some(_mfa_id)) => AuthState::NeedsMfa,
             Ok(None) => AuthState::Authenticated,
             Err(_) => {
@@ -90,14 +98,15 @@ where
     }
 
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>> {
-        let s = req.get_session();
-        s.purge();
+        let session = req.get_session();
+        session.purge();
 
-        Box::pin(async {})
+        Box::pin(ready(()))
     }
 
-    fn configure_provider(&self, extensions: &mut actix_web::dev::Extensions) {
-        extensions.insert(Rc::clone(&self.additional_factor));
+    fn configure_provider(&self, extensions: &mut Extensions) {
+        extensions.insert(Rc::clone(&self.mfa_config));
+        extensions.insert(Arc::clone(&self.load_user));
     }
 
     fn is_user_authorized_for_request(
@@ -105,10 +114,17 @@ where
         req: ServiceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<ServiceRequest, UnauthorizedError>>>> {
         let request_path = req.request().path().to_owned();
+        #[allow(unused_assignments)]
+        // not sure why it gives a warning since the "else" block of the "if let" was introduced.
         let mut mfa_route_option = None;
 
         if let Some(routes) = req.app_data::<Data<Routes>>() {
             mfa_route_option = Some(routes.get_mfa().to_owned());
+        } else {
+            error!("SessionAuthProvider cannot check routes. It expects that a Data<Routes> container has been registered as app data.");
+            return Box::pin(ready(Err(UnauthorizedError::new(
+                "Routes are not registered by the application. Cannot authenticate request.",
+            ))));
         }
 
         let auth_token_req = self.get_auth_token(req.request());
@@ -131,9 +147,6 @@ where
                 let mut extensions = req.extensions_mut();
                 extensions.insert(token);
             }
-
-            // is it really needed on each secured route? or only on /mfa and /login?
-
             Ok(req)
         })
     }
@@ -165,6 +178,13 @@ impl LoginSession {
 
     pub fn set_user<U: Serialize>(&self, user: U) -> Result<(), SessionInsertError> {
         self.session.insert(SESSION_KEY_USER, user)
+    }
+
+    pub fn get_user<U: Serialize + DeserializeOwned + Clone>(&self) -> Option<U> {
+        match self.session.get::<U>(SESSION_KEY_USER) {
+            Ok(Some(user)) => Some(user),
+            _ => None,
+        }
     }
 
     pub fn valid_until(&self, valid_until: SystemTime) -> Result<(), SessionInsertError> {

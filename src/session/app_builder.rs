@@ -8,15 +8,15 @@ use actix_web::{
     body::MessageBody,
     cookie::Key,
     dev::{ServiceFactory, ServiceRequest, ServiceResponse},
-    App, Error, HttpRequest,
+    App, Error,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     config::Routes,
     login::LoadUserByCredentials,
+    mfa::MfaConfig,
     middleware::{AuthMiddleware, PathMatcher},
-    multifactor::Factor,
 };
 
 use super::{handlers::SessionApiHandlers, session_auth::SessionAuthProvider};
@@ -30,8 +30,7 @@ where
     session_middleware: SessionMiddleware<ST>,
     path_matcher: PathMatcher,
     load_user_service: Arc<S>,
-    factor: Option<Box<dyn Factor>>,
-    mfa_condition: Option<fn(&U, &HttpRequest) -> bool>,
+    mfa_config: MfaConfig<U>,
     routes: Routes,
 }
 
@@ -41,39 +40,27 @@ where
     S: LoadUserByCredentials<User = U> + 'static,
     ST: SessionStore,
 {
-    pub fn set_mfa_with_condition(
-        self,
-        factor: Box<dyn Factor>,
-        condition: fn(&U, &HttpRequest) -> bool,
-    ) -> SessionLoginAppBuilder<U, S, ST> {
+    pub fn set_mfa(self, mfa_config: MfaConfig<U>) -> SessionLoginAppBuilder<U, S, ST> {
         Self {
             path_matcher: self.path_matcher,
-            factor: Some(factor),
-            mfa_condition: Some(condition),
+            mfa_config,
             routes: self.routes,
             load_user_service: self.load_user_service,
             session_middleware: self.session_middleware,
         }
     }
 
-    pub fn set_mfa(self, factor: Box<dyn Factor>) -> SessionLoginAppBuilder<U, S, ST> {
-        Self {
-            path_matcher: self.path_matcher,
-            factor: Some(factor),
-            mfa_condition: None,
-            routes: self.routes,
-            load_user_service: self.load_user_service,
-            session_middleware: self.session_middleware,
-        }
-    }
-
-    pub fn set_routes_and_secured_paths(
+    pub fn set_login_routes_and_secured_paths(
         self,
         login_routes: Routes,
         secured_paths: Vec<&str>,
     ) -> SessionLoginAppBuilder<U, S, ST> {
         let mut path_matcher: PathMatcher = PathMatcher::new(
-            vec![login_routes.get_logout(), login_routes.get_mfa()],
+            vec![
+                login_routes.get_logout(),
+                login_routes.get_mfa(),
+                login_routes.get_logout(),
+            ],
             false,
         );
         path_matcher.add(secured_paths);
@@ -81,14 +68,13 @@ where
         Self {
             path_matcher,
             session_middleware: self.session_middleware,
-            mfa_condition: None,
-            factor: None,
+            mfa_config: self.mfa_config,
             routes: login_routes,
             load_user_service: self.load_user_service,
         }
     }
 
-    pub fn set_routes_and_unsecured_paths(
+    pub fn set_login_routes_and_unsecured_paths(
         self,
         login_routes: Routes,
         unsecured_paths: Vec<&str>,
@@ -99,8 +85,7 @@ where
         Self {
             path_matcher,
             session_middleware: self.session_middleware,
-            mfa_condition: None,
-            factor: None,
+            mfa_config: self.mfa_config,
             routes: login_routes,
             load_user_service: self.load_user_service,
         }
@@ -113,8 +98,7 @@ where
         Self {
             path_matcher: self.path_matcher,
             session_middleware,
-            mfa_condition: None,
-            factor: None,
+            mfa_config: self.mfa_config,
             routes: self.routes,
             load_user_service: self.load_user_service,
         }
@@ -138,25 +122,14 @@ where
             Error = Error,
         >,
     > {
-        let mut handler =
-            SessionApiHandlers::new_from_shared(self.load_user_service).with_routes(self.routes);
+        let handler = SessionApiHandlers::new_from_shared(Arc::clone(&self.load_user_service))
+            .with_routes(self.routes);
 
-        let provider = match self.factor {
-            Some(factor) => {
-                let provider = SessionAuthProvider::new(factor);
-                match self.mfa_condition {
-                    Some(condition) => {
-                        handler = handler.with_mfa(true).with_mfa_condition(condition);
-                    }
-                    None => {
-                        handler = handler.with_mfa(true);
-                    }
-                };
+        let mut provider = SessionAuthProvider::new(Arc::clone(&self.load_user_service));
 
-                provider
-            }
-            None => SessionAuthProvider::default(),
-        };
+        if self.mfa_config.is_configured() {
+            provider = SessionAuthProvider::new_with_mfa(self.load_user_service, self.mfa_config);
+        }
 
         let middleware = AuthMiddleware::<_, U>::new(provider, self.path_matcher);
 
@@ -172,7 +145,7 @@ where
     U: Serialize + DeserializeOwned + Clone + 'static,
     S: LoadUserByCredentials<User = U> + 'static,
 {
-    pub fn create_from_owned(load_user_service: S) -> Self {
+    pub fn create(load_user_service: S) -> Self {
         Self::create_from_shared(Arc::new(load_user_service))
     }
 
@@ -183,9 +156,8 @@ where
                 CookieSessionStore::default(),
                 Key::generate(),
             ),
-            load_user_service: Arc::clone(&load_user_service),
-            mfa_condition: None,
-            factor: None,
+            load_user_service,
+            mfa_config: MfaConfig::empty(),
             routes: Routes::default(),
         }
     }

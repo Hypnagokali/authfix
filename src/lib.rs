@@ -9,36 +9,7 @@
 //!
 //! # Examples
 //! ## For session based authentication ([Actix Session](https://docs.rs/actix-session/latest/actix_session/)).
-//! ```no_run
-//! use actix_session::{storage::CookieSessionStore, SessionMiddleware};
-//! use actix_web::{cookie::Key, App, HttpServer};
-//! use authfix::{middleware::{AuthMiddleware, PathMatcher}, session::session_auth::{SessionAuthProvider}};
-//! use serde::{Deserialize, Serialize};
-//!
-//! fn create_actix_session_middleware() -> SessionMiddleware<CookieSessionStore> {
-//!     let key = Key::generate();
-//!    
-//!     SessionMiddleware::new(CookieSessionStore::default(), key.clone())
-//! }
-//! #[actix_web::main]
-//! async fn main() -> std::io::Result<()> {
-//!     HttpServer::new(move || {
-//!         App::new()
-//!           .wrap(AuthMiddleware::<_, User>::new(SessionAuthProvider::default(), PathMatcher::default()))
-//!             .wrap(create_actix_session_middleware())
-//!     })
-//!     .bind(("127.0.0.1", 8080))?
-//!     .run()
-//!     .await
-//! }
-//!
-//! // The user needs the traits Serialize and Deserialize and Clone
-//! #[derive(Serialize, Deserialize, Clone)]
-//! pub struct User {
-//!    pub email: String,
-//!    pub name: String,
-//! }
-//! ```
+//! *New example is needed*
 
 use actix_web::{
     dev::{Extensions, ServiceRequest},
@@ -56,6 +27,7 @@ use std::{
 pub mod config;
 pub mod errors;
 pub mod login;
+pub mod mfa;
 pub mod middleware;
 pub mod multifactor;
 pub mod session;
@@ -79,11 +51,11 @@ where
     ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
 
-    /// Configure the authentication provider for request.
-    ///
-    /// This method configures the extensions for all routes, secured and not secured ones.
+    /// Configure the authentication provider. Prepares login related request.
     #[allow(unused)]
-    fn configure_provider(&self, extensions: &mut Extensions) {}
+    fn configure_provider(&self, extensions: &mut Extensions) {
+        // default implementation does not configure anything
+    }
 
     fn is_user_authorized_for_request(
         &self,

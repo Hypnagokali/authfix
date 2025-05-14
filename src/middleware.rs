@@ -211,7 +211,7 @@ where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
-    AuthProvider: AuthenticationProvider<U> + Clone + 'static,
+    AuthProvider: AuthenticationProvider<U> + 'static,
     U: DeserializeOwned + Clone + 'static,
 {
     type Response = ServiceResponse<B>;

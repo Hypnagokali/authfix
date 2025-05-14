@@ -9,7 +9,6 @@ pub struct LoginToken {
     pub email: String,
     pub password: String,
 }
-
 /// Trait that handles the loading of a user and executes a success and error handler
 #[async_trait]
 pub trait LoadUserByCredentials: Send + Sync {
