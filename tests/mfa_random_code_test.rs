@@ -329,16 +329,17 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
         actix_rt::System::new()
             .block_on(async {
                 HttpServer::new(move || {
+                    // Hint:
                     // This is the manual configuration of the auth and session middleware and the SessionApiHandlers
+
                     let code_factor = Box::new(MfaRandomCode::new(generator, DummySender {}));
                     let mfa_config =
                         MfaConfig::new(vec![code_factor], OnlyRandomCodeFactor, mfa_condition);
                     let load_user_service = Arc::new(HardCodedLoadUserService);
-
                     App::new()
                         .service(secured_route)
                         .configure(
-                            SessionApiHandlers::new_from_shared(Arc::clone(&load_user_service))
+                            SessionApiHandlers::<HardCodedLoadUserService, User>::default()
                                 .get_config(),
                         )
                         .wrap(AuthMiddleware::<_, User>::new(
