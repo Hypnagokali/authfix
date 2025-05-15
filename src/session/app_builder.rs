@@ -122,8 +122,7 @@ where
             Error = Error,
         >,
     > {
-        let handler = SessionApiHandlers::new_from_shared(Arc::clone(&self.load_user_service))
-            .with_routes(self.routes);
+        let handler: SessionApiHandlers<S, U> = SessionApiHandlers::new(self.routes);
 
         let mut provider = SessionAuthProvider::new(Arc::clone(&self.load_user_service));
 

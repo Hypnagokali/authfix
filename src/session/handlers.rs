@@ -1,4 +1,5 @@
 use std::{
+    marker::PhantomData,
     sync::Arc,
     time::{Duration, SystemTime},
 };
@@ -57,8 +58,8 @@ impl LoginSessionResponse {
 #[allow(clippy::type_complexity)]
 #[derive(Clone)]
 pub struct SessionApiHandlers<T: LoadUserByCredentials<User = U>, U> {
-    user_service: Arc<T>,
     routes: Routes,
+    phantom_data: PhantomData<T>,
 }
 
 impl<T, U> SessionApiHandlers<T, U>
@@ -66,30 +67,10 @@ where
     U: DeserializeOwned + Serialize + Clone + 'static,
     T: LoadUserByCredentials<User = U> + 'static,
 {
-    /// Creates a handler that owns the [LoadUserService]
-    ///
-    /// It can be used, if the [LoadUserService] is only needed for login handling.
-    pub fn new(user_service: T) -> Self {
+    pub fn new(routes: Routes) -> Self {
         Self {
-            user_service: Arc::new(user_service),
-            routes: Routes::default(),
-        }
-    }
-
-    /// Creates a handler with a shared [LoadUserByCredentials] and standard [Routes]
-    ///
-    /// This method can be used, if the [LoadUserByCredentials] is a shared service.
-    pub fn new_from_shared(user_service: Arc<T>) -> Self {
-        Self {
-            user_service,
-            routes: Routes::default(),
-        }
-    }
-
-    pub fn with_routes(self, routes: Routes) -> Self {
-        Self {
-            user_service: self.user_service,
             routes,
+            phantom_data: PhantomData,
         }
     }
 
@@ -100,6 +81,19 @@ where
         |config: &mut ServiceConfig| {
             config.service(self);
             config.app_data(routes);
+        }
+    }
+}
+
+impl<T, U> Default for SessionApiHandlers<T, U>
+where
+    U: DeserializeOwned + Serialize + Clone + 'static,
+    T: LoadUserByCredentials<User = U> + 'static,
+{
+    fn default() -> Self {
+        Self {
+            routes: Routes::default(),
+            phantom_data: PhantomData,
         }
     }
 }
