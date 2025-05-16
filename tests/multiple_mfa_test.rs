@@ -3,114 +3,118 @@ use std::{net::SocketAddr, sync::Arc, thread};
 use actix_web::{get, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
+    login::{LoadUserByCredentials, LoadUserError, LoginToken},
     mfa::{MfaByUser, MfaConfig, MfaError},
     multifactor::{
         google_auth::{GoogleAuthFactor, MFA_ID_AUTHENTICATOR_TOTP},
+        random_code_auth::{CodeSender, MfaRandomCode, RandomCode, MFA_ID_RANDOM_CODE},
         Factor,
     },
     session::app_builder::SessionLoginAppBuilder,
     AuthToken,
 };
-
+use chrono::{Local, TimeDelta};
 use google_authenticator::GoogleAuthenticator;
 use reqwest::{Client, StatusCode};
-use test_utils::{HardCodedLoadUserService, TotpTestRepo, User, SECRET};
+use serde::{Deserialize, Serialize};
+use test_utils::{CustomError, TotpTestRepo, SECRET};
 
 mod test_utils;
 
-fn mfa_condition(user: &User, _req: &HttpRequest) -> bool {
-    user.name == "anna"
+#[derive(Serialize, Deserialize, Clone)]
+struct UserWithMfa {
+    name: String,
+    mfa: Option<String>,
 }
 
-struct OnlyAuthenticatorFactor;
+struct LoadMfa;
 
 #[async_trait]
-impl MfaByUser for OnlyAuthenticatorFactor {
-    type User = User;
+impl MfaByUser for LoadMfa {
+    type User = UserWithMfa;
 
-    async fn get_mfa_id_by_user(&self, _: Self::User) -> Result<Option<String>, MfaError> {
-        Ok(Some(MFA_ID_AUTHENTICATOR_TOTP.to_owned()))
+    async fn get_mfa_id_by_user(&self, user: Self::User) -> Result<Option<String>, MfaError> {
+        Ok(user.mfa)
     }
 }
 
+struct ThreeUserService;
+
+#[async_trait]
+impl LoadUserByCredentials for ThreeUserService {
+    type User = UserWithMfa;
+
+    async fn load_user(&self, login_token: &LoginToken) -> Result<Self::User, LoadUserError> {
+        match login_token.email.as_ref() {
+            "joe" => Ok(UserWithMfa {
+                name: "Joe".into(),
+                mfa: Some(MFA_ID_AUTHENTICATOR_TOTP.into()),
+            }),
+            "anna" => Ok(UserWithMfa {
+                name: "anna".into(),
+                mfa: Some(MFA_ID_RANDOM_CODE.into()),
+            }),
+            "linda" => Ok(UserWithMfa {
+                name: "linda".into(),
+                mfa: None,
+            }),
+            _ => Err(LoadUserError::LoginFailed),
+        }
+    }
+}
+
+struct DoNotSendCode;
+
+impl CodeSender for DoNotSendCode {
+    type Error = CustomError;
+
+    fn send_code(&self, _: RandomCode) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+fn mfa_condition(_: &UserWithMfa, _: &HttpRequest) -> bool {
+    true
+}
+
+fn single_code_generator() -> RandomCode {
+    let valid_until = Local::now()
+        .checked_add_signed(TimeDelta::minutes(5))
+        .unwrap();
+    RandomCode::new("123abc", valid_until.into())
+}
+
 #[get("/secured-route")]
-pub async fn secured_route(token: AuthToken<User>) -> impl Responder {
-    HttpResponse::Ok().body(format!(
-        "Request from user: {}",
-        token.get_authenticated_user().email
-    ))
+async fn secured_route(_: AuthToken<UserWithMfa>) -> impl Responder {
+    HttpResponse::Ok()
 }
 
 #[actix_rt::test]
-async fn should_not_be_logged_in_without_mfa() {
+async fn should_be_logged_in_without_mfa() {
     let addr = actix_test::unused_addr();
     start_test_server(addr);
 
     let client = Client::builder().cookie_store(true).build().unwrap();
 
-    let mut res = client
+    client
         .post(format!("http://{addr}/login"))
-        .body(r#"{ "email": "anna", "password": "test123" }"#)
+        .body(r#"{ "email": "linda", "password": "test123" }"#)
         .header("Content-Type", "application/json")
         .send()
         .await
         .unwrap();
-
-    assert_eq!(res.status(), StatusCode::OK);
-
-    res = client
-        .get(format!("http://{addr}/secured-route"))
-        .send()
-        .await
-        .unwrap();
-
-    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
-}
-
-#[actix_rt::test]
-async fn should_return_401_if_calling_mfa_without_login() {
-    let addr = actix_test::unused_addr();
-    start_test_server(addr);
-
-    let client = Client::builder().cookie_store(true).build().unwrap();
-    let authenticator = GoogleAuthenticator::new();
-    let code = authenticator
-        .get_code(SECRET, 0)
-        .expect("Code should be created");
 
     let res = client
-        .post(format!("http://{addr}/login/mfa"))
-        .body(format!("{{ \"code\": \"{}\" }}", code))
-        .header("Content-Type", "application/json")
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
-}
-
-#[actix_rt::test]
-async fn should_respond_mfa_needed_for_login_status() {
-    let addr = actix_test::unused_addr();
-    start_test_server(addr);
-
-    let client = Client::builder().cookie_store(true).build().unwrap();
-
-    let login_res = client
-        .post(format!("http://{addr}/login"))
-        .body(r#"{ "email": "anna", "password": "test123" }"#)
-        .header("Content-Type", "application/json")
+        .get(format!("http://{addr}/secured-route"))
         .send()
         .await
         .unwrap();
 
-    let body = login_res.text().await.unwrap().replace(" ", "");
-
-    assert!(body.contains(r#"status":"MfaNeeded"#));
-    assert!(body.contains(r#"mfaId":"TOTP_MFA"#));
+    assert_eq!(res.status(), StatusCode::OK);
 }
 
 #[actix_rt::test]
-async fn should_be_logged_in_after_mfa() {
+async fn should_be_logged_in_using_authenticator() {
     let addr = actix_test::unused_addr();
     start_test_server(addr);
 
@@ -122,7 +126,7 @@ async fn should_be_logged_in_after_mfa() {
 
     client
         .post(format!("http://{addr}/login"))
-        .body(r#"{ "email": "anna", "password": "test123" }"#)
+        .body(r#"{ "email": "joe", "password": "test123" }"#)
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -147,7 +151,7 @@ async fn should_be_logged_in_after_mfa() {
 }
 
 #[actix_rt::test]
-async fn should_be_not_logged_in_if_mfa_fails() {
+async fn should_be_logged_in_using_random_code() {
     let addr = actix_test::unused_addr();
     start_test_server(addr);
 
@@ -161,22 +165,21 @@ async fn should_be_not_logged_in_if_mfa_fails() {
         .await
         .unwrap();
 
-    let mut res = client
+    client
         .post(format!("http://{addr}/login/mfa"))
-        .body(format!("{{ \"code\": \"{}\" }}", "\"WRONGCODE\""))
+        .body(format!("{{ \"code\": \"{}\" }}", "123abc"))
         .header("Content-Type", "application/json")
         .send()
         .await
         .unwrap();
-    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 
-    res = client
+    let res = client
         .get(format!("http://{addr}/secured-route"))
         .send()
         .await
         .unwrap();
 
-    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(res.status(), StatusCode::OK);
 }
 
 fn start_test_server(addr: SocketAddr) {
@@ -186,16 +189,18 @@ fn start_test_server(addr: SocketAddr) {
                 let totp_secret_repo = Arc::new(TotpTestRepo);
 
                 let app_closure = move || {
-                    let factor: Box<dyn Factor> =
-                        Box::new(GoogleAuthFactor::<_, User>::with_discrepancy(
+                    let authenticator: Box<dyn Factor> =
+                        Box::new(GoogleAuthFactor::<_, UserWithMfa>::with_discrepancy(
                             Arc::clone(&totp_secret_repo),
                             3,
                         ));
+                    let rand_code: Box<dyn Factor> =
+                        Box::new(MfaRandomCode::new(single_code_generator, DoNotSendCode));
 
                     let mfa_config =
-                        MfaConfig::new(vec![factor], OnlyAuthenticatorFactor, mfa_condition);
+                        MfaConfig::new(vec![authenticator, rand_code], LoadMfa, mfa_condition);
 
-                    SessionLoginAppBuilder::create(HardCodedLoadUserService)
+                    SessionLoginAppBuilder::create(ThreeUserService)
                         .set_mfa(mfa_config)
                         .build()
                         .service(secured_route)
