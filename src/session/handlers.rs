@@ -136,7 +136,9 @@ async fn mfa_route<U: Serialize + DeserializeOwned + Clone>(
     if let Some(f) = mfa_config.get_factor_by_user(&user).await {
         f.check_code(body.get_code(), &req).await?;
         session.mfa_challenge_done();
-        Ok(HttpResponse::Ok().finish())
+        Ok(mfa_config
+            .handle_success(&user, HttpResponse::Ok().finish())
+            .await)
     } else {
         Ok(HttpResponse::Unauthorized().finish())
     }
@@ -158,7 +160,7 @@ async fn generate_code_if_mfa_necessary<U: Serialize + DeserializeOwned + Clone>
     let mut mfa_needed = false;
 
     if let Some(factor) = mfa_config.get_factor_by_user(user).await {
-        if mfa_config.is_condition_met(user, req) {
+        if mfa_config.is_condition_met(user, req.clone()).await {
             factor.generate_code(req)?;
             session.needs_mfa(&factor.get_unique_id())?;
             mfa_needed = true;

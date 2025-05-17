@@ -1,23 +1,23 @@
 use std::{net::SocketAddr, sync::Arc, thread};
 
-use actix_web::{get, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{get, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
     login::{LoadUserByCredentials, LoadUserError, LoginToken},
-    mfa::{MfaByUser, MfaConfig, MfaError},
+    mfa::{HandleMfaRequest, MfaConfig, MfaError},
     multifactor::{
         google_auth::{GoogleAuthFactor, MFA_ID_AUTHENTICATOR_TOTP},
-        random_code_auth::{CodeSender, MfaRandomCode, RandomCode, MFA_ID_RANDOM_CODE},
+        random_code_auth::{MfaRandomCode, MFA_ID_RANDOM_CODE},
         Factor,
     },
     session::app_builder::SessionLoginAppBuilder,
     AuthToken,
 };
-use chrono::{Local, TimeDelta};
+
 use google_authenticator::GoogleAuthenticator;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
-use test_utils::{CustomError, TotpTestRepo, SECRET};
+use test_utils::{single_code_generator, DoNotSendCode, TotpTestRepo, SECRET};
 
 mod test_utils;
 
@@ -29,12 +29,12 @@ struct UserWithMfa {
 
 struct LoadMfa;
 
-#[async_trait]
-impl MfaByUser for LoadMfa {
+#[async_trait(?Send)]
+impl HandleMfaRequest for LoadMfa {
     type User = UserWithMfa;
 
-    async fn get_mfa_id_by_user(&self, user: Self::User) -> Result<Option<String>, MfaError> {
-        Ok(user.mfa)
+    async fn get_mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError> {
+        Ok(user.mfa.clone())
     }
 }
 
@@ -61,27 +61,6 @@ impl LoadUserByCredentials for ThreeUserService {
             _ => Err(LoadUserError::LoginFailed),
         }
     }
-}
-
-struct DoNotSendCode;
-
-impl CodeSender for DoNotSendCode {
-    type Error = CustomError;
-
-    fn send_code(&self, _: RandomCode) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
-
-fn mfa_condition(_: &UserWithMfa, _: &HttpRequest) -> bool {
-    true
-}
-
-fn single_code_generator() -> RandomCode {
-    let valid_until = Local::now()
-        .checked_add_signed(TimeDelta::minutes(5))
-        .unwrap();
-    RandomCode::new("123abc", valid_until.into())
 }
 
 #[get("/secured-route")]
@@ -197,8 +176,7 @@ fn start_test_server(addr: SocketAddr) {
                     let rand_code: Box<dyn Factor> =
                         Box::new(MfaRandomCode::new(single_code_generator, DoNotSendCode));
 
-                    let mfa_config =
-                        MfaConfig::new(vec![authenticator, rand_code], LoadMfa, mfa_condition);
+                    let mfa_config = MfaConfig::new(vec![authenticator, rand_code], LoadMfa);
 
                     SessionLoginAppBuilder::create(ThreeUserService)
                         .set_mfa(mfa_config)

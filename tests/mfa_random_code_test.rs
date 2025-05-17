@@ -8,7 +8,7 @@ use actix_session::{storage::CookieSessionStore, SessionExt, SessionMiddleware};
 use actix_web::{cookie::Key, get, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    mfa::{MfaByUser, MfaConfig, MfaError},
+    mfa::{HandleMfaRequest, MfaConfig, MfaError},
     middleware::{AuthMiddleware, PathMatcher},
     multifactor::random_code_auth::{CodeSender, MfaRandomCode, RandomCode, MFA_ID_RANDOM_CODE},
     session::{handlers::SessionApiHandlers, session_auth::SessionAuthProvider},
@@ -32,17 +32,13 @@ fn _setup_logger() {
     });
 }
 
-fn mfa_condition(_: &User, _: &HttpRequest) -> bool {
-    true
-}
-
 struct OnlyRandomCodeFactor;
 
-#[async_trait]
-impl MfaByUser for OnlyRandomCodeFactor {
+#[async_trait(?Send)]
+impl HandleMfaRequest for OnlyRandomCodeFactor {
     type User = User;
 
-    async fn get_mfa_id_by_user(&self, _: Self::User) -> Result<Option<String>, MfaError> {
+    async fn get_mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
         Ok(Some(MFA_ID_RANDOM_CODE.to_owned()))
     }
 }
@@ -333,8 +329,7 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
                     // This is the manual configuration of the auth and session middleware and the SessionApiHandlers
 
                     let code_factor = Box::new(MfaRandomCode::new(generator, DummySender {}));
-                    let mfa_config =
-                        MfaConfig::new(vec![code_factor], OnlyRandomCodeFactor, mfa_condition);
+                    let mfa_config = MfaConfig::new(vec![code_factor], OnlyRandomCodeFactor);
                     let load_user_service = Arc::new(HardCodedLoadUserService);
                     App::new()
                         .service(secured_route)
