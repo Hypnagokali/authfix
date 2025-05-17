@@ -3,7 +3,7 @@ use std::{net::SocketAddr, sync::Arc, thread};
 use actix_web::{get, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    mfa::{MfaByUser, MfaConfig, MfaError},
+    mfa::{HandleMfaRequest, MfaConfig, MfaError},
     multifactor::{
         google_auth::{GoogleAuthFactor, MFA_ID_AUTHENTICATOR_TOTP},
         Factor,
@@ -18,18 +18,18 @@ use test_utils::{HardCodedLoadUserService, TotpTestRepo, User, SECRET};
 
 mod test_utils;
 
-fn mfa_condition(user: &User, _req: &HttpRequest) -> bool {
-    user.name == "anna"
-}
-
 struct OnlyAuthenticatorFactor;
 
-#[async_trait]
-impl MfaByUser for OnlyAuthenticatorFactor {
+#[async_trait(?Send)]
+impl HandleMfaRequest for OnlyAuthenticatorFactor {
     type User = User;
 
-    async fn get_mfa_id_by_user(&self, _: Self::User) -> Result<Option<String>, MfaError> {
+    async fn get_mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
         Ok(Some(MFA_ID_AUTHENTICATOR_TOTP.to_owned()))
+    }
+
+    async fn is_condition_met(&self, user: &Self::User, _req: HttpRequest) -> bool {
+        user.name == "anna"
     }
 }
 
@@ -192,8 +192,7 @@ fn start_test_server(addr: SocketAddr) {
                             3,
                         ));
 
-                    let mfa_config =
-                        MfaConfig::new(vec![factor], OnlyAuthenticatorFactor, mfa_condition);
+                    let mfa_config = MfaConfig::new(vec![factor], OnlyAuthenticatorFactor);
 
                     SessionLoginAppBuilder::create(HardCodedLoadUserService)
                         .set_mfa(mfa_config)

@@ -3,8 +3,12 @@ use std::future::ready;
 use async_trait::async_trait;
 use authfix::{
     login::{LoadUserByCredentials, LoadUserError, LoginToken},
-    multifactor::TotpSecretRepository,
+    multifactor::{
+        random_code_auth::{CodeSender, RandomCode},
+        TotpSecretRepository,
+    },
 };
+use chrono::{Local, TimeDelta};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
 
@@ -75,4 +79,22 @@ where
     ) -> impl std::future::Future<Output = Result<String, Self::Error>> {
         Box::pin(ready(Ok(SECRET.to_owned())))
     }
+}
+
+pub struct DoNotSendCode;
+
+impl CodeSender for DoNotSendCode {
+    type Error = CustomError;
+
+    fn send_code(&self, _: RandomCode) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+#[allow(dead_code)]
+pub fn single_code_generator() -> RandomCode {
+    let valid_until = Local::now()
+        .checked_add_signed(TimeDelta::minutes(5))
+        .unwrap();
+    RandomCode::new("123abc", valid_until.into())
 }

@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use actix_web::{dev::Payload, FromRequest, HttpMessage, HttpRequest, ResponseError};
+use actix_web::{dev::Payload, FromRequest, HttpMessage, HttpRequest, HttpResponse, ResponseError};
 use async_trait::async_trait;
 use futures::future::{ready, Ready};
 use log::warn;
@@ -9,15 +9,25 @@ use thiserror::Error;
 
 use crate::multifactor::Factor;
 
-#[async_trait]
-pub trait MfaByUser {
+#[async_trait(?Send)]
+pub trait HandleMfaRequest {
     type User;
 
-    async fn get_mfa_id_by_user(&self, user: Self::User) -> Result<Option<String>, MfaError>;
+    async fn get_mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError>;
+
+    #[allow(unused)]
+    async fn is_condition_met(&self, user: &Self::User, req: HttpRequest) -> bool {
+        true
+    }
+
+    #[allow(unused)]
+    async fn handle_success(&self, user: &Self::User, mut res: HttpResponse) -> HttpResponse {
+        res
+    }
 }
 
 #[derive(Error, Debug)]
-#[error("Cannot load Mfa ID by user: {msg}")]
+#[error("Handling of mfa request failed: {msg}")]
 pub struct MfaError {
     msg: String,
 }
@@ -42,8 +52,7 @@ impl ResponseError for MfaError {}
 
 pub struct MfaConfigInner<U> {
     factors: Vec<Box<dyn Factor>>,
-    condition: fn(&U, &HttpRequest) -> bool,
-    load_mfa: Box<dyn MfaByUser<User = U>>,
+    handle_mfa: Box<dyn HandleMfaRequest<User = U>>,
 }
 
 pub struct MfaConfig<U>
@@ -65,14 +74,12 @@ where
 
     pub fn new(
         factors: Vec<Box<dyn Factor>>,
-        load_mfa: impl MfaByUser<User = U> + 'static,
-        condition: fn(&U, &HttpRequest) -> bool,
+        handle_mfa: impl HandleMfaRequest<User = U> + 'static,
     ) -> Self {
         Self {
             inner: Rc::new(Some(MfaConfigInner {
                 factors,
-                condition,
-                load_mfa: Box::new(load_mfa),
+                handle_mfa: Box::new(handle_mfa),
             })),
         }
     }
@@ -81,18 +88,28 @@ where
         self.inner.is_some()
     }
 
-    pub fn is_condition_met(&self, user: &U, req: &HttpRequest) -> bool {
+    pub async fn is_condition_met(&self, user: &U, req: HttpRequest) -> bool {
         if let Some(inner) = self.inner.as_ref() {
-            (inner.condition)(user, req)
+            // inner.handle_mfa.is_condition_met(user, req).await
+            inner.handle_mfa.is_condition_met(user, req).await
         } else {
             warn!("Tried to use 'MfaConfig::is_condition_met' while MfaConfig is not configured");
             false
         }
     }
 
+    pub async fn handle_success(&self, user: &U, res: HttpResponse) -> HttpResponse {
+        if let Some(inner) = self.inner.as_ref() {
+            inner.handle_mfa.handle_success(user, res).await
+        } else {
+            warn!("Tried to use 'MfaConfig::get_factor_by_user' while MfaConfig is not configured");
+            res
+        }
+    }
+
     pub async fn get_factor_by_user(&self, user: &U) -> Option<&Box<dyn Factor>> {
         if let Some(inner) = self.inner.as_ref() {
-            match inner.load_mfa.get_mfa_id_by_user(user.clone()).await {
+            match inner.handle_mfa.get_mfa_id_by_user(user).await {
                 Ok(Some(mfa)) => inner.factors.iter().find(|f| f.get_unique_id() == mfa),
                 _ => None,
             }
