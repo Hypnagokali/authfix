@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, thread};
+use std::{net::SocketAddr, sync::Arc, thread};
 
 use actix_web::{cookie::Cookie, get, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
@@ -107,9 +107,12 @@ fn start_test_server(addr: SocketAddr) {
     thread::spawn(move || {
         actix_rt::System::new()
             .block_on(async {
+                let sender = Arc::new(DoNotSendCode);
                 let app_closure = move || {
-                    let rand_code: Box<dyn Factor> =
-                        Box::new(MfaRandomCode::new(single_code_generator, DoNotSendCode));
+                    let rand_code: Box<dyn Factor> = Box::new(MfaRandomCode::new(
+                        single_code_generator,
+                        Arc::clone(&sender),
+                    ));
 
                     let mfa_config = MfaConfig::new(vec![rand_code], LoadMfa);
 

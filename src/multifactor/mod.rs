@@ -30,7 +30,10 @@ pub enum GetTotpSecretError {
 // one should be public, the other needs to be pub (crate) to hide is_condition_met() and generate_code()
 pub trait Factor {
     /// Responsible for generating the code and sending it to the user. Currently its needed to retrieve the user from the request
-    fn generate_code(&self, req: &HttpRequest) -> Result<(), GenerateCodeError>;
+    fn generate_code(
+        &self,
+        req: &HttpRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<(), GenerateCodeError>>>>;
     /// Identifier for the Factor. Can be any String it only needs to be unique inside the app
     fn get_unique_id(&self) -> String;
     /// checks the code and returns empty Ok if code is correct, an Error otherwise
