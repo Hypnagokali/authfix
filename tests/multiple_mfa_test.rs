@@ -166,15 +166,17 @@ fn start_test_server(addr: SocketAddr) {
         actix_rt::System::new()
             .block_on(async {
                 let totp_secret_repo = Arc::new(TotpTestRepo);
-
+                let sender = Arc::new(DoNotSendCode);
                 let app_closure = move || {
                     let authenticator: Box<dyn Factor> =
                         Box::new(GoogleAuthFactor::<_, UserWithMfa>::with_discrepancy(
                             Arc::clone(&totp_secret_repo),
                             3,
                         ));
-                    let rand_code: Box<dyn Factor> =
-                        Box::new(MfaRandomCode::new(single_code_generator, DoNotSendCode));
+                    let rand_code: Box<dyn Factor> = Box::new(MfaRandomCode::new(
+                        single_code_generator,
+                        Arc::clone(&sender),
+                    ));
 
                     let mfa_config = MfaConfig::new(vec![authenticator, rand_code], LoadMfa);
 

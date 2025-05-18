@@ -67,8 +67,11 @@ where
     T: TotpSecretRepository<U> + 'static,
     U: DeserializeOwned + Clone + 'static,
 {
-    fn generate_code(&self, _req: &actix_web::HttpRequest) -> Result<(), GenerateCodeError> {
-        Ok(())
+    fn generate_code(
+        &self,
+        _req: &actix_web::HttpRequest,
+    ) -> std::pin::Pin<Box<dyn Future<Output = Result<(), GenerateCodeError>>>> {
+        Box::pin(ready(Ok(())))
     }
 
     fn check_code(

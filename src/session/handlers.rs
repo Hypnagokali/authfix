@@ -161,7 +161,7 @@ async fn generate_code_if_mfa_necessary<U: Serialize + DeserializeOwned + Clone>
 
     if let Some(factor) = mfa_config.get_factor_by_user(user).await {
         if mfa_config.is_condition_met(user, req.clone()).await {
-            factor.generate_code(req)?;
+            factor.generate_code(req).await?;
             session.needs_mfa(&factor.get_unique_id())?;
             mfa_needed = true;
         }

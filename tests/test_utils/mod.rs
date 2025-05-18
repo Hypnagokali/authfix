@@ -83,10 +83,11 @@ where
 
 pub struct DoNotSendCode;
 
+#[async_trait]
 impl CodeSender for DoNotSendCode {
     type Error = CustomError;
 
-    fn send_code(&self, _: RandomCode) -> Result<(), Self::Error> {
+    async fn send_code(&self, _: RandomCode) -> Result<(), Self::Error> {
         Ok(())
     }
 }

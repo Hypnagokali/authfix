@@ -262,11 +262,13 @@ async fn should_not_be_logged_in_after_time_is_up() {
     assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 }
 
-struct DummySender {}
+struct DummySender;
+
+#[async_trait]
 impl CodeSender for DummySender {
     type Error = CustomError;
 
-    fn send_code(&self, code: RandomCode) -> Result<(), Self::Error> {
+    async fn send_code(&self, code: RandomCode) -> Result<(), Self::Error> {
         let st = code.valid_until().to_owned();
         let date_time: DateTime<Local> = st.into();
         let now = Local::now();
@@ -324,11 +326,13 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
     thread::spawn(move || {
         actix_rt::System::new()
             .block_on(async {
+                let sender = Arc::new(DummySender);
+
                 HttpServer::new(move || {
                     // Hint:
                     // This is the manual configuration of the auth and session middleware and the SessionApiHandlers
 
-                    let code_factor = Box::new(MfaRandomCode::new(generator, DummySender {}));
+                    let code_factor = Box::new(MfaRandomCode::new(generator, Arc::clone(&sender)));
                     let mfa_config = MfaConfig::new(vec![code_factor], OnlyRandomCodeFactor);
                     let load_user_service = Arc::new(HardCodedLoadUserService);
                     App::new()
