@@ -1,5 +1,5 @@
-#[cfg(feature = "google_auth")]
-pub mod google_auth;
+#[cfg(feature = "authenticator")]
+pub mod authenticator;
 #[cfg(feature = "mfa_send_code")]
 pub mod random_code_auth;
 
@@ -15,14 +15,31 @@ pub trait TotpSecretRepository<U>
 where
     U: DeserializeOwned,
 {
-    type Error: StdError;
-    fn get_auth_secret(&self, user: &U) -> impl Future<Output = Result<String, Self::Error>>;
+    fn get_auth_secret(&self, user: &U)
+        -> impl Future<Output = Result<String, GetTotpSecretError>>;
 }
 
 #[derive(Error, Debug)]
-pub enum GetTotpSecretError {
-    #[error("GetTotpSecretError: {0}")]
-    DefaultError(String),
+#[error("Retrieving TOTP secret failed: {msg}")]
+pub struct GetTotpSecretError {
+    msg: String,
+}
+
+impl GetTotpSecretError {
+    #[allow(unused)]
+    fn new(msg: &str) -> Self {
+        Self {
+            msg: msg.to_owned(),
+        }
+    }
+}
+
+impl Default for GetTotpSecretError {
+    fn default() -> Self {
+        Self {
+            msg: "Cannot get secret".to_owned(),
+        }
+    }
 }
 
 // ToDo:
@@ -142,12 +159,12 @@ mod tests {
 
     #[test]
     fn generate_error_should_print_cause_test() {
-        let orig = GetTotpSecretError::DefaultError("orig error".to_owned());
+        let orig = GetTotpSecretError::new("orig error");
         let code_error = GenerateCodeError::new_with_cause("error", orig);
 
         assert_eq!(
             format!("{}", code_error),
-            "GenerateCodeError: error, caused by: GetTotpSecretError: orig error"
+            "GenerateCodeError: error, caused by: Retrieving TOTP secret failed: orig error"
         );
     }
 }

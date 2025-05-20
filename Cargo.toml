@@ -19,7 +19,7 @@ thiserror = "2.0"
 # used for public api like the trait `LoadUserService`
 async-trait = "0.1.88"
 
-# feature: google_auth
+# feature: authenticator
 google-authenticator = { version = "0.4", optional = true }
 qrcode-generator = { version = "5.0", optional = true }
 rand = { version = "0.9", optional = true }
@@ -37,8 +37,8 @@ chrono = "0.4.40"
 env_logger = "0.11.8"
 
 # to make integration tests work
-authfix = { path = ".", features = ["google_auth", "mfa_send_code"] } 
+authfix = { path = ".", features = ["authenticator", "mfa_send_code"] } 
 
 [features]
-google_auth = ["dep:google-authenticator", "dep:qrcode-generator", "dep:rand", "dep:base32"]
+authenticator = ["dep:google-authenticator", "dep:qrcode-generator", "dep:rand", "dep:base32"]
 mfa_send_code = []

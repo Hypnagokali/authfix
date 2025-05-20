@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use authfix::{
     mfa::{HandleMfaRequest, MfaConfig, MfaError},
     multifactor::{
-        google_auth::{GoogleAuthFactor, MFA_ID_AUTHENTICATOR_TOTP},
+        authenticator::{AuthenticatorFactor, MFA_ID_AUTHENTICATOR_TOTP},
         Factor,
     },
     session::app_builder::SessionLoginAppBuilder,
@@ -187,7 +187,7 @@ fn start_test_server(addr: SocketAddr) {
 
                 let app_closure = move || {
                     let factor: Box<dyn Factor> =
-                        Box::new(GoogleAuthFactor::<_, User>::with_discrepancy(
+                        Box::new(AuthenticatorFactor::<_, User>::with_discrepancy(
                             Arc::clone(&totp_secret_repo),
                             3,
                         ));

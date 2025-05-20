@@ -26,16 +26,9 @@ pub const MFA_ID_AUTHENTICATOR_TOTP: &str = "TOTP_MFA";
 ///
 /// # Examples
 /// ```ignore
-/// App::new()
-///    //...
-///   .wrap(AuthMiddleware::<_, User>::new_with_factor(
-///     SessionAuthProvider,
-///     PathMatcher::default(),
-///     Box::new(GoogleAuthFactor::<_, User>::new(Arc::clone(&your_totp_repository))),
-///   )
-/// )
+/// // Needs new example
 /// ```
-pub struct GoogleAuthFactor<T, U>
+pub struct AuthenticatorFactor<T, U>
 where
     T: TotpSecretRepository<U>,
     U: DeserializeOwned,
@@ -45,7 +38,7 @@ where
     phantom_data_user: PhantomData<U>,
 }
 
-impl<T, U> GoogleAuthFactor<T, U>
+impl<T, U> AuthenticatorFactor<T, U>
 where
     T: TotpSecretRepository<U>,
     U: DeserializeOwned + Clone,
@@ -62,7 +55,7 @@ where
     }
 }
 
-impl<T, U> Factor for GoogleAuthFactor<T, U>
+impl<T, U> Factor for AuthenticatorFactor<T, U>
 where
     T: TotpSecretRepository<U> + 'static,
     U: DeserializeOwned + Clone + 'static,
@@ -177,16 +170,16 @@ pub mod tests {
 
     #[test]
     fn twenty_bytes_should_have_32_chars_in_base32() {
-        let gen = TotpSecretGenerator::new("my_app", "johnson");
-        let code = gen.get_secret();
+        let generator = TotpSecretGenerator::new("my_app", "johnson");
+        let code = generator.get_secret();
 
         assert_eq!(code.len(), 32);
     }
 
     #[test]
     fn codes_should_not_be_equal() {
-        let gen = TotpSecretGenerator::new("my_app", "eli");
-        let code1 = gen.get_secret();
+        let generator = TotpSecretGenerator::new("my_app", "eli");
+        let code1 = generator.get_secret();
 
         let gen2 = TotpSecretGenerator::new("my_app", "eli");
         let code2 = gen2.get_secret();
@@ -196,8 +189,8 @@ pub mod tests {
 
     #[test]
     fn should_generate_svg_with_200px() {
-        let gen = TotpSecretGenerator::new("TestApp", "john.doe@example.org");
-        let qr_code = gen.get_qr_code().unwrap();
+        let generator = TotpSecretGenerator::new("TestApp", "john.doe@example.org");
+        let qr_code = generator.get_qr_code().unwrap();
 
         let start_svg =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg width=\"200\" height=\"200\"";
