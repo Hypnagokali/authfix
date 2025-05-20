@@ -5,7 +5,7 @@ use authfix::{
     login::{LoadUserByCredentials, LoadUserError, LoginToken},
     multifactor::{
         random_code_auth::{CodeSender, RandomCode},
-        TotpSecretRepository,
+        GetTotpSecretError, TotpSecretRepository,
     },
 };
 use chrono::{Local, TimeDelta};
@@ -61,22 +61,16 @@ impl LoadUserByCredentials for HardCodedLoadUserService {
     }
 }
 
-#[derive(Error, Debug)]
-#[error("No secret found in repo")]
-pub struct NoSecretFoundError;
-
 pub struct TotpTestRepo;
 
 impl<U> TotpSecretRepository<U> for TotpTestRepo
 where
     U: DeserializeOwned,
 {
-    type Error = NoSecretFoundError;
-
     fn get_auth_secret(
         &self,
         _user: &U,
-    ) -> impl std::future::Future<Output = Result<String, Self::Error>> {
+    ) -> impl std::future::Future<Output = Result<String, GetTotpSecretError>> {
         Box::pin(ready(Ok(SECRET.to_owned())))
     }
 }

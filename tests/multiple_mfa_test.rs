@@ -6,7 +6,7 @@ use authfix::{
     login::{LoadUserByCredentials, LoadUserError, LoginToken},
     mfa::{HandleMfaRequest, MfaConfig, MfaError},
     multifactor::{
-        google_auth::{GoogleAuthFactor, MFA_ID_AUTHENTICATOR_TOTP},
+        authenticator::{AuthenticatorFactor, MFA_ID_AUTHENTICATOR_TOTP},
         random_code_auth::{MfaRandomCode, MFA_ID_RANDOM_CODE},
         Factor,
     },
@@ -169,7 +169,7 @@ fn start_test_server(addr: SocketAddr) {
                 let sender = Arc::new(DoNotSendCode);
                 let app_closure = move || {
                     let authenticator: Box<dyn Factor> =
-                        Box::new(GoogleAuthFactor::<_, UserWithMfa>::with_discrepancy(
+                        Box::new(AuthenticatorFactor::<_, UserWithMfa>::with_discrepancy(
                             Arc::clone(&totp_secret_repo),
                             3,
                         ));
