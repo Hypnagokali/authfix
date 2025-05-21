@@ -10,13 +10,15 @@ use async_trait::async_trait;
 use authfix::{
     mfa::{HandleMfaRequest, MfaConfig, MfaError},
     middleware::{AuthMiddleware, PathMatcher},
-    multifactor::random_code_auth::{CodeSender, MfaRandomCode, RandomCode, MFA_ID_RANDOM_CODE},
+    multifactor::random_code_auth::{
+        CodeSendError, CodeSender, MfaRandomCode, RandomCode, MFA_ID_RANDOM_CODE,
+    },
     session::{handlers::SessionApiHandlers, session_auth::SessionAuthProvider},
     AuthToken,
 };
 use chrono::{DateTime, Duration, Local, TimeDelta};
 use reqwest::{Client, StatusCode};
-use test_utils::{CustomError, HardCodedLoadUserService, User};
+use test_utils::{HardCodedLoadUserService, User};
 
 mod test_utils;
 
@@ -266,9 +268,7 @@ struct DummySender;
 
 #[async_trait]
 impl CodeSender for DummySender {
-    type Error = CustomError;
-
-    async fn send_code(&self, code: RandomCode) -> Result<(), Self::Error> {
+    async fn send_code(&self, code: RandomCode) -> Result<(), CodeSendError> {
         let st = code.valid_until().to_owned();
         let date_time: DateTime<Local> = st.into();
         let now = Local::now();

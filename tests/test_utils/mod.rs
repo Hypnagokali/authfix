@@ -4,13 +4,12 @@ use async_trait::async_trait;
 use authfix::{
     login::{LoadUserByCredentials, LoadUserError, LoginToken},
     multifactor::{
-        random_code_auth::{CodeSender, RandomCode},
+        random_code_auth::{CodeSendError, CodeSender, RandomCode},
         GetTotpSecretError, TotpSecretRepository,
     },
 };
 use chrono::{Local, TimeDelta};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use thiserror::Error;
 
 // I am really not sure why cargo suddenly complains that TEST_OUT and test_out_path is not used. For now I mark it as allow(dead_code)
 #[allow(dead_code)]
@@ -22,14 +21,6 @@ pub const SECRET: &str = "I3VFM3JKMNDJCDH5BMBEEQAW6KJ6NOE3";
 #[allow(dead_code)]
 pub fn test_out_path(path: &str) -> String {
     format!("{TEST_OUT}/{path}")
-}
-
-// A standard error for tests
-#[derive(Error, Debug)]
-pub enum CustomError {
-    #[allow(dead_code)]
-    #[error("An error occured")]
-    Error,
 }
 
 //
@@ -79,9 +70,7 @@ pub struct DoNotSendCode;
 
 #[async_trait]
 impl CodeSender for DoNotSendCode {
-    type Error = CustomError;
-
-    async fn send_code(&self, _: RandomCode) -> Result<(), Self::Error> {
+    async fn send_code(&self, _: RandomCode) -> Result<(), CodeSendError> {
         Ok(())
     }
 }
