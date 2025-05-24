@@ -183,12 +183,12 @@ async fn login<T: LoadUserByCredentials<User = U>, U: Serialize + DeserializeOwn
         Ok(user) => {
             let mut login_res = LoginSessionResponse::success();
 
-            if !generate_code_if_mfa_necessary(&user, mfa_config, &req, &session).await? {
+            if !generate_code_if_mfa_necessary(&user, mfa_config.clone(), &req, &session).await? {
                 // MFA not needed, call success handler
                 user_service.on_success_handler(&req, &user).await?;
             } else {
                 // set timeout for login session
-                if let Some(validity) = SystemTime::now().checked_add(Duration::from_secs(60 * 5)) {
+                if let Some(validity) = SystemTime::now().checked_add(Duration::from_secs(mfa_config.get_timeout_in_seconds())) {
                     session.valid_until(validity)?;
                     if let Some(mfa_id) = session.get_mfa_id() {
                         login_res = LoginSessionResponse::needs_mfa(&mfa_id);
@@ -196,7 +196,7 @@ async fn login<T: LoadUserByCredentials<User = U>, U: Serialize + DeserializeOwn
                         error!("Generate MFA challenge error: No mfa_id in session found");
                     }
                 } else {
-                    error!("Generate MFA challenge error: Cannot create validity");
+                    error!("Generate MFA challenge error: Cannot create login session timeout");
                     return Ok(HttpResponse::InternalServerError().finish());
                 }
             }

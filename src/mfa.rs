@@ -53,8 +53,10 @@ impl ResponseError for MfaError {}
 pub struct MfaConfigInner<U> {
     factors: Vec<Box<dyn Factor>>,
     handle_mfa: Box<dyn HandleMfaRequest<User = U>>,
+    timeout: u64,
 }
 
+#[derive(Clone)]
 pub struct MfaConfig<U>
 where
     U: Serialize + DeserializeOwned + Clone + 'static,
@@ -80,6 +82,21 @@ where
             inner: Rc::new(Some(MfaConfigInner {
                 factors,
                 handle_mfa: Box::new(handle_mfa),
+                timeout: 300, // 5 minutes as default value
+            })),
+        }
+    }
+
+    pub fn new_with_timeout(
+        factors: Vec<Box<dyn Factor>>,
+        handle_mfa: impl HandleMfaRequest<User = U> + 'static,
+        timeout: u64
+    ) -> Self {
+        Self {
+            inner: Rc::new(Some(MfaConfigInner {
+                factors,
+                handle_mfa: Box::new(handle_mfa),
+                timeout,
             })),
         }
     }
@@ -88,12 +105,20 @@ where
         self.inner.is_some()
     }
 
+    pub fn get_timeout_in_seconds(&self) -> u64 {
+        if let Some(inner) = self.inner.as_ref() {
+            inner.timeout
+        } else {
+            print_not_configured_warn();
+            0
+        }
+    }
+
     pub async fn is_condition_met(&self, user: &U, req: HttpRequest) -> bool {
         if let Some(inner) = self.inner.as_ref() {
-            // inner.handle_mfa.is_condition_met(user, req).await
             inner.handle_mfa.is_condition_met(user, req).await
         } else {
-            warn!("Tried to use 'MfaConfig::is_condition_met' while MfaConfig is not configured");
+            print_not_configured_warn();
             false
         }
     }
@@ -102,7 +127,7 @@ where
         if let Some(inner) = self.inner.as_ref() {
             inner.handle_mfa.handle_success(user, res).await
         } else {
-            warn!("Tried to use 'MfaConfig::get_factor_by_user' while MfaConfig is not configured");
+            print_not_configured_warn();
             res
         }
     }
@@ -114,7 +139,7 @@ where
                 _ => None,
             }
         } else {
-            warn!("Tried to use 'MfaConfig::get_factor_by_user' while MfaConfig is not configured");
+            print_not_configured_warn();
             None
         }
     }
@@ -137,4 +162,8 @@ where
             ready(Ok(MfaConfig::empty()))
         }
     }
+}
+
+fn print_not_configured_warn() {
+    warn!("An attempt was made to use a MfaConfig method, although its not configured");
 }
