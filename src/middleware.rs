@@ -11,10 +11,9 @@ use actix_web::{
 use futures::future::LocalBoxFuture;
 use log::{debug, trace};
 use regex::Regex;
-use serde::de::DeserializeOwned;
 use urlencoding::encode;
 
-use crate::{config::Routes, AuthToken, AuthenticationProvider};
+use crate::{config::Routes, AuthToken, AuthUser, AuthenticationProvider};
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 
@@ -113,7 +112,7 @@ fn transform_to_encoded_regex(input: &str) -> String {
 pub struct AuthMiddleware<AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: DeserializeOwned + Clone + 'static,
+    U: AuthUser + 'static,
 {
     auth_provider: Rc<AuthProvider>,
     path_matcher: Rc<PathMatcher>,
@@ -123,7 +122,7 @@ where
 impl<AuthProvider, U> AuthMiddleware<AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: DeserializeOwned + Clone + 'static,
+    U: AuthUser + 'static,
 {
     pub fn new(auth_provider: AuthProvider, path_matcher: PathMatcher) -> Self {
         AuthMiddleware {
@@ -137,7 +136,7 @@ where
 pub struct AuthMiddlewareInner<S, AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: DeserializeOwned + Clone + 'static,
+    U: AuthUser + 'static,
 {
     service: Rc<S>,
     auth_provider: Rc<AuthProvider>,
@@ -150,7 +149,7 @@ where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
-    U: DeserializeOwned + Clone + 'static,
+    U: AuthUser + 'static,
     AuthProvider: AuthenticationProvider<U> + 'static,
 {
     type Response = ServiceResponse<B>;
@@ -212,7 +211,7 @@ where
     S::Future: 'static,
     B: 'static,
     AuthProvider: AuthenticationProvider<U> + 'static,
-    U: DeserializeOwned + Clone + 'static,
+    U: AuthUser + 'static,
 {
     type Response = ServiceResponse<B>;
     type Error = Error;

@@ -10,20 +10,20 @@ use actix_web::{
     dev::{ServiceFactory, ServiceRequest, ServiceResponse},
     App, Error,
 };
-use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     config::Routes,
     login::LoadUserByCredentials,
     mfa::MfaConfig,
     middleware::{AuthMiddleware, PathMatcher},
+    AuthUser,
 };
 
 use super::{handlers::SessionApiHandlers, session_auth::SessionAuthProvider};
 
 pub struct SessionLoginAppBuilder<U, S, ST>
 where
-    U: Serialize + DeserializeOwned + Clone + 'static,
+    U: AuthUser + 'static,
     S: LoadUserByCredentials<User = U> + 'static,
     ST: SessionStore,
 {
@@ -36,7 +36,7 @@ where
 
 impl<U, S, ST> SessionLoginAppBuilder<U, S, ST>
 where
-    U: Serialize + DeserializeOwned + Clone + 'static,
+    U: AuthUser + 'static,
     S: LoadUserByCredentials<User = U> + 'static,
     ST: SessionStore,
 {
@@ -107,7 +107,7 @@ where
 
 impl<U, S, ST> SessionLoginAppBuilder<U, S, ST>
 where
-    U: Serialize + DeserializeOwned + Clone + 'static,
+    U: AuthUser + 'static,
     S: LoadUserByCredentials<User = U> + 'static,
     ST: SessionStore + 'static,
 {
@@ -141,7 +141,7 @@ where
 
 impl<U, S> SessionLoginAppBuilder<U, S, CookieSessionStore>
 where
-    U: Serialize + DeserializeOwned + Clone + 'static,
+    U: AuthUser + 'static,
     S: LoadUserByCredentials<User = U> + 'static,
 {
     pub fn create(load_user_service: S) -> Self {

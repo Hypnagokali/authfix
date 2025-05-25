@@ -7,7 +7,9 @@ use authfix::{
     AuthToken,
 };
 use reqwest::{Client, StatusCode};
-use serde::{Deserialize, Serialize};
+use test_utils::User;
+
+mod test_utils;
 
 static _INIT_LOGGER: Once = Once::new();
 
@@ -19,12 +21,6 @@ fn _setup_logger() {
             .try_init()
             .unwrap();
     });
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct User {
-    pub email: String,
-    pub name: String,
 }
 
 struct AcceptEveryoneLoginService;

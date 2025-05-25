@@ -8,12 +8,11 @@ use std::{
 use actix_web::{HttpMessage, HttpRequest};
 use google_authenticator::GoogleAuthenticator;
 use rand::RngCore;
-use serde::de::DeserializeOwned;
 use thiserror::Error;
 
 use crate::{
     multifactor::{CheckCodeError, Factor, GenerateCodeError, TotpSecretRepository},
-    AuthToken,
+    AuthToken, AuthUser,
 };
 
 /// ID to reference authenticator mfa
@@ -28,11 +27,7 @@ pub const MFA_ID_AUTHENTICATOR_TOTP: &str = "TOTP_MFA";
 /// ```ignore
 /// // Needs new example
 /// ```
-pub struct AuthenticatorFactor<T, U>
-where
-    T: TotpSecretRepository<U>,
-    U: DeserializeOwned,
-{
+pub struct AuthenticatorFactor<T, U> {
     totp_secret_repo: Arc<T>,
     discrepancy: u64,
     phantom_data_user: PhantomData<U>,
@@ -41,7 +36,7 @@ where
 impl<T, U> AuthenticatorFactor<T, U>
 where
     T: TotpSecretRepository<U>,
-    U: DeserializeOwned + Clone,
+    U: AuthUser,
 {
     pub fn new(totp_secret_repo: Arc<T>) -> Self {
         Self::with_discrepancy(totp_secret_repo, 0)
@@ -58,7 +53,7 @@ where
 impl<T, U> Factor for AuthenticatorFactor<T, U>
 where
     T: TotpSecretRepository<U> + 'static,
-    U: DeserializeOwned + Clone + 'static,
+    U: AuthUser + 'static,
 {
     fn generate_code(
         &self,

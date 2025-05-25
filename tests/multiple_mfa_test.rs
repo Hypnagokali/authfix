@@ -11,7 +11,7 @@ use authfix::{
         Factor,
     },
     session::app_builder::SessionLoginAppBuilder,
-    AuthToken,
+    AccountInfo, AuthToken,
 };
 
 use google_authenticator::GoogleAuthenticator;
@@ -26,6 +26,8 @@ struct UserWithMfa {
     name: String,
     mfa: Option<String>,
 }
+
+impl AccountInfo for UserWithMfa {}
 
 struct LoadMfa;
 

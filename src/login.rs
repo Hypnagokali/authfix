@@ -1,7 +1,9 @@
 use actix_web::{HttpRequest, HttpResponse, ResponseError};
 use async_trait::async_trait;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::Deserialize;
 use thiserror::Error;
+
+use crate::AuthUser;
 
 /// Credentials comming from the login request
 #[derive(Deserialize)]
@@ -12,7 +14,7 @@ pub struct LoginToken {
 /// Trait that handles the loading of a user and executes a success and error handler
 #[async_trait]
 pub trait LoadUserByCredentials: Send + Sync {
-    type User: DeserializeOwned + Serialize + Clone;
+    type User: AuthUser;
 
     /// Gets a [LoginToken] and returns a user if credentials are correct a [LoadUserError] otherwise
     async fn load_user(&self, login_token: &LoginToken) -> Result<Self::User, LoadUserError>;

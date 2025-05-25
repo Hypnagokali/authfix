@@ -7,9 +7,10 @@ use authfix::{
         random_code_auth::{CodeSendError, CodeSender, RandomCode},
         GetTotpSecretError, TotpSecretRepository,
     },
+    AccountInfo, AuthUser,
 };
 use chrono::{Local, TimeDelta};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 // I am really not sure why cargo suddenly complains that TEST_OUT and test_out_path is not used. For now I mark it as allow(dead_code)
 #[allow(dead_code)]
@@ -31,6 +32,8 @@ pub struct User {
     pub email: String,
     pub name: String,
 }
+
+impl AccountInfo for User {}
 
 pub struct HardCodedLoadUserService;
 
@@ -56,7 +59,7 @@ pub struct TotpTestRepo;
 
 impl<U> TotpSecretRepository<U> for TotpTestRepo
 where
-    U: DeserializeOwned,
+    U: AuthUser,
 {
     fn get_auth_secret(
         &self,

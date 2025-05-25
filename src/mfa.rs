@@ -4,10 +4,9 @@ use actix_web::{dev::Payload, FromRequest, HttpMessage, HttpRequest, HttpRespons
 use async_trait::async_trait;
 use futures::future::{ready, Ready};
 use log::warn;
-use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
 
-use crate::multifactor::Factor;
+use crate::{multifactor::Factor, AuthUser};
 
 #[async_trait(?Send)]
 pub trait HandleMfaRequest {
@@ -59,14 +58,14 @@ pub struct MfaConfigInner<U> {
 #[derive(Clone)]
 pub struct MfaConfig<U>
 where
-    U: Serialize + DeserializeOwned + Clone + 'static,
+    U: AuthUser + 'static,
 {
     inner: Rc<Option<MfaConfigInner<U>>>,
 }
 
 impl<U> MfaConfig<U>
 where
-    U: Serialize + DeserializeOwned + Clone + 'static,
+    U: AuthUser + 'static,
 {
     pub fn empty() -> Self {
         Self {
@@ -90,7 +89,7 @@ where
     pub fn new_with_timeout(
         factors: Vec<Box<dyn Factor>>,
         handle_mfa: impl HandleMfaRequest<User = U> + 'static,
-        timeout: u64
+        timeout: u64,
     ) -> Self {
         Self {
             inner: Rc::new(Some(MfaConfigInner {
@@ -147,7 +146,7 @@ where
 
 impl<U> FromRequest for MfaConfig<U>
 where
-    U: Serialize + DeserializeOwned + Clone,
+    U: AuthUser,
 {
     type Error = actix_web::Error;
     type Future = Ready<Result<MfaConfig<U>, Self::Error>>;
