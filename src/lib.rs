@@ -16,7 +16,7 @@ use actix_web::{
     Error, FromRequest, HttpMessage, HttpRequest,
 };
 use errors::UnauthorizedError;
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 use std::{
     cell::{Ref, RefCell},
     future::{ready, Future, Ready},
@@ -36,6 +36,22 @@ pub mod session;
 pub use actix_session;
 pub use async_trait;
 
+pub trait AccountInfo {
+    fn get_user_identification(&self) -> String {
+        "user_identification is not implemented".to_owned()
+    }
+
+    fn is_user_disabled(&self) -> bool {
+        false
+    }
+    fn is_account_locked(&self) -> bool {
+        false
+    }
+}
+
+pub trait AuthUser: AccountInfo + Serialize + DeserializeOwned + Clone {}
+impl<T> AuthUser for T where T: AccountInfo + Serialize + DeserializeOwned + Clone {}
+
 /// This trait is used to retrieve the logged in user.
 /// If no user was found (e.g. in Actix-Session) it will return an Err.
 ///
@@ -43,7 +59,7 @@ pub use async_trait;
 /// [SessionAuthProvider](crate::session::session_auth::SessionAuthProvider)
 pub trait AuthenticationProvider<U>
 where
-    U: DeserializeOwned + Clone + 'static,
+    U: AuthUser + 'static,
 {
     fn get_auth_token(
         &self,
@@ -80,14 +96,14 @@ where
 #[derive(Clone)]
 pub struct AuthToken<U>
 where
-    U: DeserializeOwned + Clone,
+    U: AuthUser,
 {
     inner: Rc<RefCell<AuthTokenInner<U>>>,
 }
 
 impl<U> AuthToken<U>
 where
-    U: DeserializeOwned + Clone,
+    U: AuthUser,
 {
     pub fn get_authenticated_user(&self) -> Ref<U> {
         Ref::map(self.inner.borrow(), |inner| &inner.user)
@@ -135,7 +151,7 @@ pub enum AuthState {
 
 struct AuthTokenInner<U>
 where
-    U: DeserializeOwned + Clone,
+    U: AuthUser,
 {
     user: U,
     auth_state: AuthState,
@@ -143,7 +159,7 @@ where
 
 impl<U> FromRequest for AuthToken<U>
 where
-    U: DeserializeOwned + Clone + 'static,
+    U: AuthUser + 'static,
 {
     type Error = Error;
     type Future = Ready<Result<AuthToken<U>, Error>>;
@@ -160,11 +176,11 @@ where
 }
 
 pub trait AuthTokenExt {
-    fn get_auth_token<U: DeserializeOwned + Clone + 'static>(&self) -> Option<AuthToken<U>>;
+    fn get_auth_token<U: AuthUser + 'static>(&self) -> Option<AuthToken<U>>;
 }
 
 impl AuthTokenExt for HttpRequest {
-    fn get_auth_token<U: DeserializeOwned + Clone + 'static>(&self) -> Option<AuthToken<U>> {
+    fn get_auth_token<U: AuthUser + 'static>(&self) -> Option<AuthToken<U>> {
         let ext = self.extensions();
         ext.get::<AuthToken<U>>()
             .map(|auth_token_ref| AuthToken::from_ref(auth_token_ref))

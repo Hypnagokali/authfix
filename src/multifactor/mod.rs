@@ -6,14 +6,16 @@ pub mod random_code_auth;
 use std::{error::Error as StdError, future::Future, pin::Pin};
 
 use actix_web::{http::StatusCode, HttpRequest, HttpResponse, ResponseError};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+use crate::AuthUser;
 
 /// When TOTP is used, the secret needs to be stored somewhere
 /// This is a repository trait that loads the secret for a given user
 pub trait TotpSecretRepository<U>
 where
-    U: DeserializeOwned,
+    U: AuthUser,
 {
     fn get_auth_secret(&self, user: &U)
         -> impl Future<Output = Result<String, GetTotpSecretError>>;

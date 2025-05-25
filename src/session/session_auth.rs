@@ -14,10 +14,9 @@ use actix_web::{
     Error, FromRequest, HttpMessage, HttpRequest,
 };
 use log::error;
-use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    config::Routes, login::LoadUserByCredentials, mfa::MfaConfig, AuthState, AuthToken,
+    config::Routes, login::LoadUserByCredentials, mfa::MfaConfig, AuthState, AuthToken, AuthUser,
     AuthenticationProvider, UnauthorizedError,
 };
 
@@ -31,7 +30,7 @@ const SESSION_KEY_LOGIN_VALID_UNTIL: &str = "authfix__login_valid_until";
 #[derive(Clone)]
 pub struct SessionAuthProvider<U, L>
 where
-    U: DeserializeOwned + Serialize + Clone + 'static,
+    U: AuthUser + 'static,
     L: LoadUserByCredentials<User = U> + 'static,
 {
     mfa_config: Rc<MfaConfig<U>>,
@@ -42,7 +41,7 @@ where
 
 impl<U, L> SessionAuthProvider<U, L>
 where
-    U: DeserializeOwned + Serialize + Clone + 'static,
+    U: AuthUser + 'static,
     L: LoadUserByCredentials<User = U> + 'static,
 {
     /// Creates a new SessionAuthProvider without mfa.
@@ -68,7 +67,7 @@ where
 
 impl<U, L> AuthenticationProvider<U> for SessionAuthProvider<U, L>
 where
-    U: DeserializeOwned + Serialize + Clone + 'static,
+    U: AuthUser + 'static,
     L: LoadUserByCredentials<User = U> + 'static,
 {
     fn get_auth_token(
@@ -176,11 +175,11 @@ impl LoginSession {
         )
     }
 
-    pub fn set_user<U: Serialize>(&self, user: U) -> Result<(), SessionInsertError> {
+    pub fn set_user<U: AuthUser>(&self, user: U) -> Result<(), SessionInsertError> {
         self.session.insert(SESSION_KEY_USER, user)
     }
 
-    pub fn get_user<U: Serialize + DeserializeOwned + Clone>(&self) -> Option<U> {
+    pub fn get_user<U: AuthUser>(&self) -> Option<U> {
         match self.session.get::<U>(SESSION_KEY_USER) {
             Ok(Some(user)) => Some(user),
             _ => None,

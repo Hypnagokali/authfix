@@ -9,7 +9,7 @@ use crate::{
     login::{LoadUserByCredentials, LoginToken},
     mfa::MfaConfig,
     multifactor::CheckCodeError,
-    AuthToken,
+    AuthToken, AuthUser,
 };
 use actix_web::{
     dev::{AppService, HttpServiceFactory},
@@ -18,7 +18,7 @@ use actix_web::{
     Error, HttpRequest, HttpResponse, Resource, Responder,
 };
 use log::{error, warn};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use super::session_auth::LoginSession;
 
@@ -64,7 +64,7 @@ pub struct SessionApiHandlers<T: LoadUserByCredentials<User = U>, U> {
 
 impl<T, U> SessionApiHandlers<T, U>
 where
-    U: DeserializeOwned + Serialize + Clone + 'static,
+    U: AuthUser + 'static,
     T: LoadUserByCredentials<User = U> + 'static,
 {
     pub fn new(routes: Routes) -> Self {
@@ -87,7 +87,7 @@ where
 
 impl<T, U> Default for SessionApiHandlers<T, U>
 where
-    U: DeserializeOwned + Serialize + Clone + 'static,
+    U: AuthUser + 'static,
     T: LoadUserByCredentials<User = U> + 'static,
 {
     fn default() -> Self {
@@ -110,7 +110,7 @@ impl MfaRequestBody {
     }
 }
 
-async fn mfa_route<U: Serialize + DeserializeOwned + Clone>(
+async fn mfa_route<U: AuthUser>(
     mfa_config: MfaConfig<U>,
     body: Json<MfaRequestBody>,
     req: HttpRequest,
@@ -146,7 +146,7 @@ async fn mfa_route<U: Serialize + DeserializeOwned + Clone>(
 
 /// Triggers the code generation and sets the login state to mfa needed
 /// Returns true if mfa needed
-async fn generate_code_if_mfa_necessary<U: Serialize + DeserializeOwned + Clone>(
+async fn generate_code_if_mfa_necessary<U: AuthUser>(
     // U will need a trait bound like 'HasFactor' -> user.get_factor() -> String
     user: &U,
     mfa_config: MfaConfig<U>,
@@ -171,7 +171,7 @@ async fn generate_code_if_mfa_necessary<U: Serialize + DeserializeOwned + Clone>
 }
 
 #[allow(clippy::type_complexity)]
-async fn login<T: LoadUserByCredentials<User = U>, U: Serialize + DeserializeOwned + Clone>(
+async fn login<T: LoadUserByCredentials<User = U>, U: AuthUser>(
     login_token: Json<LoginToken>,
     user_service: ReqData<Arc<T>>,
     mfa_config: MfaConfig<U>,
@@ -181,6 +181,22 @@ async fn login<T: LoadUserByCredentials<User = U>, U: Serialize + DeserializeOwn
     session.reset();
     match user_service.load_user(&login_token).await {
         Ok(user) => {
+            if user.is_user_disabled() {
+                warn!(
+                    "User {} attempt to login but the user is disabled",
+                    user.get_user_identification()
+                );
+                return Ok(HttpResponse::Unauthorized().finish());
+            }
+
+            if user.is_account_locked() {
+                warn!(
+                    "User {} attempt to login but the account is locked",
+                    user.get_user_identification()
+                );
+                return Ok(HttpResponse::Unauthorized().finish());
+            }
+
             let mut login_res = LoginSessionResponse::success();
 
             if !generate_code_if_mfa_necessary(&user, mfa_config.clone(), &req, &session).await? {
@@ -188,7 +204,9 @@ async fn login<T: LoadUserByCredentials<User = U>, U: Serialize + DeserializeOwn
                 user_service.on_success_handler(&req, &user).await?;
             } else {
                 // set timeout for login session
-                if let Some(validity) = SystemTime::now().checked_add(Duration::from_secs(mfa_config.get_timeout_in_seconds())) {
+                if let Some(validity) = SystemTime::now()
+                    .checked_add(Duration::from_secs(mfa_config.get_timeout_in_seconds()))
+                {
                     session.valid_until(validity)?;
                     if let Some(mfa_id) = session.get_mfa_id() {
                         login_res = LoginSessionResponse::needs_mfa(&mfa_id);
@@ -215,7 +233,7 @@ async fn login<T: LoadUserByCredentials<User = U>, U: Serialize + DeserializeOwn
 impl<T, U> HttpServiceFactory for SessionApiHandlers<T, U>
 where
     T: LoadUserByCredentials<User = U> + 'static,
-    U: Serialize + DeserializeOwned + Clone + 'static,
+    U: AuthUser + 'static,
 {
     fn register(self, config: &mut AppService) {
         let mfa_resource = Resource::new(self.routes.get_mfa())
@@ -238,7 +256,7 @@ where
     }
 }
 
-async fn logout<U: DeserializeOwned + Clone>(token: AuthToken<U>) -> impl Responder {
+async fn logout<U: AuthUser>(token: AuthToken<U>) -> impl Responder {
     token.invalidate();
     HttpResponse::Ok()
 }
