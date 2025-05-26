@@ -5,24 +5,25 @@ This library provides a middleware for [Actix Web](https://github.com/actix/acti
 
 *Not yet published*
 
-First test version `0.1.0`:
+Progress of first version `0.1.0`:
 - [x] Implementation on top of Actix-Session
     - [x] Login
     - [x] Secured routes
     - [x] Logout
     - [x] Mfa with an authenticator
     - [x] Mfa with random code that can be sent by mail or sms
-    - [ ] Login session timeout (for mfa) is configurable
-    - [ ] User has is_disabled and is_account_locked properties
-    - [ ] Publish to crates.io
-    - [x] Reference project
+    - [x] Login session timeout (for mfa) is configurable
+    - [x] User has is_disabled and is_account_locked properties
     - [ ] Docs and Readme with examples
-
+    - [ ] Reference project
+    - [ ] Publish to crates.io
 
 Planning:
-- [ ] Implementation for OIDC
+- [ ] OIDC
     - [ ] Login with Google, GitHub, etc...
-- [ ] WebAuthn(?)
+
+Maybe later:
+- WebAuthn / Passkeys?
 
 ## Examples coming soon
 
