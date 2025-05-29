@@ -21,6 +21,7 @@ use crate::{
 
 use super::{handlers::SessionApiHandlers, session_auth::SessionAuthProvider};
 
+/// A builder that build an [actix_web::App] configured with session authentication
 pub struct SessionLoginAppBuilder<U, S, ST>
 where
     U: AuthUser + 'static,
@@ -144,17 +145,14 @@ where
     U: AuthUser + 'static,
     S: LoadUserByCredentials<User = U> + 'static,
 {
-    pub fn create(load_user_service: S) -> Self {
-        Self::create_from_shared(Arc::new(load_user_service))
+    pub fn create(load_user_service: S, key: Key) -> Self {
+        Self::create_from_shared(Arc::new(load_user_service), key)
     }
 
-    pub fn create_from_shared(load_user_service: Arc<S>) -> Self {
+    pub fn create_from_shared(load_user_service: Arc<S>, key: Key) -> Self {
         Self {
             path_matcher: Routes::default().into(),
-            session_middleware: SessionMiddleware::new(
-                CookieSessionStore::default(),
-                Key::generate(),
-            ),
+            session_middleware: SessionMiddleware::new(CookieSessionStore::default(), key),
             load_user_service,
             mfa_config: MfaConfig::empty(),
             routes: Routes::default(),

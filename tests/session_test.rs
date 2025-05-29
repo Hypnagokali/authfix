@@ -1,6 +1,6 @@
-use std::{net::SocketAddr, sync::Once, thread};
+use std::{net::SocketAddr, thread};
 
-use actix_web::{get, HttpResponse, HttpServer, Responder};
+use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
     config::Routes, login::LoadUserByCredentials, session::app_builder::SessionLoginAppBuilder,
@@ -10,18 +10,6 @@ use reqwest::{Client, StatusCode};
 use test_utils::User;
 
 mod test_utils;
-
-static _INIT_LOGGER: Once = Once::new();
-
-fn _setup_logger() {
-    _INIT_LOGGER.call_once(|| {
-        env_logger::builder()
-            .is_test(true)
-            .filter_level(log::LevelFilter::Debug)
-            .try_init()
-            .unwrap();
-    });
-}
 
 struct AcceptEveryoneLoginService;
 
@@ -166,12 +154,12 @@ async fn logout_should_invalidate_session() {
 }
 
 fn start_test_server(addr: SocketAddr) {
-    // _setup_logger();
+    let key = Key::generate();
     thread::spawn(move || {
         actix_rt::System::new()
             .block_on(async {
                 HttpServer::new(move || {
-                    SessionLoginAppBuilder::create(AcceptEveryoneLoginService)
+                    SessionLoginAppBuilder::create(AcceptEveryoneLoginService, key.clone())
                         .set_login_routes_and_unsecured_paths(
                             Routes::default(),
                             vec!["/public-route"],
@@ -179,7 +167,6 @@ fn start_test_server(addr: SocketAddr) {
                         .build()
                         .service(secured_route)
                         .service(public_route)
-                    // .wrap(Logger::default())
                 })
                 .bind(format!("{addr}"))
                 .unwrap()

@@ -1,6 +1,6 @@
 use std::{net::SocketAddr, sync::Arc, thread};
 
-use actix_web::{get, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{cookie::Key, get, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
     mfa::{HandleMfaRequest, MfaConfig, MfaError},
@@ -180,6 +180,7 @@ async fn should_be_not_logged_in_if_mfa_fails() {
 }
 
 fn start_test_server(addr: SocketAddr) {
+    let key = Key::generate();
     thread::spawn(move || {
         actix_rt::System::new()
             .block_on(async {
@@ -194,7 +195,7 @@ fn start_test_server(addr: SocketAddr) {
 
                     let mfa_config = MfaConfig::new(vec![factor], OnlyAuthenticatorFactor);
 
-                    SessionLoginAppBuilder::create(HardCodedLoadUserService)
+                    SessionLoginAppBuilder::create(HardCodedLoadUserService, key.clone())
                         .set_mfa(mfa_config)
                         .build()
                         .service(secured_route)
