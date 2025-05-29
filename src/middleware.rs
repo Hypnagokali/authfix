@@ -35,13 +35,22 @@ const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 #[derive(Clone)]
 pub struct PathMatcher {
     is_exclusion_list: bool,
-    path_regex_list: Vec<(String, Regex)>,
+    path_regex_list: Vec<Regex>,
 }
 
-fn add_path_to_list(path_list: &Vec<&str>, list: &mut Vec<(String, Regex)>) {
+fn add_path_to_list(path_list: &Vec<&str>, list: &mut Vec<Regex>) {
     for &pattern in path_list.iter() {
         let regex_pattern = format!("^{}$", transform_to_encoded_regex(pattern));
-        list.push((pattern.to_owned(), Regex::new(&regex_pattern).unwrap()));
+        list.push(Regex::new(&regex_pattern).unwrap());
+
+        if pattern.ends_with("/*") || pattern.ends_with("/") {
+            let last_slash_index = pattern.rfind("/").unwrap();
+            let regex_pattern = format!(
+                "^{}$",
+                transform_to_encoded_regex(&pattern[..last_slash_index])
+            );
+            list.push(Regex::new(&regex_pattern).unwrap());
+        }
     }
 }
 
@@ -66,9 +75,9 @@ impl PathMatcher {
         let mut path_regex_iter = self.path_regex_list.iter();
 
         if self.is_exclusion_list {
-            path_regex_iter.all(|p| !p.1.is_match(&encoded_path))
+            path_regex_iter.all(|p| !p.is_match(&encoded_path))
         } else {
-            path_regex_iter.any(|p| p.1.is_match(&encoded_path))
+            path_regex_iter.any(|p| p.is_match(&encoded_path))
         }
     }
 }
@@ -236,6 +245,28 @@ mod tests {
     use super::PathMatcher;
 
     #[test]
+    fn should_not_match_any() {
+        let path_matcher = PathMatcher::new(vec![], false);
+        assert!(!path_matcher.matches("/"));
+    }
+
+    #[test]
+    fn should_match_root() {
+        let path_matcher = PathMatcher::new(vec!["/"], false);
+        assert!(path_matcher.matches("/"));
+    }
+
+    #[test]
+    fn should_match_parent_path_when_child_not_specified() {
+        let path_matcher_wild_card = PathMatcher::new(vec!["/some-route/*"], false);
+        let path_matcher_no_child = PathMatcher::new(vec!["/some-route/"], false);
+        assert!(path_matcher_wild_card.matches("/some-route"));
+        assert!(!path_matcher_wild_card.matches("/some-route-specific"));
+
+        assert!(path_matcher_no_child.matches("/some-route"));
+    }
+
+    #[test]
     fn should_be_able_to_add_routes_to_path_matcher() {
         let routes = Routes::new("", "/custom-login", "/custom-mfa", "/logout");
 
@@ -249,7 +280,6 @@ mod tests {
     #[test]
     fn path_matcher_can_be_created_from_routes() {
         let routes = Routes::new("", "/custom-login", "/custom-mfa", "/logout");
-
         let path_matcher: PathMatcher = routes.into();
 
         assert!(!path_matcher.matches("/custom-login"));
