@@ -1,6 +1,6 @@
 use std::{net::SocketAddr, thread};
 
-use actix_web::{get, HttpResponse, HttpServer, Responder};
+use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
     login::{LoadUserByCredentials, LoadUserError, LoginToken},
@@ -110,15 +110,14 @@ async fn should_not_login_if_account_locked() {
 }
 
 fn start_test_server(addr: SocketAddr) {
-    // _setup_logger();
+    let key = Key::generate();
     thread::spawn(move || {
         actix_rt::System::new()
             .block_on(async {
                 HttpServer::new(move || {
-                    SessionLoginAppBuilder::create(LoadUser)
+                    SessionLoginAppBuilder::create(LoadUser, key.clone())
                         .build()
                         .service(secured_route)
-                    // .wrap(Logger::default())
                 })
                 .bind(format!("{addr}"))
                 .unwrap()

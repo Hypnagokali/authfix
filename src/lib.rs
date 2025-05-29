@@ -73,7 +73,7 @@ where
         // default implementation does not configure anything
     }
 
-    fn is_user_authorized_for_request(
+    fn check_if_authorized(
         &self,
         service_request: ServiceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<ServiceRequest, UnauthorizedError>>>>;

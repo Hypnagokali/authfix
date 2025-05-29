@@ -108,7 +108,7 @@ where
         extensions.insert(Arc::clone(&self.load_user));
     }
 
-    fn is_user_authorized_for_request(
+    fn check_if_authorized(
         &self,
         req: ServiceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<ServiceRequest, UnauthorizedError>>>> {

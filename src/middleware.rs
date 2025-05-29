@@ -175,7 +175,7 @@ where
 
             Box::pin(async move {
                 // Before Request
-                let processed_request = auth_provider.is_user_authorized_for_request(req).await?;
+                let processed_request = auth_provider.check_if_authorized(req).await?;
 
                 let res = service.call(processed_request).await?;
 
