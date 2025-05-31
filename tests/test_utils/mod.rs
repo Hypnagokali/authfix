@@ -1,5 +1,3 @@
-use std::future::ready;
-
 use async_trait::async_trait;
 use authfix::{
     login::{LoadUserByCredentials, LoadUserError, LoginToken},
@@ -57,15 +55,13 @@ impl LoadUserByCredentials for HardCodedLoadUserService {
 
 pub struct TotpTestRepo;
 
+#[async_trait]
 impl<U> TotpSecretRepository<U> for TotpTestRepo
 where
     U: AuthUser,
 {
-    fn get_auth_secret(
-        &self,
-        _user: &U,
-    ) -> impl std::future::Future<Output = Result<String, GetTotpSecretError>> {
-        Box::pin(ready(Ok(SECRET.to_owned())))
+    async fn get_auth_secret(&self, _user: &U) -> Result<String, GetTotpSecretError> {
+        Ok(SECRET.to_owned())
     }
 }
 
