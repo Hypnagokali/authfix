@@ -29,8 +29,7 @@ pub struct GetTotpSecretError {
 }
 
 impl GetTotpSecretError {
-    #[allow(unused)]
-    fn new(msg: &str) -> Self {
+    pub fn new(msg: &str) -> Self {
         Self {
             msg: msg.to_owned(),
         }
