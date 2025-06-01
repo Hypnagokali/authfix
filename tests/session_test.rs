@@ -160,10 +160,7 @@ fn start_test_server(addr: SocketAddr) {
             .block_on(async {
                 HttpServer::new(move || {
                     SessionLoginAppBuilder::create(AcceptEveryoneLoginService, key.clone())
-                        .set_login_routes_and_unsecured_paths(
-                            Routes::default(),
-                            vec!["/public-route"],
-                        )
+                        .set_login_routes_and_public_paths(Routes::default(), vec!["/public-route"])
                         .build()
                         .service(secured_route)
                         .service(public_route)
