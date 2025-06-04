@@ -86,8 +86,7 @@ where
             repo.get_auth_secret(&u)
                 .await
                 .map(|secret| {
-                    let authenticator = GoogleAuthenticator::new();
-                    if authenticator.verify_code(&secret, &code_to_check, discrepancy, 0) {
+                    if Authenticator::verify(&secret, &code_to_check, discrepancy) {
                         Ok(())
                     } else {
                         Err(CheckCodeError::InvalidCode)
@@ -159,27 +158,54 @@ pub enum SecretCodeGenerationError {
     QrCodeGenerationError,
 }
 
+/// Handles verification of a TOTP
+pub struct Authenticator;
+
+impl Authenticator {
+    /// Verifies the given code for a given secret
+    /// 
+    /// discrepancy adds a tolerance in seconds - how long the generation of the code might be
+    pub fn verify(secret: &str, code: &str, discrepancy: u64) -> bool {
+        let authenticator = GoogleAuthenticator::new();
+
+        authenticator.verify_code(secret, code, discrepancy, 0)
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
+    use google_authenticator::GoogleAuthenticator;
+
+    use crate::multifactor::authenticator::Authenticator;
+
     use super::TotpSecretGenerator;
+
+    #[test]
+    fn authenticator_should_verify_code() {
+        let google_authenticator = GoogleAuthenticator::new();
+        let secret = google_authenticator.create_secret(20);
+        let code = google_authenticator.get_code(&secret, 0).unwrap();
+
+        assert!(Authenticator::verify(&secret, &code, 0))
+    }
 
     #[test]
     fn twenty_bytes_should_have_32_chars_in_base32() {
         let generator = TotpSecretGenerator::new("my_app", "johnson");
-        let code = generator.get_secret();
+        let secret = generator.get_secret();
 
-        assert_eq!(code.len(), 32);
+        assert_eq!(secret.len(), 32);
     }
 
     #[test]
     fn codes_should_not_be_equal() {
         let generator = TotpSecretGenerator::new("my_app", "eli");
-        let code1 = generator.get_secret();
+        let secret1 = generator.get_secret();
 
         let gen2 = TotpSecretGenerator::new("my_app", "eli");
-        let code2 = gen2.get_secret();
+        let secret2 = gen2.get_secret();
 
-        assert_ne!(code1, code2);
+        assert_ne!(secret1, secret2);
     }
 
     #[test]
