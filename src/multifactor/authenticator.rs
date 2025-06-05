@@ -163,7 +163,7 @@ pub struct Authenticator;
 
 impl Authenticator {
     /// Verifies the given code for a given secret
-    /// 
+    ///
     /// discrepancy adds a tolerance in seconds - how long the generation of the code might be
     pub fn verify(secret: &str, code: &str, discrepancy: u64) -> bool {
         let authenticator = GoogleAuthenticator::new();

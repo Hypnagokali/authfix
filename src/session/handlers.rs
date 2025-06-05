@@ -74,7 +74,7 @@ where
         }
     }
 
-    /// Configuration function to setup a [SessionLoginHandler]
+    /// Returns the config that can be used by Actix Web to register the handlers
     pub fn get_config(self) -> impl FnOnce(&mut ServiceConfig) {
         let routes = web::Data::new(self.routes.clone());
 
