@@ -58,7 +58,7 @@
 //! #[get("/secured")]
 //! async fn secured(auth_token: AuthToken<User>) -> impl Responder {
 //!     let user = auth_token.get_authenticated_user();
-//!     HttpResponse::Ok().json(user.clone())
+//!     HttpResponse::Ok().json(&*user)
 //! }
 //!
 //! #[actix_web::main]
