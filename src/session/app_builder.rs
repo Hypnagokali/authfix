@@ -12,14 +12,13 @@ use actix_web::{
 };
 
 use crate::{
-    config::Routes,
     login::LoadUserByCredentials,
     mfa::MfaConfig,
     middleware::{AuthMiddleware, PathMatcher},
     AuthUser,
 };
 
-use super::{handlers::SessionApiHandlers, session_auth::SessionAuthProvider};
+use super::{config::Routes, handlers::SessionApiHandlers, session_auth::SessionAuthProvider};
 
 /// A builder that build an [actix_web::App] configured with session authentication
 pub struct SessionLoginAppBuilder<U, S, ST>

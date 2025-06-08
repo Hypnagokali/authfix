@@ -1,13 +1,30 @@
-use std::rc::Rc;
+//! This module contains MFA realated types and traits
 
+use std::rc::Rc;
 use actix_web::{dev::Payload, FromRequest, HttpMessage, HttpRequest, HttpResponse, ResponseError};
 use async_trait::async_trait;
 use futures::future::{ready, Ready};
 use log::warn;
 use thiserror::Error;
-
 use crate::{multifactor::Factor, AuthUser};
 
+///  Handles the MFA request
+/// ```ignore
+/// #[async_trait(?Send)]
+/// pub trait HandleMfaRequest {
+///     type User;
+/// 
+///     async fn get_mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError>;
+/// 
+///     async fn is_condition_met(&self, user: &Self::User, req: HttpRequest) -> bool {
+///         true
+///     }
+/// 
+///     async fn handle_success(&self, user: &Self::User, mut res: HttpResponse) -> HttpResponse {
+///         res
+///     }
+/// }
+/// ```
 #[async_trait(?Send)]
 pub trait HandleMfaRequest {
     type User;
@@ -49,7 +66,7 @@ impl Default for MfaError {
 
 impl ResponseError for MfaError {}
 
-pub struct MfaConfigInner<U> {
+struct MfaConfigInner<U> {
     factors: Vec<Box<dyn Factor>>,
     handle_mfa: Box<dyn HandleMfaRequest<User = U>>,
     timeout: u64,

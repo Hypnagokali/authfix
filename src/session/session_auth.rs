@@ -16,7 +16,7 @@ use actix_web::{
 use log::error;
 
 use crate::{
-    config::Routes, login::LoadUserByCredentials, mfa::MfaConfig, AuthState, AuthToken, AuthUser,
+    session::config::Routes, login::LoadUserByCredentials, mfa::MfaConfig, AuthState, AuthToken, AuthUser,
     AuthenticationProvider, UnauthorizedError,
 };
 
@@ -103,7 +103,7 @@ where
         Box::pin(ready(()))
     }
 
-    fn configure_provider(&self, extensions: &mut Extensions) {
+    fn configure_request(&self, extensions: &mut Extensions) {
         extensions.insert(Rc::clone(&self.mfa_config));
         extensions.insert(Arc::clone(&self.load_user));
     }

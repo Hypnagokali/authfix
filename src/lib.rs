@@ -1,17 +1,23 @@
-//! Authentication middleware for Actix Web.
+//! # Authfix
+//! Authfix makes it easy to add an authentication layer to Actix Web.
 //!
-//! `Authfix` makes it easy to add an authentication layer to Actix Web.
-//!
-//! It provides a middleware with which secured paths can be defined globally. It also provides an extractor ([AuthToken]) that can be used, to
+//! It provides a middleware with which secured paths can be defined globally. It also provides an extractor ([AuthToken]) that can be used to
 //! retrieve the currently logged in user.
 //!
-//! The session authentication is designed to work with Single Page Applications, so it offers API endpoints for login, logout and mfa verification. Redirects
-//! are handled by the SPA itself.
+//! # Session Authentication
+//! Currently, only session authentication is supported (OIDC is planned). It is designed to work with Single Page Applications, so it offers a JSON API for login, logout and mfa verification. Redirects
+//! are then handled by the SPA.
 //!
+//! # Async traits
+//! To use this library, the user has to implement certrain traits (e.g.: [LoadUserByCredentials](crate::login::LoadUserByCredentials)) and most of them
+//! are async. To make the implementation easier and less verbose, these traits use the [async_trait](https://crates.io/crates/async-trait) crate. Unfortunately, this makes the docs a bit messy, so the 
+//! original trait definition is provided in the trait's documentation.
+//! 
 //! *The library is still in the early stages and a work in progress so it can contain security flaws. Please report them or provide a PR: [Authfix Repo](https://github.com/Hypnagokali/authfix)*
 //!
 //! # Examples
-//! ## For session based authentication ([Actix Session](https://docs.rs/actix-session/latest/actix_session/)).
+//! ## Session based authentication 
+//! The session based authentication is based on: [Actix Session](https://docs.rs/actix-session/latest/actix_session/). Authfix re-exports actix_session, you don't need it as a dependency.
 //! ```no_run
 //! use actix_web::{HttpResponse, HttpServer, Responder, cookie::Key, get};
 //! use authfix::{
@@ -90,62 +96,76 @@ use std::{
     rc::Rc,
 };
 
-pub mod config;
+pub mod middleware;
+pub mod session;
 pub mod errors;
 pub mod login;
 pub mod mfa;
-pub mod middleware;
 pub mod multifactor;
-pub mod session;
 
 // re-exports
 pub use actix_session;
 pub use async_trait;
 
+/// Contains the information about the user account.
+/// 
+/// There is only a semantic difference between disabling a user or locking the account. 
+/// In both cases, the user cannot log in.
+/// `get_user_identification` is used for logging.
 pub trait AccountInfo {
     fn get_user_identification(&self) -> String {
         "user_identification is not implemented".to_owned()
     }
 
+    /// If user is disabled, login is not possible
     fn is_user_disabled(&self) -> bool {
         false
     }
+
+    /// If account is locked, login is not possible
     fn is_account_locked(&self) -> bool {
         false
     }
 }
 
+/// This is a helper trait to bundle all necessary traits needed by a user
+/// 
+/// Don't implement it, just derive Serialize, Deserialize from serde, Clone from std and implement AccountInfo
 pub trait AuthUser: AccountInfo + Serialize + DeserializeOwned + Clone {}
 impl<T> AuthUser for T where T: AccountInfo + Serialize + DeserializeOwned + Clone {}
 
-/// This trait is used to retrieve the logged in user.
-/// If no user was found (e.g. in Actix-Session) it will return an Err.
+/// Main component used by the middleware to handle the authentication mechanism
 ///
-/// Currently it is only implemented for actix-session:
-/// [SessionAuthProvider](crate::session::session_auth::SessionAuthProvider)
+/// Its responsible for checking if the user is authorized and for invalidating the session/token/whatever after logout.
+/// Additionally it is responsible for configuring special request (injecting services), such as for login or mfa.
+/// If you want to implement your custom authentication mechanism, implement this trait and provide a way to store the user
 pub trait AuthenticationProvider<U>
 where
     U: AuthUser + 'static,
 {
-    fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
-
-    /// Configure the authentication provider. Prepares login related request.
-    #[allow(unused)]
-    fn configure_provider(&self, extensions: &mut Extensions) {
-        // default implementation does not configure anything
-    }
-
+    /// Tries to retrieve the logged in user or fails with [UnauthorizedError]
     fn get_auth_token(
         &self,
         service_request: &ServiceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
+
+    /// Invalidates the authentication after [AuthToken] has been set to [AuthState::Invalid].
+    fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
+
+    /// Configures the request if needed
+    /// 
+    /// E.g.: the session authentication requires a user service to retrieve the user by credentials - this service is injected using this method. 
+    #[allow(unused)]
+    fn configure_request(&self, extensions: &mut Extensions) {
+        // default implementation does not configure anything
+    }
 }
 
 /// Extractor that holds the authenticated user
 ///
-/// [`AuthToken`] will be used to handle the logged in user within secured routes. If you inject it a route that is not secured,
-/// an 401 [UnauthorizedError] will be returned to the client.
-/// Retrieve the current user:
+/// If you inject [AuthToken] in a route that is not secured (a public route), it will respond with 500.
+/// 
+/// # Example:
 /// ```ignore
 /// #[get("/secured-route")]
 /// pub async fn secured_route(token: AuthToken<User>) -> impl Responder {
@@ -167,8 +187,15 @@ impl<U> AuthToken<U>
 where
     U: AuthUser,
 {
+    /// Returns a reference to the logged in user.
     pub fn get_authenticated_user(&self) -> Ref<U> {
         Ref::map(self.inner.borrow(), |inner| &inner.user)
+    }
+
+    /// Invalidates the AuthToken. This triggers [AuthenticationProvider::invalidate]
+    pub fn invalidate(&self) {
+        let mut inner = self.inner.borrow_mut();
+        inner.auth_state = AuthState::Invalid;
     }
 
     pub(crate) fn needs_mfa(&self) -> bool {
@@ -184,11 +211,6 @@ where
     pub(crate) fn is_authenticated(&self) -> bool {
         let inner = self.inner.borrow();
         inner.auth_state == AuthState::Authenticated
-    }
-
-    pub fn invalidate(&self) {
-        let mut inner = self.inner.borrow_mut();
-        inner.auth_state = AuthState::Invalid;
     }
 
     pub(crate) fn new(user: U, auth_state: AuthState) -> Self {
@@ -232,11 +254,18 @@ where
             return ready(Ok(AuthToken::from_ref(token)));
         }
 
-        // ToDo: not a good error, needs 500
-        ready(Err(UnauthorizedError::default().into()))
+        ready(Err(actix_web::error::ErrorInternalServerError("'AuthToken' cannot be used in public routes.")))
     }
 }
 
+/// Extension to get the [AuthToken] from [HttpRequest]
+/// ```ignore
+/// use authfix::AuthTokenExt; 
+/// 
+/// fn some_function(req: actix_web::HttpRequest) -> bool {
+///     req.get_auth_token::<User>().is_some()
+/// }
+/// ```
 pub trait AuthTokenExt {
     fn get_auth_token<U: AuthUser + 'static>(&self) -> Option<AuthToken<U>>;
 }

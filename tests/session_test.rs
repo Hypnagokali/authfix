@@ -3,7 +3,7 @@ use std::{net::SocketAddr, thread};
 use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    config::Routes, login::LoadUserByCredentials, session::app_builder::SessionLoginAppBuilder,
+    login::LoadUserByCredentials, session::{app_builder::SessionLoginAppBuilder, config::Routes},
     AuthToken,
 };
 use reqwest::{Client, StatusCode};
