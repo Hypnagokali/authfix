@@ -127,10 +127,6 @@ pub trait AuthenticationProvider<U>
 where
     U: AuthUser + 'static,
 {
-    fn get_auth_token(
-        &self,
-        req: &HttpRequest,
-    ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
 
     /// Configure the authentication provider. Prepares login related request.
@@ -139,7 +135,7 @@ where
         // default implementation does not configure anything
     }
 
-    fn check_if_authorized(
+    fn create_auth_token_if_authorized(
         &self,
         service_request: ServiceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<ServiceRequest, UnauthorizedError>>>>;
