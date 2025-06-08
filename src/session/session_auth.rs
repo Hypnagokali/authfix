@@ -11,7 +11,7 @@ use actix_session::{Session, SessionExt, SessionInsertError};
 use actix_web::{
     dev::{Extensions, ServiceRequest},
     web::Data,
-    Error, FromRequest, HttpMessage, HttpRequest,
+    Error, FromRequest, HttpRequest,
 };
 use log::error;
 
@@ -64,7 +64,7 @@ where
         }
     }
 
-    pub fn get_auth_token(
+    pub fn get_auth_token_from_session(
         &self,
         req: &actix_web::HttpRequest,
     ) -> Result<AuthToken<U>, UnauthorizedError> {
@@ -108,10 +108,10 @@ where
         extensions.insert(Arc::clone(&self.load_user));
     }
 
-    fn create_auth_token_if_authorized(
+    fn get_auth_token(
         &self,
-        req: ServiceRequest,
-    ) -> Pin<Box<dyn Future<Output = Result<ServiceRequest, UnauthorizedError>>>> {
+        req: &ServiceRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>> {
         let request_path = req.request().path().to_owned();
         #[allow(unused_assignments)]
         // not sure why it gives a warning since the "else" block of the "if let" was introduced.
@@ -126,7 +126,7 @@ where
             ))));
         }
 
-        let auth_token_req = self.get_auth_token(req.request());
+        let auth_token_req = self.get_auth_token_from_session(req.request());
         Box::pin(async move {
             let token = auth_token_req?;
 
@@ -142,11 +142,7 @@ where
                 return Err(UnauthorizedError::default());
             }
 
-            {
-                let mut extensions = req.extensions_mut();
-                extensions.insert(token);
-            }
-            Ok(req)
+            Ok(token)
         })
     }
 }
