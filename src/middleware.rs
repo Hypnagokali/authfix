@@ -178,7 +178,7 @@ where
             debug!("Secured route: '{}'", debug_path);
 
             Box::pin(async move {
-                // Before Request: get AuthToken or response with 401
+                // Before Request: get AuthToken or respond with 401
                 let token = auth_provider.get_auth_token(&req).await?;
 
                 {

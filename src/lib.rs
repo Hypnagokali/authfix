@@ -130,7 +130,7 @@ pub trait AccountInfo {
 
 /// This is a helper trait to bundle all necessary traits needed by a user
 /// 
-/// Simply derive Serialize, Deserialize
+/// Don't implement it, just derive Serialize, Deserialize from serde, Clone from std and implement AccountInfo
 pub trait AuthUser: AccountInfo + Serialize + DeserializeOwned + Clone {}
 impl<T> AuthUser for T where T: AccountInfo + Serialize + DeserializeOwned + Clone {}
 
@@ -138,10 +138,18 @@ impl<T> AuthUser for T where T: AccountInfo + Serialize + DeserializeOwned + Clo
 ///
 /// Its responsible for checking if the user is authorized and for invalidating the session/token/whatever after logout.
 /// Additionally it is responsible for configuring special request (injecting services), such as for login or mfa.
+/// If you want to implement your custom authentication mechanism, implement this trait and provide a way to store the user
 pub trait AuthenticationProvider<U>
 where
     U: AuthUser + 'static,
 {
+    /// Tries to retrieve the logged in user or fails with [UnauthorizedError]
+    fn get_auth_token(
+        &self,
+        service_request: &ServiceRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
+
+    /// Invalidates the authentication after [AuthToken] has been set to [AuthState::Invalid].
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
 
     /// Configures the request if needed
@@ -149,11 +157,6 @@ where
     fn configure_request(&self, extensions: &mut Extensions) {
         // default implementation does not configure anything
     }
-
-    fn get_auth_token(
-        &self,
-        service_request: &ServiceRequest,
-    ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
 }
 
 /// Extractor that holds the authenticated user
