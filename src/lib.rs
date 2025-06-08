@@ -134,7 +134,7 @@ pub trait AccountInfo {
 pub trait AuthUser: AccountInfo + Serialize + DeserializeOwned + Clone {}
 impl<T> AuthUser for T where T: AccountInfo + Serialize + DeserializeOwned + Clone {}
 
-/// Authentication lifecycle hooks
+/// Main component used by the middleware to handle the authentication mechanism
 ///
 /// Its responsible for checking if the user is authorized and for invalidating the session/token/whatever after logout.
 /// Additionally it is responsible for configuring special request (injecting services), such as for login or mfa.
@@ -153,6 +153,8 @@ where
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
 
     /// Configures the request if needed
+    /// 
+    /// E.g.: the session authentication requires a user service to retrieve the user by credentials - this service is injected using this method. 
     #[allow(unused)]
     fn configure_request(&self, extensions: &mut Extensions) {
         // default implementation does not configure anything
@@ -161,9 +163,9 @@ where
 
 /// Extractor that holds the authenticated user
 ///
-/// [`AuthToken`] will be used to handle the logged in user within secured routes. If you inject it a route that is not secured,
-/// an 401 [UnauthorizedError] will be returned to the client.
-/// Retrieve the current user:
+/// If you inject [AuthToken] in a route that is not secured (a public route), it will respond with 500.
+/// 
+/// # Example:
 /// ```ignore
 /// #[get("/secured-route")]
 /// pub async fn secured_route(token: AuthToken<User>) -> impl Responder {
@@ -185,8 +187,15 @@ impl<U> AuthToken<U>
 where
     U: AuthUser,
 {
+    /// Returns a reference to the logged in user.
     pub fn get_authenticated_user(&self) -> Ref<U> {
         Ref::map(self.inner.borrow(), |inner| &inner.user)
+    }
+
+    /// Invalidates the AuthToken. This triggers [AuthenticationProvider::invalidate]
+    pub fn invalidate(&self) {
+        let mut inner = self.inner.borrow_mut();
+        inner.auth_state = AuthState::Invalid;
     }
 
     pub(crate) fn needs_mfa(&self) -> bool {
@@ -202,11 +211,6 @@ where
     pub(crate) fn is_authenticated(&self) -> bool {
         let inner = self.inner.borrow();
         inner.auth_state == AuthState::Authenticated
-    }
-
-    pub fn invalidate(&self) {
-        let mut inner = self.inner.borrow_mut();
-        inner.auth_state = AuthState::Invalid;
     }
 
     pub(crate) fn new(user: U, auth_state: AuthState) -> Self {
@@ -250,11 +254,18 @@ where
             return ready(Ok(AuthToken::from_ref(token)));
         }
 
-        // ToDo: not a good error, needs 500
-        ready(Err(UnauthorizedError::default().into()))
+        ready(Err(actix_web::error::ErrorInternalServerError("'AuthToken' cannot be used in public routes.")))
     }
 }
 
+/// Extension to get the [AuthToken] from [HttpRequest]
+/// ```ignore
+/// use authfix::AuthTokenExt; 
+/// 
+/// fn some_function(req: actix_web::HttpRequest) -> bool {
+///     req.get_auth_token::<User>().is_some()
+/// }
+/// ```
 pub trait AuthTokenExt {
     fn get_auth_token<U: AuthUser + 'static>(&self) -> Option<AuthToken<U>>;
 }
