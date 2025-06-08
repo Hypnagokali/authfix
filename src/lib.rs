@@ -135,10 +135,10 @@ where
         // default implementation does not configure anything
     }
 
-    fn create_auth_token_if_authorized(
+    fn get_auth_token(
         &self,
-        service_request: ServiceRequest,
-    ) -> Pin<Box<dyn Future<Output = Result<ServiceRequest, UnauthorizedError>>>>;
+        service_request: &ServiceRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
 }
 
 /// Extractor that holds the authenticated user

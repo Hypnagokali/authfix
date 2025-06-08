@@ -183,10 +183,15 @@ where
             debug!("Secured route: '{}'", debug_path);
 
             Box::pin(async move {
-                // Before Request
-                let processed_request = auth_provider.create_auth_token_if_authorized(req).await?;
+                // Before Request: get AuthToken or response with 401
+                let token = auth_provider.get_auth_token(&req).await?;
 
-                let res = service.call(processed_request).await?;
+                {
+                    let mut extensions = req.extensions_mut();
+                    extensions.insert(token);
+                }
+
+                let res = service.call(req).await?;
 
                 // Process logout logic after request
                 let token_valid = {
