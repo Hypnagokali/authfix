@@ -63,24 +63,18 @@ where
             phantom_data: PhantomData,
         }
     }
-}
 
-impl<U, L> AuthenticationProvider<U> for SessionAuthProvider<U, L>
-where
-    U: AuthUser + 'static,
-    L: LoadUserByCredentials<User = U> + 'static,
-{
-    fn get_auth_token(
+    pub fn get_auth_token(
         &self,
         req: &actix_web::HttpRequest,
-    ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>> {
+    ) -> Result<AuthToken<U>, UnauthorizedError> {
         let session = req.get_session().clone();
 
         let user = match session.get::<U>(SESSION_KEY_USER) {
             Ok(Some(user)) => user,
             _ => {
                 error!("No user in session. Cannot read {}", SESSION_KEY_USER);
-                return Box::pin(ready(Err(UnauthorizedError::default())));
+                return Err(UnauthorizedError::default());
             }
         };
 
@@ -89,13 +83,19 @@ where
             Ok(None) => AuthState::Authenticated,
             Err(_) => {
                 error!("Cannot read '{}' value from session", SESSION_KEY_NEED_MFA);
-                return Box::pin(ready(Err(UnauthorizedError::default())));
+                return Err(UnauthorizedError::default());
             }
         };
 
-        Box::pin(ready(Ok(AuthToken::new(user, state))))
+        Ok(AuthToken::new(user, state))
     }
+}
 
+impl<U, L> AuthenticationProvider<U> for SessionAuthProvider<U, L>
+where
+    U: AuthUser + 'static,
+    L: LoadUserByCredentials<User = U> + 'static,
+{
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>> {
         let session = req.get_session();
         session.purge();
@@ -108,7 +108,7 @@ where
         extensions.insert(Arc::clone(&self.load_user));
     }
 
-    fn check_if_authorized(
+    fn create_auth_token_if_authorized(
         &self,
         req: ServiceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<ServiceRequest, UnauthorizedError>>>> {
@@ -128,7 +128,7 @@ where
 
         let auth_token_req = self.get_auth_token(req.request());
         Box::pin(async move {
-            let token = auth_token_req.await?;
+            let token = auth_token_req?;
 
             let mut is_valid_mfa_req = false;
             if token.needs_mfa()
