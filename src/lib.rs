@@ -64,7 +64,7 @@
 //! #[get("/secured")]
 //! async fn secured(auth_token: AuthToken<User>) -> impl Responder {
 //!     let user = auth_token.get_authenticated_user();
-//!     HttpResponse::Ok().json(user.clone())
+//!     HttpResponse::Ok().json(&*user)
 //! }
 //!
 //! #[actix_web::main]
@@ -142,14 +142,6 @@ pub trait AuthenticationProvider<U>
 where
     U: AuthUser + 'static,
 {
-
-    /// Called on each secured path to get the AuthToken from the underlying authentication mechanism
-    fn get_auth_token(
-        &self,
-        req: &HttpRequest,
-    ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
-
-    /// Called before sending the response. Invalidates authentication.
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
 
     /// Configures the request if needed
@@ -158,10 +150,7 @@ where
         // default implementation does not configure anything
     }
 
-    /// Checks if the user is authorized to access the resource
-    /// 
-    /// 
-    fn check_if_authorized(
+    fn create_auth_token_if_authorized(
         &self,
         service_request: ServiceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<ServiceRequest, UnauthorizedError>>>>;

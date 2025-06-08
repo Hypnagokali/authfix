@@ -179,7 +179,7 @@ where
 
             Box::pin(async move {
                 // Before Request
-                let processed_request = auth_provider.check_if_authorized(req).await?;
+                let processed_request = auth_provider.create_auth_token_if_authorized(req).await?;
 
                 let res = service.call(processed_request).await?;
 
