@@ -38,7 +38,7 @@ pub trait LoadUserByCredentials: Send + Sync {
 
 #[derive(Error, Debug)]
 pub enum LoadUserError {
-    #[error("Username or password wrong")]
+    #[error("Credentials wrong")]
     LoginFailed,
 }
 

@@ -1,3 +1,5 @@
+//! Error types for all kinds of authentication
+
 use std::fmt;
 
 use actix_web::{HttpResponse, ResponseError};

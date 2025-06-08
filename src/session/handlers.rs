@@ -5,7 +5,6 @@ use std::{
 };
 
 use crate::{
-    config::Routes,
     login::{LoadUserByCredentials, LoginToken},
     mfa::MfaConfig,
     multifactor::CheckCodeError,
@@ -20,7 +19,7 @@ use actix_web::{
 use log::{error, warn};
 use serde::{Deserialize, Serialize};
 
-use super::session_auth::LoginSession;
+use super::{config::Routes, session_auth::LoginSession};
 
 #[derive(Serialize)]
 enum LoginSessionStatus {

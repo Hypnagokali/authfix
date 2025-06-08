@@ -13,7 +13,7 @@ use log::{debug, trace};
 use regex::Regex;
 use urlencoding::encode;
 
-use crate::{config::Routes, AuthToken, AuthUser, AuthenticationProvider};
+use crate::{AuthToken, AuthUser, AuthenticationProvider};
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 
@@ -79,12 +79,6 @@ impl PathMatcher {
         } else {
             path_regex_iter.any(|p| p.is_match(&encoded_path))
         }
-    }
-}
-
-impl From<Routes> for PathMatcher {
-    fn from(value: Routes) -> Self {
-        PathMatcher::new(vec![value.get_login()], true)
     }
 }
 
@@ -175,8 +169,9 @@ where
         let auth_provider = Rc::clone(&self.auth_provider);
 
         {
+            // see issue #125
             let mut extensions = req.extensions_mut();
-            auth_provider.configure_provider(&mut extensions);
+            auth_provider.configure_request(&mut extensions);
         }
 
         if self.path_matcher.matches(&request_path) {
@@ -240,8 +235,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::config::Routes;
-
     use super::PathMatcher;
 
     #[test]
@@ -264,27 +257,6 @@ mod tests {
         assert!(!path_matcher_wild_card.matches("/some-route-specific"));
 
         assert!(path_matcher_no_child.matches("/some-route"));
-    }
-
-    #[test]
-    fn should_be_able_to_add_routes_to_path_matcher() {
-        let routes = Routes::new("", "/custom-login", "/custom-mfa", "/logout");
-
-        let mut path_matcher: PathMatcher = routes.into();
-        path_matcher.add(vec!["/public"]);
-
-        assert!(!path_matcher.matches("/custom-login"));
-        assert!(!path_matcher.matches("/public"));
-    }
-
-    #[test]
-    fn path_matcher_can_be_created_from_routes() {
-        let routes = Routes::new("", "/custom-login", "/custom-mfa", "/logout");
-        let path_matcher: PathMatcher = routes.into();
-
-        assert!(!path_matcher.matches("/custom-login"));
-        assert!(path_matcher.matches("/custom-mfa"));
-        assert!(path_matcher.matches("/logout"));
     }
 
     #[test]

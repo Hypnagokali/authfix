@@ -1,3 +1,17 @@
+//! General configuration for session auth
+use crate::middleware::PathMatcher;
+
+/// Configuration for the auth related API endpoints: login, logout, verify MFA
+/// 
+/// The default implementation gives: "/login", "/login/mfa" and "/logout"
+/// ```ignore
+/// let routes = Routes::default();
+/// ```
+/// 
+/// Routes implements [Into] for [PathMatcher], the resulting PathMatcher is then configured for securing all routes by default.
+/// ```ignore
+/// let path_matcher: PathMatcher = Routes::new("/auth", "/login", "/mfa", "/logout").into();
+/// ```
 #[derive(Clone)]
 pub struct Routes {
     login: String,
@@ -22,6 +36,12 @@ impl Routes {
     }
     pub fn get_mfa(&self) -> &str {
         &self.mfa
+    }
+}
+
+impl Into<PathMatcher> for Routes {
+    fn into(self) -> PathMatcher {
+        PathMatcher::new(vec![self.get_login()], true)
     }
 }
 
@@ -63,8 +83,29 @@ fn normalize_uri_part(part: &str) -> String {
 
 #[cfg(test)]
 mod test {
+    use crate::{middleware::PathMatcher, session::config::normalize_uri_part};
     use super::Routes;
-    use crate::config::normalize_uri_part;
+
+    #[test]
+    fn should_be_able_to_add_routes_to_path_matcher() {
+        let routes = Routes::new("", "/custom-login", "/custom-mfa", "/logout");
+
+        let mut path_matcher: PathMatcher = routes.into();
+        path_matcher.add(vec!["/public"]);
+
+        assert!(!path_matcher.matches("/custom-login"));
+        assert!(!path_matcher.matches("/public"));
+    }
+
+    #[test]
+    fn path_matcher_can_be_created_from_routes() {
+        let routes = Routes::new("", "/custom-login", "/custom-mfa", "/logout");
+        let path_matcher: PathMatcher = routes.into();
+
+        assert!(!path_matcher.matches("/custom-login"));
+        assert!(path_matcher.matches("/custom-mfa"));
+        assert!(path_matcher.matches("/logout"));
+    }
 
     #[test]
     fn should_ignore_empty_prefix() {
