@@ -16,8 +16,8 @@ use actix_web::{
 use log::error;
 
 use crate::{
-    session::config::Routes, login::LoadUserByCredentials, mfa::MfaConfig, AuthState, AuthToken, AuthUser,
-    AuthenticationProvider, UnauthorizedError,
+    login::LoadUserByCredentials, mfa::MfaConfig, session::config::Routes, AuthState, AuthToken,
+    AuthUser, AuthenticationProvider, UnauthorizedError,
 };
 
 const SESSION_KEY_USER: &str = "authfix__user";

@@ -2,13 +2,13 @@
 use crate::middleware::PathMatcher;
 
 /// Configuration for the auth related API endpoints: login, logout, verify MFA
-/// 
+///
 /// The default implementation gives: "/login", "/login/mfa" and "/logout"
 /// ```ignore
 /// let routes = Routes::default();
 /// ```
-/// 
-/// Routes implements [Into] for [PathMatcher], the resulting PathMatcher is then configured for securing all routes by default.
+///
+/// Routes implements [From] for [PathMatcher], the resulting PathMatcher is then configured for securing all routes by default.
 /// ```ignore
 /// let path_matcher: PathMatcher = Routes::new("/auth", "/login", "/mfa", "/logout").into();
 /// ```
@@ -39,9 +39,9 @@ impl Routes {
     }
 }
 
-impl Into<PathMatcher> for Routes {
-    fn into(self) -> PathMatcher {
-        PathMatcher::new(vec![self.get_login()], true)
+impl From<Routes> for PathMatcher {
+    fn from(value: Routes) -> Self {
+        PathMatcher::new(vec![value.get_login()], true)
     }
 }
 
@@ -83,8 +83,8 @@ fn normalize_uri_part(part: &str) -> String {
 
 #[cfg(test)]
 mod test {
-    use crate::{middleware::PathMatcher, session::config::normalize_uri_part};
     use super::Routes;
+    use crate::{middleware::PathMatcher, session::config::normalize_uri_part};
 
     #[test]
     fn should_be_able_to_add_routes_to_path_matcher() {

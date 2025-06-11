@@ -1,12 +1,16 @@
 # Authfix
-> Authfix is an Actix Web Middleware for securing routes with session based authentication and mfa. Its currently based on Actix-Session
+> Authentication layer for Actix-Web
 
-This library provides a middleware for [Actix Web](https://github.com/actix/actix-web) to secure routes based on [Actix-Session](https://github.com/actix/actix-extras/tree/master/actix-session). It provides an extractor to retrieve the logged in user and it provides mfa-functionality.
+This library offers an authentication middleware for [Actix Web](https://github.com/actix/actix-web).
+
+Currently it provides session-based authentication based on [actix-session](https://crates.io/crates/actix-session), but you can implement your own `AuthenticationProvider` if needed. A provider for OIDC is planned.
+
+The session-based authentication supports multi-factor functionality which is easy to configure. This includes TOTP (e.g., Google/Microsoft Authenticator) and a random code sender that can deliver the code to the user via SMS, E-Mail, or other channels.
 
 *Not yet published*
 
 Progress of first version `0.1.0`:
-- [x] Implementation on top of Actix-Session
+- [x] Session-based
     - [x] Login
     - [x] Secured routes
     - [x] Logout
@@ -21,7 +25,7 @@ Progress of first version `0.1.0`:
 Planning for version `0.2.0`:
 - [ ] OIDC
     - [ ] Example with Keycloak
-    - [ ] Presets for Login with Google, GitHub, etc...?
+    - [ ] Login with Google, GitHub, etc...?
 
 Maybe later:
 - WebAuthn / Passkeys?

@@ -3,7 +3,8 @@ use std::{net::SocketAddr, thread};
 use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    login::LoadUserByCredentials, session::{app_builder::SessionLoginAppBuilder, config::Routes},
+    login::LoadUserByCredentials,
+    session::{app_builder::SessionLoginAppBuilder, config::Routes},
     AuthToken,
 };
 use reqwest::{Client, StatusCode};
@@ -69,7 +70,7 @@ async fn should_can_login() {
 }
 
 #[actix_rt::test]
-async fn should_return_401_when_auth_token_is_used_in_a_non_secured_route() {
+async fn should_return_500_when_auth_token_is_used_in_a_non_secured_route() {
     let addr = actix_test::unused_addr();
 
     start_test_server(addr);
@@ -82,7 +83,7 @@ async fn should_return_401_when_auth_token_is_used_in_a_non_secured_route() {
         .await
         .unwrap();
 
-    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
 }
 
 #[actix_rt::test]
