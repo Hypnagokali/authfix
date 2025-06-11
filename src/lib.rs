@@ -10,13 +10,13 @@
 //!
 //! # Async traits
 //! To use this library, the user has to implement certrain traits (e.g.: [LoadUserByCredentials](crate::login::LoadUserByCredentials)) and most of them
-//! are async. To make the implementation easier and less verbose, these traits use the [async_trait](https://crates.io/crates/async-trait) crate. Unfortunately, this makes the docs a bit messy, so the 
+//! are async. To make the implementation easier and less verbose, these traits use the [async_trait](https://crates.io/crates/async-trait) crate. Unfortunately, this makes the docs a bit messy, so the
 //! original trait definition is provided in the trait's documentation.
-//! 
+//!
 //! *The library is still in the early stages and a work in progress so it can contain security flaws. Please report them or provide a PR: [Authfix Repo](https://github.com/Hypnagokali/authfix)*
 //!
 //! # Examples
-//! ## Session based authentication 
+//! ## Session based authentication
 //! The session based authentication is based on: [Actix Session](https://docs.rs/actix-session/latest/actix_session/). Authfix re-exports actix_session, you don't need it as a dependency.
 //! ```no_run
 //! use actix_web::{HttpResponse, HttpServer, Responder, cookie::Key, get};
@@ -96,20 +96,20 @@ use std::{
     rc::Rc,
 };
 
-pub mod middleware;
-pub mod session;
 pub mod errors;
 pub mod login;
 pub mod mfa;
+pub mod middleware;
 pub mod multifactor;
+pub mod session;
 
 // re-exports
 pub use actix_session;
 pub use async_trait;
 
 /// Contains the information about the user account.
-/// 
-/// There is only a semantic difference between disabling a user or locking the account. 
+///
+/// There is only a semantic difference between disabling a user or locking the account.
 /// In both cases, the user cannot log in.
 /// `get_user_identification` is used for logging.
 pub trait AccountInfo {
@@ -129,7 +129,7 @@ pub trait AccountInfo {
 }
 
 /// This is a helper trait to bundle all necessary traits needed by a user
-/// 
+///
 /// Don't implement it, just derive Serialize, Deserialize from serde, Clone from std and implement AccountInfo
 pub trait AuthUser: AccountInfo + Serialize + DeserializeOwned + Clone {}
 impl<T> AuthUser for T where T: AccountInfo + Serialize + DeserializeOwned + Clone {}
@@ -153,8 +153,8 @@ where
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
 
     /// Configures the request if needed
-    /// 
-    /// E.g.: the session authentication requires a user service to retrieve the user by credentials - this service is injected using this method. 
+    ///
+    /// E.g.: the session authentication requires a user service to retrieve the user by credentials - this service is injected using this method.
     #[allow(unused)]
     fn configure_request(&self, extensions: &mut Extensions) {
         // default implementation does not configure anything
@@ -164,7 +164,7 @@ where
 /// Extractor that holds the authenticated user
 ///
 /// If you inject [AuthToken] in a route that is not secured (a public route), it will respond with 500.
-/// 
+///
 /// # Example:
 /// ```ignore
 /// #[get("/secured-route")]
@@ -254,14 +254,16 @@ where
             return ready(Ok(AuthToken::from_ref(token)));
         }
 
-        ready(Err(actix_web::error::ErrorInternalServerError("'AuthToken' cannot be used in public routes.")))
+        ready(Err(actix_web::error::ErrorInternalServerError(
+            "'AuthToken' cannot be used in public routes.",
+        )))
     }
 }
 
 /// Extension to get the [AuthToken] from [HttpRequest]
 /// ```ignore
-/// use authfix::AuthTokenExt; 
-/// 
+/// use authfix::AuthTokenExt;
+///
 /// fn some_function(req: actix_web::HttpRequest) -> bool {
 ///     req.get_auth_token::<User>().is_some()
 /// }
