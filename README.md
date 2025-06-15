@@ -37,10 +37,10 @@ For more examples visit the examples repo: [Authfix examples](https://github.com
 ```rust
 use actix_web::{HttpResponse, HttpServer, Responder, cookie::Key, get};
 use authfix::{
-    AccountInfo, AuthToken,
+    AuthToken,
     async_trait::async_trait,
     login::{LoadUserByCredentials, LoadUserError, LoginToken},
-    session::app_builder::SessionLoginAppBuilder,
+    session::{AccountInfo, app_builder::SessionLoginAppBuilder},
 };
 use serde::{Deserialize, Serialize};
 

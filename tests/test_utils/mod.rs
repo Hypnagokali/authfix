@@ -5,7 +5,7 @@ use authfix::{
         random_code_auth::{CodeSendError, CodeSender, RandomCode},
         GetTotpSecretError, TotpSecretRepository,
     },
-    AccountInfo, AuthUser,
+    session::{AccountInfo, SessionUser},
 };
 use chrono::{Local, TimeDelta};
 use serde::{Deserialize, Serialize};
@@ -58,7 +58,7 @@ pub struct TotpTestRepo;
 #[async_trait]
 impl<U> TotpSecretRepository<U> for TotpTestRepo
 where
-    U: AuthUser,
+    U: SessionUser,
 {
     async fn get_auth_secret(&self, _user: &U) -> Result<String, GetTotpSecretError> {
         Ok(SECRET.to_owned())
