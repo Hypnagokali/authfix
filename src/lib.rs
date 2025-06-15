@@ -144,21 +144,24 @@ where
     U: AuthUser + 'static,
 {
     /// Tries to retrieve the logged in user or fails with [UnauthorizedError]
+    /// Returns a Future because its likely that this method can be used for calling an external service
     fn get_auth_token(
         &self,
         service_request: &ServiceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
 
     /// Invalidates the authentication after [AuthToken] has been set to [AuthState::Invalid].
+    /// Returns a Future: same as for `get_auth_token` 
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
+
+    #[allow(unused)]
+    fn is_request_config_required(&self, req: &HttpRequest) -> bool;
 
     /// Configures the request if needed
     ///
     /// E.g.: the session authentication requires a user service to retrieve the user by credentials - this service is injected using this method.
     #[allow(unused)]
-    fn configure_request(&self, extensions: &mut Extensions) {
-        // default implementation does not configure anything
-    }
+    fn configure_request(&self, extensions: &mut Extensions);
 }
 
 /// Extractor that holds the authenticated user

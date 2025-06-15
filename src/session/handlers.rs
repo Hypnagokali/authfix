@@ -57,7 +57,7 @@ impl LoginSessionResponse {
 #[allow(clippy::type_complexity)]
 #[derive(Clone)]
 pub struct SessionApiHandlers<T: LoadUserByCredentials<User = U>, U> {
-    routes: Routes,
+    routes: Arc<Routes>,
     phantom_data: PhantomData<T>,
 }
 
@@ -66,7 +66,7 @@ where
     U: AuthUser + 'static,
     T: LoadUserByCredentials<User = U> + 'static,
 {
-    pub fn new(routes: Routes) -> Self {
+    pub fn new(routes: Arc<Routes>) -> Self {
         Self {
             routes,
             phantom_data: PhantomData,
@@ -75,7 +75,7 @@ where
 
     /// Returns the config that can be used by Actix Web to register the handlers
     pub fn get_config(self) -> impl FnOnce(&mut ServiceConfig) {
-        let routes = web::Data::new(self.routes.clone());
+        let routes = web::Data::new(Arc::clone(&self.routes));
 
         |config: &mut ServiceConfig| {
             config.service(self);
@@ -91,7 +91,7 @@ where
 {
     fn default() -> Self {
         Self {
-            routes: Routes::default(),
+            routes: Arc::new(Routes::default()),
             phantom_data: PhantomData,
         }
     }

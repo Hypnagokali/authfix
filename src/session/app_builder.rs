@@ -118,13 +118,17 @@ where
             Error = Error,
         >,
     > {
-        let handler: SessionApiHandlers<S, U> = SessionApiHandlers::new(self.routes);
+        let shared_routes = Arc::new(self.routes);
+        let handler: SessionApiHandlers<S, U> = SessionApiHandlers::new(Arc::clone(&shared_routes));
 
-        let mut provider = SessionAuthProvider::new(Arc::clone(&self.load_user_service));
-
-        if self.mfa_config.is_configured() {
-            provider = SessionAuthProvider::new_with_mfa(self.load_user_service, self.mfa_config);
-        }
+        let provider = if self.mfa_config.is_configured() { 
+            SessionAuthProvider::new_with_mfa(self.load_user_service, self.mfa_config, shared_routes)
+        } else {
+            SessionAuthProvider::new(
+                Arc::clone(&self.load_user_service),
+                shared_routes
+            )            
+        };
 
         let middleware = AuthMiddleware::<_, U>::new(provider, self.path_matcher);
 

@@ -10,7 +10,6 @@ use std::{
 use actix_session::{Session, SessionExt, SessionInsertError};
 use actix_web::{
     dev::{Extensions, ServiceRequest},
-    web::Data,
     Error, FromRequest, HttpRequest,
 };
 use log::error;
@@ -26,7 +25,8 @@ const SESSION_KEY_LOGIN_VALID_UNTIL: &str = "authfix__login_valid_until";
 
 /// Provider for session based authentication.
 ///
-/// Uses [Actix-Session](https://docs.rs/actix-session/latest/actix_session/), so it must be set as middleware.
+/// Uses [Actix-Session](https://docs.rs/actix-session/latest/actix_session/), so it must be set as middleware. If you use 
+/// the [SessionLoginAppBuilder](crate::session::app_builder::SessionLoginAppBuilder) it is set by default.
 #[derive(Clone)]
 pub struct SessionAuthProvider<U, L>
 where
@@ -36,6 +36,7 @@ where
     mfa_config: Rc<MfaConfig<U>>,
     #[allow(dead_code)] // load_user will be registered as extension later
     load_user: Arc<L>,
+    routes: Arc<Routes>,
     phantom_data: PhantomData<U>,
 }
 
@@ -47,19 +48,21 @@ where
     /// Creates a new SessionAuthProvider without mfa.
     ///
     /// Arc is used here because L could be a service that is shared across the application (e.g. UserService)
-    pub fn new(load_user: Arc<L>) -> Self {
+    pub fn new(load_user: Arc<L>, routes: Arc<Routes>) -> Self {
         Self {
             mfa_config: Rc::new(MfaConfig::empty()),
             load_user,
+            routes,
             phantom_data: PhantomData,
         }
     }
 
     /// Creates a new SessionAuthProvider with mfa
-    pub fn new_with_mfa(load_user: Arc<L>, mfa_config: MfaConfig<U>) -> Self {
+    pub fn new_with_mfa(load_user: Arc<L>, mfa_config: MfaConfig<U>, routes: Arc<Routes>) -> Self {
         Self {
             mfa_config: Rc::new(mfa_config),
             load_user,
+            routes,
             phantom_data: PhantomData,
         }
     }
@@ -103,6 +106,11 @@ where
         Box::pin(ready(()))
     }
 
+    fn is_request_config_required(&self, req: &HttpRequest) -> bool {
+        // Maybe the pathmatcher should be used for comparing paths (see #131)
+        self.routes.get_login() == req.path() || self.routes.get_mfa() == req.path()
+    }
+
     fn configure_request(&self, extensions: &mut Extensions) {
         extensions.insert(Rc::clone(&self.mfa_config));
         extensions.insert(Arc::clone(&self.load_user));
@@ -113,27 +121,16 @@ where
         req: &ServiceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>> {
         let request_path = req.request().path().to_owned();
-        #[allow(unused_assignments)]
-        // not sure why it gives a warning since the "else" block of the "if let" was introduced.
-        let mut mfa_route_option = None;
-
-        if let Some(routes) = req.app_data::<Data<Routes>>() {
-            mfa_route_option = Some(routes.get_mfa().to_owned());
-        } else {
-            error!("SessionAuthProvider cannot check routes. It expects that a Data<Routes> container has been registered as app data.");
-            return Box::pin(ready(Err(UnauthorizedError::new(
-                "Routes are not registered by the application. Cannot authenticate request.",
-            ))));
-        }
 
         let auth_token_req = self.get_auth_token_from_session(req.request());
+        let mfa_route = self.routes.get_mfa().to_owned();
+
         Box::pin(async move {
             let token = auth_token_req?;
 
             let mut is_valid_mfa_req = false;
             if token.needs_mfa()
-                && mfa_route_option.is_some()
-                && mfa_route_option.unwrap() == request_path
+                && mfa_route == request_path
             {
                 is_valid_mfa_req = true;
             }
