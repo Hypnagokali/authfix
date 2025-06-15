@@ -4,8 +4,8 @@ use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
     login::{LoadUserByCredentials, LoadUserError, LoginToken},
-    session::app_builder::SessionLoginAppBuilder,
-    AccountInfo, AuthToken,
+    session::{app_builder::SessionLoginAppBuilder, AccountInfo},
+    AuthToken,
 };
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};

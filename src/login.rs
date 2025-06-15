@@ -3,8 +3,6 @@ use async_trait::async_trait;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::AuthUser;
-
 /// Credentials comming from the login request
 #[derive(Deserialize)]
 pub struct LoginToken {
@@ -14,7 +12,7 @@ pub struct LoginToken {
 /// Trait that handles the loading of a user and executes a success and error handler
 #[async_trait]
 pub trait LoadUserByCredentials: Send + Sync {
-    type User: AuthUser;
+    type User;
 
     /// Gets a [LoginToken] and returns a user if credentials are correct a [LoadUserError] otherwise
     async fn load_user(&self, login_token: &LoginToken) -> Result<Self::User, LoadUserError>;
