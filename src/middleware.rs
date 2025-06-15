@@ -178,7 +178,7 @@ where
             debug!("Secured route: '{}'", debug_path);
 
             Box::pin(async move {
-                // Before Request: get AuthToken or respond with 401
+                // Before request: get AuthToken or respond with 401
                 let token = auth_provider.get_auth_token(&req).await?;
 
                 {
@@ -188,7 +188,7 @@ where
 
                 let res = service.call(req).await?;
 
-                // Process logout logic after request
+                // After request: apply logout logic
                 let token_valid = {
                     let extensions = res.request().extensions();
                     if let Some(token) = extensions.get::<AuthToken<U>>() {
@@ -200,7 +200,7 @@ where
                 };
 
                 if !token_valid {
-                    debug!("AuthToken no longer valid (maybe logged out). Invalidate Authentication. (Triggered by: {})", debug_path);
+                    debug!("AuthToken no longer valid (maybe logged out). Invalidate authentication. (Triggered by path: {})", debug_path);
                     let req = res.request().clone();
                     auth_provider.invalidate(req).await;
                 }

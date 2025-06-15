@@ -9,8 +9,7 @@ use std::{
 
 use actix_session::{Session, SessionExt, SessionInsertError};
 use actix_web::{
-    dev::{Extensions, ServiceRequest},
-    Error, FromRequest, HttpRequest,
+    dev::{Extensions, ServiceRequest}, Error, FromRequest, HttpRequest,
 };
 use log::error;
 
