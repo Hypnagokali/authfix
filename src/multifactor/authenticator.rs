@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use crate::{
     multifactor::{CheckCodeError, Factor, GenerateCodeError, TotpSecretRepository},
-    AuthToken, AuthUser,
+    AuthToken,
 };
 
 /// ID to reference authenticator mfa
@@ -36,7 +36,6 @@ pub struct AuthenticatorFactor<T, U> {
 impl<T, U> AuthenticatorFactor<T, U>
 where
     T: TotpSecretRepository<U>,
-    U: AuthUser,
 {
     pub fn new(totp_secret_repo: Arc<T>) -> Self {
         Self::with_discrepancy(totp_secret_repo, 0)
@@ -53,7 +52,7 @@ where
 impl<T, U> Factor for AuthenticatorFactor<T, U>
 where
     T: TotpSecretRepository<U> + 'static,
-    U: AuthUser + 'static,
+    U: Clone + 'static,
 {
     fn generate_code(
         &self,

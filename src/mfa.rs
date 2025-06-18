@@ -1,6 +1,6 @@
 //! This module contains MFA realated types and traits
 
-use crate::{multifactor::Factor, AuthUser};
+use crate::multifactor::Factor;
 use actix_web::{dev::Payload, FromRequest, HttpMessage, HttpRequest, HttpResponse, ResponseError};
 use async_trait::async_trait;
 use futures::future::{ready, Ready};
@@ -75,14 +75,14 @@ struct MfaConfigInner<U> {
 #[derive(Clone)]
 pub struct MfaConfig<U>
 where
-    U: AuthUser + 'static,
+    U: 'static,
 {
     inner: Rc<Option<MfaConfigInner<U>>>,
 }
 
 impl<U> MfaConfig<U>
 where
-    U: AuthUser + 'static,
+    U: 'static,
 {
     pub fn empty() -> Self {
         Self {
@@ -161,10 +161,7 @@ where
     }
 }
 
-impl<U> FromRequest for MfaConfig<U>
-where
-    U: AuthUser,
-{
+impl<U> FromRequest for MfaConfig<U> {
     type Error = actix_web::Error;
     type Future = Ready<Result<MfaConfig<U>, Self::Error>>;
 

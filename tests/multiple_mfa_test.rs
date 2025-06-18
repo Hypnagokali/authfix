@@ -10,8 +10,8 @@ use authfix::{
         random_code_auth::{MfaRandomCode, MFA_ID_RANDOM_CODE},
         Factor,
     },
-    session::app_builder::SessionLoginAppBuilder,
-    AccountInfo, AuthToken,
+    session::{app_builder::SessionLoginAppBuilder, AccountInfo},
+    AuthToken,
 };
 
 use google_authenticator::GoogleAuthenticator;

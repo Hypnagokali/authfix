@@ -13,7 +13,7 @@ use log::{debug, trace};
 use regex::Regex;
 use urlencoding::encode;
 
-use crate::{AuthToken, AuthUser, AuthenticationProvider};
+use crate::{AuthToken, AuthenticationProvider};
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 
@@ -115,7 +115,7 @@ fn transform_to_encoded_regex(input: &str) -> String {
 pub struct AuthMiddleware<AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: AuthUser + 'static,
+    U: 'static,
 {
     auth_provider: Rc<AuthProvider>,
     path_matcher: Rc<PathMatcher>,
@@ -125,7 +125,7 @@ where
 impl<AuthProvider, U> AuthMiddleware<AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: AuthUser + 'static,
+    U: 'static,
 {
     pub fn new(auth_provider: AuthProvider, path_matcher: PathMatcher) -> Self {
         AuthMiddleware {
@@ -139,7 +139,7 @@ where
 pub struct AuthMiddlewareInner<S, AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
-    U: AuthUser + 'static,
+    U: 'static,
 {
     service: Rc<S>,
     auth_provider: Rc<AuthProvider>,
@@ -152,7 +152,7 @@ where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
-    U: AuthUser + 'static,
+    U: 'static,
     AuthProvider: AuthenticationProvider<U> + 'static,
 {
     type Response = ServiceResponse<B>;
@@ -220,7 +220,7 @@ where
     S::Future: 'static,
     B: 'static,
     AuthProvider: AuthenticationProvider<U> + 'static,
-    U: AuthUser + 'static,
+    U: 'static,
 {
     type Response = ServiceResponse<B>;
     type Error = Error;

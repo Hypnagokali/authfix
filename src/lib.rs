@@ -21,10 +21,10 @@
 //! ```no_run
 //! use actix_web::{HttpResponse, HttpServer, Responder, cookie::Key, get};
 //! use authfix::{
-//!     AccountInfo, AuthToken,
+//!     AuthToken,
 //!     async_trait::async_trait,
 //!     login::{LoadUserByCredentials, LoadUserError, LoginToken},
-//!     session::app_builder::SessionLoginAppBuilder,
+//!     session::{app_builder::SessionLoginAppBuilder, AccountInfo},
 //! };
 //! use serde::{Deserialize, Serialize};
 //!
@@ -88,7 +88,7 @@ use actix_web::{
     Error, FromRequest, HttpMessage, HttpRequest,
 };
 use errors::UnauthorizedError;
-use serde::{de::DeserializeOwned, Serialize};
+
 use std::{
     cell::{Ref, RefCell},
     future::{ready, Future, Ready},
@@ -104,35 +104,7 @@ pub mod multifactor;
 pub mod session;
 
 // re-exports
-pub use actix_session;
 pub use async_trait;
-
-/// Contains the information about the user account.
-///
-/// There is only a semantic difference between disabling a user or locking the account.
-/// In both cases, the user cannot log in.
-/// `get_user_identification` is used for logging.
-pub trait AccountInfo {
-    fn get_user_identification(&self) -> String {
-        "user_identification is not implemented".to_owned()
-    }
-
-    /// If user is disabled, login is not possible
-    fn is_user_disabled(&self) -> bool {
-        false
-    }
-
-    /// If account is locked, login is not possible
-    fn is_account_locked(&self) -> bool {
-        false
-    }
-}
-
-/// This is a helper trait to bundle all necessary traits needed by a user
-///
-/// Don't implement it, just derive Serialize, Deserialize from serde, Clone from std and implement AccountInfo
-pub trait AuthUser: AccountInfo + Serialize + DeserializeOwned + Clone {}
-impl<T> AuthUser for T where T: AccountInfo + Serialize + DeserializeOwned + Clone {}
 
 /// Main component used by the middleware to handle the authentication mechanism
 ///
@@ -141,7 +113,7 @@ impl<T> AuthUser for T where T: AccountInfo + Serialize + DeserializeOwned + Clo
 /// If you want to implement your custom authentication mechanism, implement this trait and provide a way to store the user
 pub trait AuthenticationProvider<U>
 where
-    U: AuthUser + 'static,
+    U: 'static,
 {
     /// Tries to retrieve the logged in user or fails with [UnauthorizedError]
     /// Returns a Future because its likely that this method can be used for calling an external service
@@ -179,17 +151,11 @@ where
 /// }
 /// ```
 #[derive(Clone)]
-pub struct AuthToken<U>
-where
-    U: AuthUser,
-{
+pub struct AuthToken<U> {
     inner: Rc<RefCell<AuthTokenInner<U>>>,
 }
 
-impl<U> AuthToken<U>
-where
-    U: AuthUser,
-{
+impl<U> AuthToken<U> {
     /// Returns a reference to the logged in user.
     pub fn get_authenticated_user(&self) -> Ref<U> {
         Ref::map(self.inner.borrow(), |inner| &inner.user)
@@ -236,17 +202,14 @@ pub enum AuthState {
     Invalid,
 }
 
-struct AuthTokenInner<U>
-where
-    U: AuthUser,
-{
+struct AuthTokenInner<U> {
     user: U,
     auth_state: AuthState,
 }
 
 impl<U> FromRequest for AuthToken<U>
 where
-    U: AuthUser + 'static,
+    U: 'static,
 {
     type Error = Error;
     type Future = Ready<Result<AuthToken<U>, Error>>;
@@ -272,11 +235,11 @@ where
 /// }
 /// ```
 pub trait AuthTokenExt {
-    fn get_auth_token<U: AuthUser + 'static>(&self) -> Option<AuthToken<U>>;
+    fn get_auth_token<U: 'static>(&self) -> Option<AuthToken<U>>;
 }
 
 impl AuthTokenExt for HttpRequest {
-    fn get_auth_token<U: AuthUser + 'static>(&self) -> Option<AuthToken<U>> {
+    fn get_auth_token<U: 'static>(&self) -> Option<AuthToken<U>> {
         let ext = self.extensions();
         ext.get::<AuthToken<U>>()
             .map(|auth_token_ref| AuthToken::from_ref(auth_token_ref))

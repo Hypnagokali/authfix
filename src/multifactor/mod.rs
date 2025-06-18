@@ -10,15 +10,10 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::AuthUser;
-
 /// When TOTP is used, the secret needs to be stored somewhere
 /// This is a repository trait that loads the secret for a given user
 #[async_trait]
-pub trait TotpSecretRepository<U>
-where
-    U: AuthUser,
-{
+pub trait TotpSecretRepository<U> {
     async fn get_auth_secret(&self, user: &U) -> Result<String, GetTotpSecretError>;
 }
 

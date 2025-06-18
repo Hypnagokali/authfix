@@ -15,7 +15,7 @@ use crate::{
     login::LoadUserByCredentials,
     mfa::MfaConfig,
     middleware::{AuthMiddleware, PathMatcher},
-    AuthUser,
+    session::SessionUser,
 };
 
 use super::{config::Routes, handlers::SessionApiHandlers, session_auth::SessionAuthProvider};
@@ -23,7 +23,7 @@ use super::{config::Routes, handlers::SessionApiHandlers, session_auth::SessionA
 /// A builder that build an [actix_web::App] configured with session authentication
 pub struct SessionLoginAppBuilder<U, S, ST>
 where
-    U: AuthUser + 'static,
+    U: SessionUser + 'static,
     S: LoadUserByCredentials<User = U> + 'static,
     ST: SessionStore,
 {
@@ -36,7 +36,7 @@ where
 
 impl<U, S, ST> SessionLoginAppBuilder<U, S, ST>
 where
-    U: AuthUser + 'static,
+    U: SessionUser + 'static,
     S: LoadUserByCredentials<User = U> + 'static,
     ST: SessionStore,
 {
@@ -103,7 +103,7 @@ where
 
 impl<U, S, ST> SessionLoginAppBuilder<U, S, ST>
 where
-    U: AuthUser + 'static,
+    U: SessionUser + 'static,
     S: LoadUserByCredentials<User = U> + 'static,
     ST: SessionStore + 'static,
 {
@@ -141,7 +141,7 @@ where
 
 impl<U, S> SessionLoginAppBuilder<U, S, CookieSessionStore>
 where
-    U: AuthUser + 'static,
+    U: SessionUser + 'static,
     S: LoadUserByCredentials<User = U> + 'static,
 {
     /// Creates an app builder with defaults
@@ -162,7 +162,7 @@ where
 
 impl<U, S, ST> SessionLoginAppBuilder<U, S, ST>
 where
-    U: AuthUser + 'static,
+    U: SessionUser + 'static,
     S: LoadUserByCredentials<User = U> + 'static,
     ST: SessionStore,
 {

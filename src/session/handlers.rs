@@ -8,7 +8,8 @@ use crate::{
     login::{LoadUserByCredentials, LoginToken},
     mfa::MfaConfig,
     multifactor::CheckCodeError,
-    AuthToken, AuthUser,
+    session::SessionUser,
+    AuthToken,
 };
 use actix_web::{
     dev::{AppService, HttpServiceFactory},
@@ -63,7 +64,7 @@ pub struct SessionApiHandlers<T: LoadUserByCredentials<User = U>, U> {
 
 impl<T, U> SessionApiHandlers<T, U>
 where
-    U: AuthUser + 'static,
+    U: SessionUser + 'static,
     T: LoadUserByCredentials<User = U> + 'static,
 {
     pub fn new(routes: Arc<Routes>) -> Self {
@@ -86,7 +87,7 @@ where
 
 impl<T, U> Default for SessionApiHandlers<T, U>
 where
-    U: AuthUser + 'static,
+    U: SessionUser + 'static,
     T: LoadUserByCredentials<User = U> + 'static,
 {
     fn default() -> Self {
@@ -109,7 +110,7 @@ impl MfaRequestBody {
     }
 }
 
-async fn mfa_route<U: AuthUser>(
+async fn mfa_route<U: SessionUser>(
     mfa_config: MfaConfig<U>,
     body: Json<MfaRequestBody>,
     req: HttpRequest,
@@ -145,7 +146,7 @@ async fn mfa_route<U: AuthUser>(
 
 /// Triggers the code generation and sets the login state to mfa needed
 /// Returns true if mfa needed
-async fn generate_code_if_mfa_necessary<U: AuthUser>(
+async fn generate_code_if_mfa_necessary<U: SessionUser>(
     // U will need a trait bound like 'HasFactor' -> user.get_factor() -> String
     user: &U,
     mfa_config: MfaConfig<U>,
@@ -170,7 +171,7 @@ async fn generate_code_if_mfa_necessary<U: AuthUser>(
 }
 
 #[allow(clippy::type_complexity)]
-async fn login<T: LoadUserByCredentials<User = U>, U: AuthUser>(
+async fn login<T: LoadUserByCredentials<User = U>, U: SessionUser>(
     login_token: Json<LoginToken>,
     user_service: ReqData<Arc<T>>,
     mfa_config: MfaConfig<U>,
@@ -232,7 +233,7 @@ async fn login<T: LoadUserByCredentials<User = U>, U: AuthUser>(
 impl<T, U> HttpServiceFactory for SessionApiHandlers<T, U>
 where
     T: LoadUserByCredentials<User = U> + 'static,
-    U: AuthUser + 'static,
+    U: SessionUser + 'static,
 {
     fn register(self, config: &mut AppService) {
         let mfa_resource = Resource::new(self.routes.get_mfa())
@@ -255,7 +256,7 @@ where
     }
 }
 
-async fn logout<U: AuthUser>(token: AuthToken<U>) -> impl Responder {
+async fn logout<U: SessionUser>(token: AuthToken<U>) -> impl Responder {
     token.invalidate();
     HttpResponse::Ok()
 }

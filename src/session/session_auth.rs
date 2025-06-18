@@ -14,8 +14,10 @@ use actix_web::{
 use log::error;
 
 use crate::{
-    login::LoadUserByCredentials, mfa::MfaConfig, session::config::Routes, AuthState, AuthToken,
-    AuthUser, AuthenticationProvider, UnauthorizedError,
+    login::LoadUserByCredentials,
+    mfa::MfaConfig,
+    session::{config::Routes, SessionUser},
+    AuthState, AuthToken, AuthenticationProvider, UnauthorizedError,
 };
 
 const SESSION_KEY_USER: &str = "authfix__user";
@@ -29,7 +31,7 @@ const SESSION_KEY_LOGIN_VALID_UNTIL: &str = "authfix__login_valid_until";
 #[derive(Clone)]
 pub struct SessionAuthProvider<U, L>
 where
-    U: AuthUser + 'static,
+    U: SessionUser + 'static,
     L: LoadUserByCredentials<User = U> + 'static,
 {
     mfa_config: Rc<MfaConfig<U>>,
@@ -41,7 +43,7 @@ where
 
 impl<U, L> SessionAuthProvider<U, L>
 where
-    U: AuthUser + 'static,
+    U: SessionUser + 'static,
     L: LoadUserByCredentials<User = U> + 'static,
 {
     /// Creates a new SessionAuthProvider without mfa.
@@ -95,7 +97,7 @@ where
 
 impl<U, L> AuthenticationProvider<U> for SessionAuthProvider<U, L>
 where
-    U: AuthUser + 'static,
+    U: SessionUser + 'static,
     L: LoadUserByCredentials<User = U> + 'static,
 {
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>> {
@@ -167,11 +169,11 @@ impl LoginSession {
         )
     }
 
-    pub fn set_user<U: AuthUser>(&self, user: U) -> Result<(), SessionInsertError> {
+    pub fn set_user<U: SessionUser>(&self, user: U) -> Result<(), SessionInsertError> {
         self.session.insert(SESSION_KEY_USER, user)
     }
 
-    pub fn get_user<U: AuthUser>(&self) -> Option<U> {
+    pub fn get_user<U: SessionUser>(&self) -> Option<U> {
         match self.session.get::<U>(SESSION_KEY_USER) {
             Ok(Some(user)) => Some(user),
             _ => None,
