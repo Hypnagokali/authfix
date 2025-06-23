@@ -40,12 +40,17 @@ where
     pub fn new(totp_secret_repo: Arc<T>) -> Self {
         Self::with_discrepancy(totp_secret_repo, 0)
     }
+
     pub fn with_discrepancy(totp_secret_repo: Arc<T>, discrepancy: u64) -> Self {
         Self {
             totp_secret_repo,
             discrepancy,
             phantom_data_user: PhantomData,
         }
+    }
+
+    pub fn id() -> String {
+        MFA_ID_AUTHENTICATOR_TOTP.to_owned()
     }
 }
 
