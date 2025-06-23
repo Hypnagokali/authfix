@@ -60,8 +60,13 @@ impl RandomCode {
     pub fn value(&self) -> &str {
         &self.value
     }
+
     pub fn valid_until(&self) -> &SystemTime {
         &self.valid_until
+    }
+
+    pub fn id() -> String {
+        MFA_ID_RANDOM_CODE.to_owned()
     }
 }
 
