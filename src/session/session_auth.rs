@@ -9,15 +9,13 @@ use std::{
 
 use actix_session::{Session, SessionExt, SessionInsertError};
 use actix_web::{
-    dev::{Extensions, ServiceRequest}, Error, FromRequest, HttpRequest,
+    dev::{Extensions, ServiceRequest}, http::header::ACCEPT, Error, FromRequest, HttpRequest
 };
 use log::error;
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    login::LoadUserByCredentials,
-    mfa::MfaConfig,
-    session::{config::Routes, SessionUser},
-    AuthState, AuthToken, AuthenticationProvider, UnauthorizedError,
+    errors::UnauthorizedRedirect, login::LoadUserByCredentials, mfa::MfaConfig, session::{config::Routes, AccountInfo, SessionUser}, AuthState, AuthToken, AuthenticationProvider, UnauthorizedError
 };
 
 const SESSION_KEY_USER: &str = "authfix__user";
@@ -38,6 +36,7 @@ where
     #[allow(dead_code)] // load_user will be registered as extension later
     load_user: Arc<L>,
     routes: Arc<Routes>,
+    redirect_flow: bool,
     phantom_data: PhantomData<U>,
 }
 
@@ -55,6 +54,7 @@ where
             load_user,
             routes,
             phantom_data: PhantomData,
+            redirect_flow: false,
         }
     }
 
@@ -65,7 +65,12 @@ where
             load_user,
             routes,
             phantom_data: PhantomData,
+            redirect_flow: false,
         }
+    }
+
+    pub fn set_redirect_flow(&mut self, with_redirect: bool) {
+        self.redirect_flow = with_redirect;
     }
 
     pub fn get_auth_token_from_session(
@@ -78,7 +83,7 @@ where
             Ok(Some(user)) => user,
             _ => {
                 error!("No user in session. Cannot read {}", SESSION_KEY_USER);
-                return Err(UnauthorizedError::default());
+                return Err(build_error(self, req));
             }
         };
 
@@ -87,7 +92,7 @@ where
             Ok(None) => AuthState::Authenticated,
             Err(_) => {
                 error!("Cannot read '{}' value from session", SESSION_KEY_NEED_MFA);
-                return Err(UnauthorizedError::default());
+                return Err(build_error(self, req));
             }
         };
 
@@ -219,4 +224,24 @@ impl FromRequest for LoginSession {
         let session = req.get_session();
         ready(Ok(LoginSession::new(session)))
     }
+}
+
+fn build_error<U, L> (session_provider: &SessionAuthProvider<U , L>, req: &HttpRequest) -> UnauthorizedError 
+where 
+    U: AccountInfo + Serialize + DeserializeOwned + Clone,
+    L: LoadUserByCredentials<User = U>
+{
+
+    if session_provider.redirect_flow {
+        req.headers().get(ACCEPT)
+        .and_then(|v| v.to_str().ok())
+        .filter(|v| v.contains("text/html"))
+        .map(|_| {
+            let redirect_to_login = session_provider.routes.get_login();
+            UnauthorizedError::new_redirect(UnauthorizedRedirect::new_with_redirect_query(redirect_to_login, req))
+        }).unwrap_or(UnauthorizedError::default())
+    } else {
+        UnauthorizedError::default()
+    }
+    
 }
