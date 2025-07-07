@@ -1,7 +1,9 @@
 //! This module contains MFA realated types and traits
 
 use crate::multifactor::Factor;
-use actix_web::{dev::Payload, FromRequest, HttpMessage, HttpRequest, HttpResponse, ResponseError};
+use actix_web::{
+    dev::Payload, FromRequest, HttpMessage, HttpRequest, HttpResponseBuilder, ResponseError,
+};
 use async_trait::async_trait;
 use futures::future::{ready, Ready};
 use log::warn;
@@ -37,7 +39,11 @@ pub trait HandleMfaRequest {
     }
 
     #[allow(unused)]
-    async fn handle_success(&self, user: &Self::User, mut res: HttpResponse) -> HttpResponse {
+    async fn handle_success(
+        &self,
+        user: &Self::User,
+        mut res: HttpResponseBuilder,
+    ) -> HttpResponseBuilder {
         res
     }
 }
@@ -139,7 +145,7 @@ where
         }
     }
 
-    pub async fn handle_success(&self, user: &U, res: HttpResponse) -> HttpResponse {
+    pub async fn handle_success(&self, user: &U, res: HttpResponseBuilder) -> HttpResponseBuilder {
         if let Some(inner) = self.inner.as_ref() {
             inner.handle_mfa.handle_success(user, res).await
         } else {

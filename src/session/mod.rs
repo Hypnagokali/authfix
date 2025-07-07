@@ -4,6 +4,7 @@ pub mod handlers;
 pub mod session_auth;
 
 pub use actix_session;
+
 use serde::{de::DeserializeOwned, Serialize};
 
 /// Contains the information about the user account.

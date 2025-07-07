@@ -32,6 +32,7 @@ where
     load_user_service: Arc<S>,
     mfa_config: MfaConfig<U>,
     routes: Routes,
+    redirect_flow: bool,
 }
 
 impl<U, S, ST> SessionLoginAppBuilder<U, S, ST>
@@ -47,6 +48,18 @@ where
             routes: self.routes,
             load_user_service: self.load_user_service,
             session_middleware: self.session_middleware,
+            redirect_flow: self.redirect_flow,
+        }
+    }
+
+    pub fn with_redirect_flow(self) -> SessionLoginAppBuilder<U, S, ST> {
+        Self {
+            path_matcher: self.path_matcher,
+            mfa_config: self.mfa_config,
+            routes: self.routes,
+            load_user_service: self.load_user_service,
+            session_middleware: self.session_middleware,
+            redirect_flow: true,
         }
     }
 
@@ -76,6 +89,7 @@ where
             mfa_config: self.mfa_config,
             routes: login_routes,
             load_user_service: self.load_user_service,
+            redirect_flow: self.redirect_flow,
         }
     }
 
@@ -97,6 +111,7 @@ where
             mfa_config: self.mfa_config,
             routes: login_routes,
             load_user_service: self.load_user_service,
+            redirect_flow: self.redirect_flow,
         }
     }
 }
@@ -118,13 +133,21 @@ where
             Error = Error,
         >,
     > {
-        let handler: SessionApiHandlers<S, U> = SessionApiHandlers::new(self.routes);
+        let shared_routes = Arc::new(self.routes);
+        let handler: SessionApiHandlers<S, U> =
+            SessionApiHandlers::new(Arc::clone(&shared_routes), self.redirect_flow);
 
-        let mut provider = SessionAuthProvider::new(Arc::clone(&self.load_user_service));
+        let mut provider = if self.mfa_config.is_configured() {
+            SessionAuthProvider::new_with_mfa(
+                self.load_user_service,
+                self.mfa_config,
+                shared_routes,
+            )
+        } else {
+            SessionAuthProvider::new(Arc::clone(&self.load_user_service), shared_routes)
+        };
 
-        if self.mfa_config.is_configured() {
-            provider = SessionAuthProvider::new_with_mfa(self.load_user_service, self.mfa_config);
-        }
+        provider.set_redirect_flow(self.redirect_flow);
 
         let middleware = AuthMiddleware::<_, U>::new(provider, self.path_matcher);
 
@@ -183,6 +206,7 @@ where
             load_user_service,
             mfa_config: MfaConfig::empty(),
             routes: Routes::default(),
+            redirect_flow: false,
         }
     }
 }

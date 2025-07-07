@@ -13,7 +13,7 @@ use authfix::{
     multifactor::random_code_auth::{
         CodeSendError, CodeSender, MfaRandomCode, RandomCode, MFA_ID_RANDOM_CODE,
     },
-    session::{handlers::SessionApiHandlers, session_auth::SessionAuthProvider},
+    session::{config::Routes, handlers::SessionApiHandlers, session_auth::SessionAuthProvider},
     AuthToken,
 };
 use chrono::{DateTime, Duration, Local, TimeDelta};
@@ -330,7 +330,7 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
 
                 HttpServer::new(move || {
                     // Hint:
-                    // This is the manual configuration of the auth and session middleware and the SessionApiHandlers
+                    // This is the manual configuration of the auth middleware with a session provider and handlers.
 
                     let code_factor = Box::new(MfaRandomCode::new(generator, Arc::clone(&sender)));
                     let mfa_config = MfaConfig::new(vec![code_factor], OnlyRandomCodeFactor);
@@ -342,7 +342,11 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
                                 .get_config(),
                         )
                         .wrap(AuthMiddleware::<_, User>::new(
-                            SessionAuthProvider::new_with_mfa(load_user_service, mfa_config),
+                            SessionAuthProvider::new_with_mfa(
+                                load_user_service,
+                                mfa_config,
+                                Arc::new(Routes::default()),
+                            ),
                             PathMatcher::new(vec!["/login", "/unsecure/*"], true),
                         ))
                         .wrap(create_actix_session_middleware())

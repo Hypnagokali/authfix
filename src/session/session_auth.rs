@@ -10,15 +10,17 @@ use std::{
 use actix_session::{Session, SessionExt, SessionInsertError};
 use actix_web::{
     dev::{Extensions, ServiceRequest},
-    web::Data,
+    http::header::ACCEPT,
     Error, FromRequest, HttpRequest,
 };
 use log::error;
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
+    errors::UnauthorizedRedirect,
     login::LoadUserByCredentials,
     mfa::MfaConfig,
-    session::{config::Routes, SessionUser},
+    session::{config::Routes, AccountInfo, SessionUser},
     AuthState, AuthToken, AuthenticationProvider, UnauthorizedError,
 };
 
@@ -28,7 +30,8 @@ const SESSION_KEY_LOGIN_VALID_UNTIL: &str = "authfix__login_valid_until";
 
 /// Provider for session based authentication.
 ///
-/// Uses [Actix-Session](https://docs.rs/actix-session/latest/actix_session/), so it must be set as middleware.
+/// Uses [Actix-Session](https://docs.rs/actix-session/latest/actix_session/), so it must be set as middleware. If you use
+/// the [SessionLoginAppBuilder](crate::session::app_builder::SessionLoginAppBuilder) it is set by default.
 #[derive(Clone)]
 pub struct SessionAuthProvider<U, L>
 where
@@ -38,6 +41,8 @@ where
     mfa_config: Rc<MfaConfig<U>>,
     #[allow(dead_code)] // load_user will be registered as extension later
     load_user: Arc<L>,
+    routes: Arc<Routes>,
+    redirect_flow: bool,
     phantom_data: PhantomData<U>,
 }
 
@@ -49,21 +54,29 @@ where
     /// Creates a new SessionAuthProvider without mfa.
     ///
     /// Arc is used here because L could be a service that is shared across the application (e.g. UserService)
-    pub fn new(load_user: Arc<L>) -> Self {
+    pub fn new(load_user: Arc<L>, routes: Arc<Routes>) -> Self {
         Self {
             mfa_config: Rc::new(MfaConfig::empty()),
             load_user,
+            routes,
             phantom_data: PhantomData,
+            redirect_flow: false,
         }
     }
 
     /// Creates a new SessionAuthProvider with mfa
-    pub fn new_with_mfa(load_user: Arc<L>, mfa_config: MfaConfig<U>) -> Self {
+    pub fn new_with_mfa(load_user: Arc<L>, mfa_config: MfaConfig<U>, routes: Arc<Routes>) -> Self {
         Self {
             mfa_config: Rc::new(mfa_config),
             load_user,
+            routes,
             phantom_data: PhantomData,
+            redirect_flow: false,
         }
+    }
+
+    pub fn set_redirect_flow(&mut self, with_redirect: bool) {
+        self.redirect_flow = with_redirect;
     }
 
     pub fn get_auth_token_from_session(
@@ -76,7 +89,7 @@ where
             Ok(Some(user)) => user,
             _ => {
                 error!("No user in session. Cannot read {}", SESSION_KEY_USER);
-                return Err(UnauthorizedError::default());
+                return Err(build_error(self, req));
             }
         };
 
@@ -85,7 +98,7 @@ where
             Ok(None) => AuthState::Authenticated,
             Err(_) => {
                 error!("Cannot read '{}' value from session", SESSION_KEY_NEED_MFA);
-                return Err(UnauthorizedError::default());
+                return Err(build_error(self, req));
             }
         };
 
@@ -105,6 +118,11 @@ where
         Box::pin(ready(()))
     }
 
+    fn is_request_config_required(&self, req: &HttpRequest) -> bool {
+        // Maybe the pathmatcher should be used for comparing paths (see #131)
+        self.routes.get_login() == req.path() || self.routes.get_mfa() == req.path()
+    }
+
     fn configure_request(&self, extensions: &mut Extensions) {
         extensions.insert(Rc::clone(&self.mfa_config));
         extensions.insert(Arc::clone(&self.load_user));
@@ -115,28 +133,15 @@ where
         req: &ServiceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>> {
         let request_path = req.request().path().to_owned();
-        #[allow(unused_assignments)]
-        // not sure why it gives a warning since the "else" block of the "if let" was introduced.
-        let mut mfa_route_option = None;
-
-        if let Some(routes) = req.app_data::<Data<Routes>>() {
-            mfa_route_option = Some(routes.get_mfa().to_owned());
-        } else {
-            error!("SessionAuthProvider cannot check routes. It expects that a Data<Routes> container has been registered as app data.");
-            return Box::pin(ready(Err(UnauthorizedError::new(
-                "Routes are not registered by the application. Cannot authenticate request.",
-            ))));
-        }
 
         let auth_token_req = self.get_auth_token_from_session(req.request());
+        let mfa_route = self.routes.get_mfa().to_owned();
+
         Box::pin(async move {
             let token = auth_token_req?;
 
             let mut is_valid_mfa_req = false;
-            if token.needs_mfa()
-                && mfa_route_option.is_some()
-                && mfa_route_option.unwrap() == request_path
-            {
+            if token.needs_mfa() && mfa_route == request_path {
                 is_valid_mfa_req = true;
             }
 
@@ -222,5 +227,32 @@ impl FromRequest for LoginSession {
     fn from_request(req: &HttpRequest, _payload: &mut actix_web::dev::Payload) -> Self::Future {
         let session = req.get_session();
         ready(Ok(LoginSession::new(session)))
+    }
+}
+
+fn build_error<U, L>(
+    session_provider: &SessionAuthProvider<U, L>,
+    req: &HttpRequest,
+) -> UnauthorizedError
+where
+    U: AccountInfo + Serialize + DeserializeOwned + Clone,
+    L: LoadUserByCredentials<User = U>,
+{
+    if session_provider.redirect_flow {
+        req.headers()
+            .get(ACCEPT)
+            .and_then(|v| v.to_str().ok())
+            .filter(|v| v.contains("text/html"))
+            .map(|_| {
+                let redirect_to_login = session_provider.routes.get_login();
+                UnauthorizedError::new_redirect(UnauthorizedRedirect::new_with_redirect_uri(
+                    redirect_to_login,
+                    req.path(),
+                    req.query_string(),
+                ))
+            })
+            .unwrap_or_default()
+    } else {
+        UnauthorizedError::default()
     }
 }

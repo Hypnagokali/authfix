@@ -80,6 +80,22 @@ impl PathMatcher {
             path_regex_iter.any(|p| p.is_match(&encoded_path))
         }
     }
+
+    pub(crate) fn are_equal(path1: &str, path2: &str) -> bool {
+        let path1_without_trailing = if path1.ends_with("/") && path1.len() > 1 {
+            &path1[0..path1.len() - 1]
+        } else {
+            path1
+        };
+
+        let path2_without_trailing = if path2.ends_with("/") && path2.len() > 1 {
+            &path2[0..path2.len() - 1]
+        } else {
+            path2
+        };
+
+        path1_without_trailing == path2_without_trailing
+    }
 }
 
 impl Default for PathMatcher {
@@ -168,8 +184,7 @@ where
         let service = Rc::clone(&self.service);
         let auth_provider = Rc::clone(&self.auth_provider);
 
-        {
-            // see issue #125
+        if auth_provider.is_request_config_required(req.request()) {
             let mut extensions = req.extensions_mut();
             auth_provider.configure_request(&mut extensions);
         }
@@ -178,7 +193,7 @@ where
             debug!("Secured route: '{}'", debug_path);
 
             Box::pin(async move {
-                // Before Request: get AuthToken or respond with 401
+                // Before request: get AuthToken or respond with 401
                 let token = auth_provider.get_auth_token(&req).await?;
 
                 {
@@ -188,7 +203,7 @@ where
 
                 let res = service.call(req).await?;
 
-                // Process logout logic after request
+                // After request: apply logout logic
                 let token_valid = {
                     let extensions = res.request().extensions();
                     if let Some(token) = extensions.get::<AuthToken<U>>() {
@@ -200,7 +215,7 @@ where
                 };
 
                 if !token_valid {
-                    debug!("AuthToken no longer valid (maybe logged out). Invalidate Authentication. (Triggered by: {})", debug_path);
+                    debug!("AuthToken no longer valid (maybe logged out). Invalidate authentication. (Triggered by path: {})", debug_path);
                     let req = res.request().clone();
                     auth_provider.invalidate(req).await;
                 }
