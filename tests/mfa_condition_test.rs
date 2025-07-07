@@ -2,7 +2,7 @@ use std::{net::SocketAddr, sync::Arc, thread};
 
 use actix_web::{
     cookie::{Cookie, Key},
-    get, HttpRequest, HttpResponse, HttpServer, Responder,
+    get, HttpRequest, HttpResponse, HttpResponseBuilder, HttpServer, Responder,
 };
 use async_trait::async_trait;
 use authfix::{
@@ -33,9 +33,13 @@ impl HandleMfaRequest for LoadMfa {
         req.cookie(&user.name).is_none()
     }
 
-    async fn handle_success(&self, user: &Self::User, mut res: HttpResponse) -> HttpResponse {
-        res.add_cookie(&Cookie::new(&user.name, "already checked"))
-            .unwrap();
+    async fn handle_success(
+        &self,
+        user: &Self::User,
+        mut res: HttpResponseBuilder,
+    ) -> HttpResponseBuilder {
+        res.cookie(Cookie::new(&user.name, "already checked"));
+
         res
     }
 }

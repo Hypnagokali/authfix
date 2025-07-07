@@ -97,6 +97,7 @@ use std::{
 };
 
 pub mod errors;
+pub mod helper;
 pub mod login;
 pub mod mfa;
 pub mod middleware;
@@ -123,7 +124,7 @@ where
     ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
 
     /// Invalidates the authentication after [AuthToken] has been set to [AuthState::Invalid].
-    /// Returns a Future: same as for `get_auth_token` 
+    /// Returns a Future: same as for `get_auth_token`
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
 
     #[allow(unused)]

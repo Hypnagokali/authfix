@@ -9,13 +9,19 @@ use std::{
 
 use actix_session::{Session, SessionExt, SessionInsertError};
 use actix_web::{
-    dev::{Extensions, ServiceRequest}, http::header::ACCEPT, Error, FromRequest, HttpRequest
+    dev::{Extensions, ServiceRequest},
+    http::header::ACCEPT,
+    Error, FromRequest, HttpRequest,
 };
 use log::error;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    errors::UnauthorizedRedirect, login::LoadUserByCredentials, mfa::MfaConfig, session::{config::Routes, AccountInfo, SessionUser}, AuthState, AuthToken, AuthenticationProvider, UnauthorizedError
+    errors::UnauthorizedRedirect,
+    login::LoadUserByCredentials,
+    mfa::MfaConfig,
+    session::{config::Routes, AccountInfo, SessionUser},
+    AuthState, AuthToken, AuthenticationProvider, UnauthorizedError,
 };
 
 const SESSION_KEY_USER: &str = "authfix__user";
@@ -24,7 +30,7 @@ const SESSION_KEY_LOGIN_VALID_UNTIL: &str = "authfix__login_valid_until";
 
 /// Provider for session based authentication.
 ///
-/// Uses [Actix-Session](https://docs.rs/actix-session/latest/actix_session/), so it must be set as middleware. If you use 
+/// Uses [Actix-Session](https://docs.rs/actix-session/latest/actix_session/), so it must be set as middleware. If you use
 /// the [SessionLoginAppBuilder](crate::session::app_builder::SessionLoginAppBuilder) it is set by default.
 #[derive(Clone)]
 pub struct SessionAuthProvider<U, L>
@@ -135,9 +141,7 @@ where
             let token = auth_token_req?;
 
             let mut is_valid_mfa_req = false;
-            if token.needs_mfa()
-                && mfa_route == request_path
-            {
+            if token.needs_mfa() && mfa_route == request_path {
                 is_valid_mfa_req = true;
             }
 
@@ -226,22 +230,29 @@ impl FromRequest for LoginSession {
     }
 }
 
-fn build_error<U, L> (session_provider: &SessionAuthProvider<U , L>, req: &HttpRequest) -> UnauthorizedError 
-where 
+fn build_error<U, L>(
+    session_provider: &SessionAuthProvider<U, L>,
+    req: &HttpRequest,
+) -> UnauthorizedError
+where
     U: AccountInfo + Serialize + DeserializeOwned + Clone,
-    L: LoadUserByCredentials<User = U>
+    L: LoadUserByCredentials<User = U>,
 {
-
     if session_provider.redirect_flow {
-        req.headers().get(ACCEPT)
-        .and_then(|v| v.to_str().ok())
-        .filter(|v| v.contains("text/html"))
-        .map(|_| {
-            let redirect_to_login = session_provider.routes.get_login();
-            UnauthorizedError::new_redirect(UnauthorizedRedirect::new_with_redirect_query(redirect_to_login, req))
-        }).unwrap_or(UnauthorizedError::default())
+        req.headers()
+            .get(ACCEPT)
+            .and_then(|v| v.to_str().ok())
+            .filter(|v| v.contains("text/html"))
+            .map(|_| {
+                let redirect_to_login = session_provider.routes.get_login();
+                UnauthorizedError::new_redirect(UnauthorizedRedirect::new_with_redirect_uri(
+                    redirect_to_login,
+                    req.path(),
+                    req.query_string(),
+                ))
+            })
+            .unwrap_or(UnauthorizedError::default())
     } else {
         UnauthorizedError::default()
     }
-    
 }

@@ -331,7 +331,7 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
                 HttpServer::new(move || {
                     // Hint:
                     // This is the manual configuration of the auth middleware with a session provider and handlers.
-    
+
                     let code_factor = Box::new(MfaRandomCode::new(generator, Arc::clone(&sender)));
                     let mfa_config = MfaConfig::new(vec![code_factor], OnlyRandomCodeFactor);
                     let load_user_service = Arc::new(HardCodedLoadUserService);
@@ -342,7 +342,11 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
                                 .get_config(),
                         )
                         .wrap(AuthMiddleware::<_, User>::new(
-                            SessionAuthProvider::new_with_mfa(load_user_service, mfa_config, Arc::new(Routes::default())),
+                            SessionAuthProvider::new_with_mfa(
+                                load_user_service,
+                                mfa_config,
+                                Arc::new(Routes::default()),
+                            ),
                             PathMatcher::new(vec!["/login", "/unsecure/*"], true),
                         ))
                         .wrap(create_actix_session_middleware())

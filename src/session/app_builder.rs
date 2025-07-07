@@ -49,7 +49,6 @@ where
             load_user_service: self.load_user_service,
             session_middleware: self.session_middleware,
             redirect_flow: self.redirect_flow,
-            
         }
     }
 
@@ -135,15 +134,17 @@ where
         >,
     > {
         let shared_routes = Arc::new(self.routes);
-        let handler: SessionApiHandlers<S, U> = SessionApiHandlers::new(Arc::clone(&shared_routes));
+        let handler: SessionApiHandlers<S, U> =
+            SessionApiHandlers::new(Arc::clone(&shared_routes), self.redirect_flow);
 
-        let mut provider = if self.mfa_config.is_configured() { 
-            SessionAuthProvider::new_with_mfa(self.load_user_service, self.mfa_config, shared_routes)
+        let mut provider = if self.mfa_config.is_configured() {
+            SessionAuthProvider::new_with_mfa(
+                self.load_user_service,
+                self.mfa_config,
+                shared_routes,
+            )
         } else {
-            SessionAuthProvider::new(
-                Arc::clone(&self.load_user_service),
-                shared_routes
-            )            
+            SessionAuthProvider::new(Arc::clone(&self.load_user_service), shared_routes)
         };
 
         provider.set_redirect_flow(self.redirect_flow);

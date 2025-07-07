@@ -80,6 +80,22 @@ impl PathMatcher {
             path_regex_iter.any(|p| p.is_match(&encoded_path))
         }
     }
+
+    pub(crate) fn are_equal(path1: &str, path2: &str) -> bool {
+        let path1_without_trailing = if path1.ends_with("/") && path1.len() > 1 {
+            &path1[0..path1.len() - 1]
+        } else {
+            path1
+        };
+
+        let path2_without_trailing = if path2.ends_with("/") && path2.len() > 1 {
+            &path2[0..path2.len() - 1]
+        } else {
+            path2
+        };
+
+        path1_without_trailing == path2_without_trailing
+    }
 }
 
 impl Default for PathMatcher {
@@ -167,7 +183,6 @@ where
         let debug_path = req.path().to_owned();
         let service = Rc::clone(&self.service);
         let auth_provider = Rc::clone(&self.auth_provider);
-
 
         if auth_provider.is_request_config_required(&req.request()) {
             let mut extensions = req.extensions_mut();
