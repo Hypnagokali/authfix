@@ -36,30 +36,31 @@ impl HttpQuery {
     }
 }
 
+#[allow(clippy::to_string_trait_impl)]
 impl ToString for HttpQuery {
     fn to_string(&self) -> String {
-        let query_string = if !self.map.is_empty() {
+        
+
+        if !self.map.is_empty() {
             let mut query_str = String::new();
             let number_of_queries = self.map.len();
             for (index, (key, val)) in self.map.iter().enumerate() {
-                query_str.push_str(&key);
+                query_str.push_str(key);
 
                 if let Some(val) = val {
-                    query_str.push_str("=");
-                    query_str.push_str(&val);
+                    query_str.push('=');
+                    query_str.push_str(val);
                 }
 
                 if number_of_queries > 1 && index < number_of_queries - 1 {
-                    query_str.push_str("&");
+                    query_str.push('&');
                 }
             }
 
             query_str
         } else {
             "".to_owned()
-        };
-
-        query_string
+        }
     }
 }
 
@@ -67,7 +68,6 @@ impl From<&str> for HttpQuery {
     fn from(value: &str) -> Self {
         let map: HashMap<String, Option<String>> = value
             .split('&')
-            .into_iter()
             .map(|kv: &str| {
                 let kv: Vec<&str> = kv.split('=').collect();
                 if kv.len() > 1 {
@@ -168,7 +168,7 @@ impl fmt::Display for UnauthorizedError {
 
 impl ResponseError for UnauthorizedError {
     fn status_code(&self) -> actix_web::http::StatusCode {
-        if let Some(_) = &self.redirect {
+        if self.redirect.is_some() {
             actix_web::http::StatusCode::FOUND
         } else {
             actix_web::http::StatusCode::UNAUTHORIZED

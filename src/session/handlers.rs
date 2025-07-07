@@ -505,8 +505,7 @@ where
 fn build_login_success_redirect(mut query: HttpQuery, routes: Data<Arc<Routes>>) -> String {
     query
         .remove("redirect_uri")
-        .map(|uri| urlencoding::decode(&uri).ok().map(|s| s.into_owned()))
-        .flatten()
+        .and_then(|uri| urlencoding::decode(&uri).ok().map(|s| s.into_owned()))
         .map(|uri| {
             if PathMatcher::are_equal(&uri, routes.get_login())
                 || PathMatcher::are_equal(&uri, routes.get_mfa())

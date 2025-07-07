@@ -251,7 +251,7 @@ where
                     req.query_string(),
                 ))
             })
-            .unwrap_or(UnauthorizedError::default())
+            .unwrap_or_default()
     } else {
         UnauthorizedError::default()
     }

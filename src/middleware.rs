@@ -184,7 +184,7 @@ where
         let service = Rc::clone(&self.service);
         let auth_provider = Rc::clone(&self.auth_provider);
 
-        if auth_provider.is_request_config_required(&req.request()) {
+        if auth_provider.is_request_config_required(req.request()) {
             let mut extensions = req.extensions_mut();
             auth_provider.configure_request(&mut extensions);
         }
