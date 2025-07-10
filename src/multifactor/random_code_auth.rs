@@ -64,10 +64,6 @@ impl RandomCode {
     pub fn valid_until(&self) -> &SystemTime {
         &self.valid_until
     }
-
-    pub fn id() -> String {
-        MFA_ID_RANDOM_CODE.to_owned()
-    }
 }
 
 /// Random code implementation of [Factor]
@@ -85,6 +81,10 @@ impl<T: CodeSender> MfaRandomCode<T> {
             code_generator,
             code_sender,
         }
+    }
+
+    pub fn id() -> String {
+        MFA_ID_RANDOM_CODE.to_owned()
     }
 }
 
