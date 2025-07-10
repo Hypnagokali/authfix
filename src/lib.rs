@@ -105,7 +105,7 @@ pub mod multifactor;
 pub mod session;
 
 // re-exports
-pub use async_trait;
+pub use async_trait::async_trait;
 
 /// Main component used by the middleware to handle the authentication mechanism
 ///
