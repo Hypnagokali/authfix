@@ -70,7 +70,7 @@ impl RandomCode {
 ///
 /// Takes in a function that should generate a random code and [CodeSender]
 /// The generated code is then saved in the Session.
-pub struct MfaRandomCode<T: CodeSender> {
+pub struct MfaRandomCode<T> {
     code_generator: fn() -> RandomCode,
     code_sender: Arc<T>,
 }
@@ -82,7 +82,9 @@ impl<T: CodeSender> MfaRandomCode<T> {
             code_sender,
         }
     }
+}
 
+impl MfaRandomCode<()> {
     pub fn id() -> String {
         MFA_ID_RANDOM_CODE.to_owned()
     }
@@ -176,4 +178,14 @@ fn purge_session_and_unknown_code_error(session: &Session, msg: &str) -> CheckCo
 fn cleanup_and_time_is_up_error(session: &Session) -> CheckCodeError {
     session.purge();
     CheckCodeError::TimeIsUp("Code is no longer valid".to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::multifactor::random_code_auth::{MfaRandomCode, MFA_ID_RANDOM_CODE};
+
+    #[test]
+    fn test_static_id() {
+        assert_eq!(MfaRandomCode::id(), MFA_ID_RANDOM_CODE);
+    }
 }
