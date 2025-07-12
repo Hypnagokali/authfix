@@ -48,7 +48,9 @@ where
             phantom_data_user: PhantomData,
         }
     }
+}
 
+impl AuthenticatorFactor<(), ()> {
     pub fn id() -> String {
         MFA_ID_AUTHENTICATOR_TOTP.to_owned()
     }
@@ -180,9 +182,14 @@ impl Authenticator {
 pub mod tests {
     use google_authenticator::GoogleAuthenticator;
 
-    use crate::multifactor::authenticator::Authenticator;
+    use crate::multifactor::authenticator::{Authenticator, AuthenticatorFactor, MFA_ID_AUTHENTICATOR_TOTP};
 
     use super::TotpSecretGenerator;
+
+    #[test]
+    fn test_static_id() {
+        assert_eq!(AuthenticatorFactor::id(), MFA_ID_AUTHENTICATOR_TOTP);
+    }
 
     #[test]
     fn authenticator_should_verify_code() {
