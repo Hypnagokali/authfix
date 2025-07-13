@@ -39,8 +39,6 @@ impl HttpQuery {
 #[allow(clippy::to_string_trait_impl)]
 impl ToString for HttpQuery {
     fn to_string(&self) -> String {
-        
-
         if !self.map.is_empty() {
             let mut query_str = String::new();
             let number_of_queries = self.map.len();
@@ -66,7 +64,12 @@ impl ToString for HttpQuery {
 
 impl From<&str> for HttpQuery {
     fn from(value: &str) -> Self {
-        let map: HashMap<String, Option<String>> = value
+        if value.trim() == "" {
+            Self {
+                map: HashMap::new(),
+            }
+        } else {
+            let map_from_str: HashMap<String, Option<String>> = value
             .split('&')
             .map(|kv: &str| {
                 let kv: Vec<&str> = kv.split('=').collect();
@@ -78,7 +81,8 @@ impl From<&str> for HttpQuery {
             })
             .collect();
 
-        Self { map }
+            Self { map: map_from_str }
+        }
     }
 }
 
@@ -250,6 +254,14 @@ mod tests {
         let query: HttpQuery = "".into();
         assert_eq!(query.to_string(), "");
     }
+
+    #[test]
+    fn should_construct_correct_query_string_if_value_added_to_empty() {
+        let mut query: HttpQuery = "".into();
+        query.insert_without_value("error");
+        assert_eq!(query.to_string(), "error");
+    }
+
 
     #[test]
     fn http_query_should_be_constructable_from_str() {
