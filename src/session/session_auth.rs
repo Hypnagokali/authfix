@@ -20,6 +20,7 @@ use crate::{
     errors::UnauthorizedRedirect,
     login::LoadUserByCredentials,
     mfa::MfaConfig,
+    middleware::PathMatcher,
     session::{config::Routes, AccountInfo, SessionUser},
     AuthState, AuthToken, AuthenticationProvider, UnauthorizedError,
 };
@@ -137,19 +138,17 @@ where
         let auth_token_req = self.get_auth_token_from_session(req.request());
         let mfa_route = self.routes.get_mfa().to_owned();
 
+        let error = build_error(self, req.request());
         Box::pin(async move {
             let token = auth_token_req?;
 
-            let mut is_valid_mfa_req = false;
-            if token.needs_mfa() && mfa_route == request_path {
-                is_valid_mfa_req = true;
+            if token.is_authenticated()
+                || (token.is_mfa_needed() && PathMatcher::are_equal(&mfa_route, &request_path))
+            {
+                Ok(token)
+            } else {
+                Err(error)
             }
-
-            if !is_valid_mfa_req && !token.is_authenticated() {
-                return Err(UnauthorizedError::default());
-            }
-
-            Ok(token)
         })
     }
 }

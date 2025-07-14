@@ -279,6 +279,40 @@ async fn should_redirect_to_login_with_error_if_credentials_wrong() {
     assert!(location_header.contains("redirect_uri=%2Fsecured-route%3Fsome%3Dvalue"));
 }
 
+#[actix_rt::test]
+async fn should_redirect_to_login_when_going_to_secured_route_and_if_not_fully_authorized() {
+    let addr = actix_test::unused_addr();
+    start_test_server(addr);
+
+    let client = Client::builder()
+        .cookie_store(true)
+        .redirect(Policy::none())
+        .build()
+        .unwrap();
+
+    client
+        .post(format!("http://{addr}/login"))
+        .body("email=anna&password=test123")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .send()
+        .await
+        .unwrap();
+
+    let res = client
+        .get(format!("http://{addr}/secured-route"))
+        .header(
+            "Accept",
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        )
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::FOUND);
+    let location_header = res.headers().get("location").unwrap();
+    assert_eq!(location_header, "/login?redirect_uri=%2Fsecured-route");
+}
+
 fn start_test_server(addr: SocketAddr) {
     INIT.call_once(|| {
         env_logger::init_from_env(env_logger::Env::new().default_filter_or("debug"));

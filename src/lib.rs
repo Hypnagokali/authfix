@@ -22,7 +22,7 @@
 //! use actix_web::{HttpResponse, HttpServer, Responder, cookie::Key, get};
 //! use authfix::{
 //!     AuthToken,
-//!     async_trait::async_trait,
+//!     async_trait,
 //!     login::{LoadUserByCredentials, LoadUserError, LoginToken},
 //!     session::{app_builder::SessionLoginAppBuilder, AccountInfo},
 //! };
@@ -168,7 +168,7 @@ impl<U> AuthToken<U> {
         inner.auth_state = AuthState::Invalid;
     }
 
-    pub(crate) fn needs_mfa(&self) -> bool {
+    pub(crate) fn is_mfa_needed(&self) -> bool {
         let inner: Ref<'_, AuthTokenInner<U>> = self.inner.borrow();
         inner.auth_state == AuthState::NeedsMfa
     }
@@ -178,6 +178,7 @@ impl<U> AuthToken<U> {
         inner.auth_state != AuthState::Invalid
     }
 
+    #[allow(unused)]
     pub(crate) fn is_authenticated(&self) -> bool {
         let inner = self.inner.borrow();
         inner.auth_state == AuthState::Authenticated
