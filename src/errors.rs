@@ -1,10 +1,10 @@
 //! Error types for all kinds of authentication
 
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, rc::Rc};
 
 use actix_web::{http::header, HttpResponse, ResponseError};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct UnauthorizedRedirect {
     location: String,
     query_string: Option<String>,
@@ -132,8 +132,13 @@ impl UnauthorizedRedirect {
     }
 }
 
+#[derive(Debug, Clone)]
+// I wrapped the error type into an Rc, because the token response Result<AuthToken<U>, UnauthorizedError> could be cached
+// and needs to be cloned
+pub struct UnauthorizedError(Rc<UnauthorizedErrorInner>);
+
 #[derive(Debug)]
-pub struct UnauthorizedError {
+pub struct UnauthorizedErrorInner {
     message: String,
     redirect: Option<UnauthorizedRedirect>,
 }
@@ -141,26 +146,26 @@ pub struct UnauthorizedError {
 impl UnauthorizedError {
     #[allow(unused)]
     pub(crate) fn new(message: &str) -> Self {
-        Self {
+        Self(Rc::new(UnauthorizedErrorInner {
             message: message.to_owned(),
             redirect: None,
-        }
+        }))
     }
 
     pub(crate) fn new_redirect(redirect: UnauthorizedRedirect) -> Self {
-        Self {
+        Self(Rc::new(UnauthorizedErrorInner {
             message: "Not authorized".to_owned(),
             redirect: Some(redirect),
-        }
+        }))
     }
 }
 
 impl Default for UnauthorizedError {
     fn default() -> Self {
-        Self {
+        Self(Rc::new(UnauthorizedErrorInner {
             message: "Not authorized".to_owned(),
             redirect: None,
-        }
+        }))
     }
 }
 
@@ -172,7 +177,7 @@ impl fmt::Display for UnauthorizedError {
 
 impl ResponseError for UnauthorizedError {
     fn status_code(&self) -> actix_web::http::StatusCode {
-        if self.redirect.is_some() {
+        if self.0.redirect.is_some() {
             actix_web::http::StatusCode::FOUND
         } else {
             actix_web::http::StatusCode::UNAUTHORIZED
@@ -180,7 +185,7 @@ impl ResponseError for UnauthorizedError {
     }
 
     fn error_response(&self) -> HttpResponse<actix_web::body::BoxBody> {
-        if let Some(redirect) = &self.redirect {
+        if let Some(redirect) = &self.0.redirect {
             let location = &redirect.location;
             let location_header = match &redirect.query_string {
                 Some(redirect_query) => &format!("{}?{}", location, redirect_query),
@@ -190,7 +195,7 @@ impl ResponseError for UnauthorizedError {
                 .insert_header((header::LOCATION, location_header.to_owned()))
                 .finish()
         } else {
-            HttpResponse::Unauthorized().json(self.message.clone())
+            HttpResponse::Unauthorized().json(self.0.message.clone())
         }
     }
 }

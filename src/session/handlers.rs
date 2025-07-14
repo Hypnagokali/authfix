@@ -516,5 +516,5 @@ fn build_login_success_redirect(mut query: HttpQuery, routes: Data<Arc<Routes>>)
                 uri
             }
         })
-        .unwrap_or("/".to_owned())
+        .unwrap_or(routes.get_default_redirect().to_owned())
 }

@@ -10,24 +10,26 @@ use std::{
 use actix_session::{Session, SessionExt, SessionInsertError};
 use actix_web::{
     dev::{Extensions, ServiceRequest},
-    http::header::ACCEPT,
-    Error, FromRequest, HttpRequest,
+    http::header::{ACCEPT, LOCATION},
+    Error, FromRequest, HttpMessage, HttpRequest,
 };
 use log::error;
-use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     errors::UnauthorizedRedirect,
+    helper::redirect_response_builder,
     login::LoadUserByCredentials,
     mfa::MfaConfig,
     middleware::PathMatcher,
-    session::{config::Routes, AccountInfo, SessionUser},
+    session::{config::Routes, SessionUser},
     AuthState, AuthToken, AuthenticationProvider, UnauthorizedError,
 };
 
 const SESSION_KEY_USER: &str = "authfix__user";
 const SESSION_KEY_NEED_MFA: &str = "authfix__needs_mfa";
 const SESSION_KEY_LOGIN_VALID_UNTIL: &str = "authfix__login_valid_until";
+
+type AuthTokenResult<U> = Result<AuthToken<U>, UnauthorizedError>;
 
 /// Provider for session based authentication.
 ///
@@ -80,17 +82,19 @@ where
         self.redirect_flow = with_redirect;
     }
 
-    pub fn get_auth_token_from_session(
-        &self,
-        req: &actix_web::HttpRequest,
-    ) -> Result<AuthToken<U>, UnauthorizedError> {
+    pub fn get_auth_token_from_session(&self, req: &actix_web::HttpRequest) -> AuthTokenResult<U> {
+        // use cached result if available
+        if let Some(result) = req.extensions().get::<AuthTokenResult<U>>() {
+            return result.clone();
+        }
+
         let session = req.get_session().clone();
 
         let user = match session.get::<U>(SESSION_KEY_USER) {
             Ok(Some(user)) => user,
             _ => {
                 error!("No user in session. Cannot read {}", SESSION_KEY_USER);
-                return Err(build_error(self, req));
+                return Err(build_error_cache_result(self, req));
             }
         };
 
@@ -99,11 +103,13 @@ where
             Ok(None) => AuthState::Authenticated,
             Err(_) => {
                 error!("Cannot read '{}' value from session", SESSION_KEY_NEED_MFA);
-                return Err(build_error(self, req));
+                return Err(build_error_cache_result(self, req));
             }
         };
 
-        Ok(AuthToken::new(user, state))
+        let res = Ok(AuthToken::new(user, state));
+        req.extensions_mut().insert(res.clone());
+        res
     }
 }
 
@@ -117,6 +123,34 @@ where
         session.purge();
 
         Box::pin(ready(()))
+    }
+
+    fn response_before_request_handling(
+        &self,
+        req: &HttpRequest,
+    ) -> Option<actix_web::HttpResponse> {
+        if req.method() != actix_web::http::Method::GET {
+            return None;
+        }
+
+        let auth_token_req = self.get_auth_token_from_session(req).ok();
+
+        if let Some(token) = auth_token_req {
+            if token.is_authenticated()
+                && self.redirect_flow
+                && (PathMatcher::are_equal(self.routes.get_login(), req.path())
+                    || PathMatcher::are_equal(self.routes.get_mfa(), req.path()))
+            {
+                // redirect to "default" if already logged in
+                return Some(
+                    redirect_response_builder()
+                        .insert_header((LOCATION, self.routes.get_default_redirect()))
+                        .finish(),
+                );
+            }
+        }
+
+        None
     }
 
     fn is_request_config_required(&self, req: &HttpRequest) -> bool {
@@ -229,12 +263,26 @@ impl FromRequest for LoginSession {
     }
 }
 
+fn build_error_cache_result<U, L>(
+    session_provider: &SessionAuthProvider<U, L>,
+    req: &HttpRequest,
+) -> UnauthorizedError
+where
+    U: SessionUser,
+    L: LoadUserByCredentials<User = U>,
+{
+    let error = build_error(session_provider, req);
+    req.extensions_mut()
+        .insert(Err::<AuthToken<U>, UnauthorizedError>(error.clone()));
+    error
+}
+
 fn build_error<U, L>(
     session_provider: &SessionAuthProvider<U, L>,
     req: &HttpRequest,
 ) -> UnauthorizedError
 where
-    U: AccountInfo + Serialize + DeserializeOwned + Clone,
+    U: SessionUser,
     L: LoadUserByCredentials<User = U>,
 {
     if session_provider.redirect_flow {
