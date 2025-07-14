@@ -182,7 +182,9 @@ impl Authenticator {
 pub mod tests {
     use google_authenticator::GoogleAuthenticator;
 
-    use crate::multifactor::authenticator::{Authenticator, AuthenticatorFactor, MFA_ID_AUTHENTICATOR_TOTP};
+    use crate::multifactor::authenticator::{
+        Authenticator, AuthenticatorFactor, MFA_ID_AUTHENTICATOR_TOTP,
+    };
 
     use super::TotpSecretGenerator;
 

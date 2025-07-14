@@ -70,16 +70,16 @@ impl From<&str> for HttpQuery {
             }
         } else {
             let map_from_str: HashMap<String, Option<String>> = value
-            .split('&')
-            .map(|kv: &str| {
-                let kv: Vec<&str> = kv.split('=').collect();
-                if kv.len() > 1 {
-                    (kv[0].to_owned(), Some(kv[1].to_owned()))
-                } else {
-                    (kv[0].to_owned(), None)
-                }
-            })
-            .collect();
+                .split('&')
+                .map(|kv: &str| {
+                    let kv: Vec<&str> = kv.split('=').collect();
+                    if kv.len() > 1 {
+                        (kv[0].to_owned(), Some(kv[1].to_owned()))
+                    } else {
+                        (kv[0].to_owned(), None)
+                    }
+                })
+                .collect();
 
             Self { map: map_from_str }
         }
@@ -261,7 +261,6 @@ mod tests {
         query.insert_without_value("error");
         assert_eq!(query.to_string(), "error");
     }
-
 
     #[test]
     fn http_query_should_be_constructable_from_str() {
