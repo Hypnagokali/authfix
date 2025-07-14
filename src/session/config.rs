@@ -17,6 +17,7 @@ pub struct Routes {
     login: String,
     logout: String,
     mfa: String,
+    default_redirect: String,
 }
 
 impl Routes {
@@ -25,7 +26,22 @@ impl Routes {
             login: create_uri(prefix, login),
             logout: create_uri(prefix, logout),
             mfa: create_uri(prefix, mfa),
+            default_redirect: normalize_uri_part("/"),
         }
+    }
+
+    /// Sets the default redirect URI, where the user is redirected after a successful login.
+    pub fn set_default_redirect(self, redirect: &str) -> Self {
+        Self {
+            login: self.login,
+            logout: self.logout,
+            mfa: self.mfa,
+            default_redirect: normalize_uri_part(redirect),
+        }
+    }
+
+    pub fn get_default_redirect(&self) -> &str {
+        &self.default_redirect
     }
 
     pub fn get_login(&self) -> &str {
@@ -51,6 +67,7 @@ impl Default for Routes {
             login: "/login".to_owned(),
             logout: "/logout".to_owned(),
             mfa: "/login/mfa".to_owned(),
+            default_redirect: normalize_uri_part("/"),
         }
     }
 }

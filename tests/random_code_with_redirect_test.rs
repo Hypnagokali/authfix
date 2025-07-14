@@ -1,13 +1,11 @@
 use std::{
     net::SocketAddr,
-    sync::{Arc, Once},
+    sync::Arc,
     thread,
     time::{Duration, SystemTime},
 };
 
-use actix_web::{
-    cookie::Key, get, middleware::Logger, HttpRequest, HttpResponse, HttpServer, Responder,
-};
+use actix_web::{cookie::Key, get, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
     mfa::{HandleMfaRequest, MfaConfig, MfaError},
@@ -21,8 +19,6 @@ use reqwest::{redirect::Policy, Client, StatusCode};
 use crate::test_utils::{HardCodedLoadUserService, User};
 
 mod test_utils;
-
-static INIT: Once = Once::new();
 
 struct OnlyRandomCodeFactor;
 
@@ -51,6 +47,11 @@ impl CodeSender for DummySender {
 #[get("/secured-route")]
 async fn secured_route() -> impl Responder {
     HttpResponse::Ok()
+}
+
+#[get("/login")]
+async fn login_page() -> impl Responder {
+    HttpResponse::Ok().body("Login Page")
 }
 
 #[actix_rt::test]
@@ -252,6 +253,39 @@ async fn should_redirect_to_root_if_redirect_uri_is_login() {
 }
 
 #[actix_rt::test]
+async fn should_redirect_to_default_if_already_authenticated() {
+    let addr = actix_test::unused_addr();
+    start_test_server(addr);
+
+    let client = Client::builder()
+        .cookie_store(true)
+        .redirect(Policy::none())
+        .build()
+        .unwrap();
+
+    // Bob logs in
+    client
+        .post(format!("http://{addr}/login"))
+        .body("email=bob&password=test123")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .send()
+        .await
+        .unwrap();
+
+    // Bob tries accessing login page
+    let res = client
+        .get(format!("http://{addr}/login"))
+        .header("Accept", "text/html")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::FOUND);
+    let location_header = res.headers().get("location").unwrap();
+    assert_eq!(location_header, "/");
+}
+
+#[actix_rt::test]
 async fn should_redirect_to_login_with_error_if_credentials_wrong() {
     let addr = actix_test::unused_addr();
     start_test_server(addr);
@@ -314,10 +348,6 @@ async fn should_redirect_to_login_when_going_to_secured_route_and_if_not_fully_a
 }
 
 fn start_test_server(addr: SocketAddr) {
-    INIT.call_once(|| {
-        env_logger::init_from_env(env_logger::Env::new().default_filter_or("debug"));
-    });
-
     thread::spawn(move || {
         actix_rt::System::new()
             .block_on(async {
@@ -341,8 +371,8 @@ fn start_test_server(addr: SocketAddr) {
                         .set_mfa(mfa_config)
                         .with_redirect_flow()
                         .build()
-                        .wrap(Logger::default())
                         .service(secured_route)
+                        .service(login_page)
                 })
                 .bind(format!("{addr}"))
                 .unwrap()

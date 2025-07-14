@@ -5,6 +5,7 @@ use std::{
 };
 
 use actix_web::{
+    body::BoxBody,
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     Error, HttpMessage,
 };
@@ -163,15 +164,14 @@ where
     user_type: PhantomData<U>,
 }
 
-impl<S, B, AuthProvider, U> Service<ServiceRequest> for AuthMiddlewareInner<S, AuthProvider, U>
+impl<S, AuthProvider, U> Service<ServiceRequest> for AuthMiddlewareInner<S, AuthProvider, U>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<BoxBody>, Error = Error> + 'static,
     S::Future: 'static,
-    B: 'static,
     U: 'static,
     AuthProvider: AuthenticationProvider<U> + 'static,
 {
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse<BoxBody>;
     type Error = Error;
     type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -187,6 +187,11 @@ where
         if auth_provider.is_request_config_required(req.request()) {
             let mut extensions = req.extensions_mut();
             auth_provider.configure_request(&mut extensions);
+        }
+
+        if let Some(response) = auth_provider.response_before_request_handling(req.request()) {
+            let res = ServiceResponse::new(req.into_parts().0, response);
+            return Box::pin(async move { Ok(res) });
         }
 
         if self.path_matcher.matches(&request_path) {
@@ -229,15 +234,14 @@ where
     }
 }
 
-impl<S, B, AuthProvider, U> Transform<S, ServiceRequest> for AuthMiddleware<AuthProvider, U>
+impl<S, AuthProvider, U> Transform<S, ServiceRequest> for AuthMiddleware<AuthProvider, U>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<BoxBody>, Error = Error> + 'static,
     S::Future: 'static,
-    B: 'static,
     AuthProvider: AuthenticationProvider<U> + 'static,
     U: 'static,
 {
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse<BoxBody>;
     type Error = Error;
     type InitError = ();
     type Transform = AuthMiddlewareInner<S, AuthProvider, U>;

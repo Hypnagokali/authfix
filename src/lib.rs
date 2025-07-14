@@ -85,7 +85,7 @@
 
 use actix_web::{
     dev::{Extensions, ServiceRequest},
-    Error, FromRequest, HttpMessage, HttpRequest,
+    Error, FromRequest, HttpMessage, HttpRequest, HttpResponse,
 };
 use errors::UnauthorizedError;
 
@@ -123,11 +123,21 @@ where
         service_request: &ServiceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
 
+    /// This is a hook that is called before the request is handled.
+    /// It should be used to analyze the request and return a response if needed.
+    /// Its not intended for checking whether the user is authenticated (use `get_auth_token` for that).
+    ///
+    /// Returns a response that is sent before the request is handled.
+    /// This is useful for example to redirect the user to root if he tried accessing the login page although he is already authenticated.
+    #[allow(unused)]
+    fn response_before_request_handling(&self, req: &HttpRequest) -> Option<HttpResponse> {
+        None
+    }
+
     /// Invalidates the authentication after [AuthToken] has been set to [AuthState::Invalid].
     /// Returns a Future: same as for `get_auth_token`
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
 
-    #[allow(unused)]
     fn is_request_config_required(&self, req: &HttpRequest) -> bool;
 
     /// Configures the request if needed
