@@ -23,11 +23,37 @@ use actix_web::{
     web::{self, Data, Form, Json, ReqData, ServiceConfig},
     Error, HttpRequest, HttpResponse, HttpResponseBuilder, Resource, Responder,
 };
+
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::{config::Routes, session_auth::LoginSession};
+
+/// This struct can be used in combination with the Query extractor to capture the error parameter
+/// The error parameter is set, if the login fails or the user provides an invalid MFA code.
+///
+/// # Example
+/// ```no_run
+/// use actix_web::{get, web::Query, Responder, HttpResponse};
+/// use authfix::session::handlers::LoginError;
+/// 
+/// #[get("/login")]
+/// async fn login(query: Query<LoginError>) -> impl Responder {
+///    println!("Hasen: {}", query.is_error());
+///    HttpResponse::Ok().body("...")
+/// }
+/// ```
+#[derive(Deserialize)]
+pub struct LoginError {
+    error: Option<String>,
+}
+
+impl LoginError {
+    pub fn is_error(&self) -> bool {
+        self.error.is_some()
+    }
+}
 
 #[derive(Error, Debug)]
 enum SessionApiMfaError {
