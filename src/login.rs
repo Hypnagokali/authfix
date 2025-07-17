@@ -1,3 +1,5 @@
+use std::future::Future;
+
 use actix_web::{HttpRequest, HttpResponse, ResponseError};
 use async_trait::async_trait;
 use serde::Deserialize;
@@ -9,29 +11,65 @@ pub struct LoginToken {
     pub email: String,
     pub password: String,
 }
-/// Trait that handles the loading of a user and executes a success and error handler
-#[async_trait]
-pub trait LoadUserByCredentials: Send + Sync {
+/// Loads the users by their credentials
+pub trait LoadUserByCredentials {
     type User;
 
     /// Gets a [LoginToken] and returns a user if credentials are correct a [LoadUserError] otherwise
-    async fn load_user(&self, login_token: &LoginToken) -> Result<Self::User, LoadUserError>;
-
-    /// Is called after the user has successfully completed authentication
-    #[allow(unused)]
-    async fn on_success_handler(
+    fn load_user(
         &self,
-        req: &HttpRequest,
-        user: &Self::User,
-    ) -> Result<(), HandlerError> {
-        Ok(())
-    }
+        login_token: &LoginToken,
+    ) -> impl Future<Output = Result<Self::User, LoadUserError>> + Send;
+}
 
-    /// Is called when the login fails
-    #[allow(unused)]
-    async fn on_error_handler(&self, req: &HttpRequest) -> Result<(), HandlerError> {
-        Ok(())
-    }
+/// This trait is called, if the login was successful
+///
+/// # Example
+/// ```no_run
+/// use authfix::async_trait;
+/// use actix_web::HttpRequest;
+/// use authfix::HandlerError;
+/// use authfix::SuccessHandler;
+/// struct MySuccessHandler;
+///
+/// #[async_trait(?Send)]
+/// impl SuccessHandler for MySuccessHandler {
+///    type User = YourUser;
+///    async fn on_success(&self, user: &Self::User, req: HttpRequest) -> Result<(), HandlerError> {
+///         // do something meaningful
+///         Ok(())
+///     }
+/// }
+/// ```
+#[async_trait(?Send)]
+pub trait SuccessHandler {
+    type User;
+
+    async fn on_success(&self, user: &Self::User, req: HttpRequest) -> Result<(), HandlerError>;
+}
+
+/// This trait is called, if the login failed
+///
+/// # Example
+/// ```no_run
+/// use authfix::async_trait;
+/// use actix_web::HttpRequest;
+/// use authfix::HandlerError;
+/// use authfix::FailureHandler;
+/// struct MyFailureHandler;
+///
+/// #[async_trait(?Send)]
+/// impl FailureHandler for MyFailureHandler {
+///    type User = YourUser;
+///    async fn on_failure(&self, req: HttpRequest) -> Result<(), HandlerError> {
+///         // do something meaningful
+///         Ok(())
+///     }
+/// }
+/// ```
+#[async_trait(?Send)]
+pub trait FailureHandler {
+    async fn on_failure(&self, req: HttpRequest) -> Result<(), HandlerError>;
 }
 
 #[derive(Error, Debug)]

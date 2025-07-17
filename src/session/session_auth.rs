@@ -18,7 +18,7 @@ use log::error;
 use crate::{
     errors::UnauthorizedRedirect,
     helper::redirect_response_builder,
-    login::LoadUserByCredentials,
+    login::{FailureHandler, LoadUserByCredentials, SuccessHandler},
     mfa::MfaConfig,
     middleware::PathMatcher,
     session::{config::Routes, SessionUser},
@@ -44,6 +44,8 @@ where
     mfa_config: Rc<MfaConfig<U>>,
     #[allow(dead_code)] // load_user will be registered as extension later
     load_user: Arc<L>,
+    error_handler: Rc<Option<Box<dyn FailureHandler>>>,
+    success_handler: Rc<Option<Box<dyn SuccessHandler<User = U>>>>,
     routes: Arc<Routes>,
     redirect_flow: bool,
     phantom_data: PhantomData<U>,
@@ -61,6 +63,8 @@ where
         Self {
             mfa_config: Rc::new(MfaConfig::empty()),
             load_user,
+            error_handler: Rc::new(None),
+            success_handler: Rc::new(None),
             routes,
             phantom_data: PhantomData,
             redirect_flow: false,
@@ -72,6 +76,8 @@ where
         Self {
             mfa_config: Rc::new(mfa_config),
             load_user,
+            error_handler: Rc::new(None),
+            success_handler: Rc::new(None),
             routes,
             phantom_data: PhantomData,
             redirect_flow: false,
@@ -80,6 +86,34 @@ where
 
     pub fn set_redirect_flow(&mut self, with_redirect: bool) {
         self.redirect_flow = with_redirect;
+    }
+
+    pub fn set_error_handler<F>(&mut self, error_handler: F)
+    where
+        F: FailureHandler + 'static,
+    {
+        self.error_handler = Rc::new(Some(Box::new(error_handler)));
+    }
+
+    pub(crate) fn set_error_handler_from_rc(
+        &mut self,
+        error_handler: Rc<Option<Box<dyn FailureHandler>>>,
+    ) {
+        self.error_handler = error_handler;
+    }
+
+    pub fn set_success_handler<S>(&mut self, success_handler: S)
+    where
+        S: SuccessHandler<User = U> + 'static,
+    {
+        self.success_handler = Rc::new(Some(Box::new(success_handler)));
+    }
+
+    pub(crate) fn set_success_handler_from_rc(
+        &mut self,
+        success_handler: Rc<Option<Box<dyn SuccessHandler<User = U>>>>,
+    ) {
+        self.success_handler = success_handler;
     }
 
     pub fn get_auth_token_from_session(&self, req: &actix_web::HttpRequest) -> AuthTokenResult<U> {
@@ -154,13 +188,21 @@ where
     }
 
     fn is_request_config_required(&self, req: &HttpRequest) -> bool {
-        // Maybe the pathmatcher should be used for comparing paths (see #131)
-        self.routes.get_login() == req.path() || self.routes.get_mfa() == req.path()
+        PathMatcher::are_equal(self.routes.get_login(), req.path())
+            || PathMatcher::are_equal(self.routes.get_mfa(), req.path())
     }
 
     fn configure_request(&self, extensions: &mut Extensions) {
         extensions.insert(Rc::clone(&self.mfa_config));
         extensions.insert(Arc::clone(&self.load_user));
+
+        println!(
+            "Success handler available: {}",
+            self.success_handler.is_some()
+        );
+
+        extensions.insert(Rc::clone(&self.error_handler));
+        extensions.insert(Rc::clone(&self.success_handler));
     }
 
     fn get_auth_token(

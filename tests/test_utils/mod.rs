@@ -35,7 +35,6 @@ impl AccountInfo for User {}
 
 pub struct HardCodedLoadUserService;
 
-#[async_trait]
 impl LoadUserByCredentials for HardCodedLoadUserService {
     type User = User;
 

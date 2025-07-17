@@ -1,5 +1,6 @@
 use std::{
     marker::PhantomData,
+    rc::Rc,
     sync::Arc,
     time::{Duration, SystemTime},
 };
@@ -7,7 +8,10 @@ use std::{
 use crate::{
     errors::{HttpQuery, UnauthorizedError, UnauthorizedRedirect},
     helper::redirect_response_builder,
-    login::{HandlerError, LoadUserByCredentials, LoadUserError, LoginToken},
+    login::{
+        FailureHandler, HandlerError, LoadUserByCredentials, LoadUserError, LoginToken,
+        SuccessHandler,
+    },
     mfa::MfaConfig,
     middleware::PathMatcher,
     multifactor::{CheckCodeError, GenerateCodeError},
@@ -37,7 +41,7 @@ use super::{config::Routes, session_auth::LoginSession};
 /// ```no_run
 /// use actix_web::{get, web::Query, Responder, HttpResponse};
 /// use authfix::session::handlers::LoginError;
-/// 
+///
 /// #[get("/login")]
 /// async fn login(query: Query<LoginError>) -> impl Responder {
 ///    println!("Hasen: {}", query.is_error());
@@ -68,6 +72,12 @@ enum SessionApiMfaError {
 impl From<CheckCodeError> for SessionApiMfaError {
     fn from(value: CheckCodeError) -> Self {
         Self::CodeError(value)
+    }
+}
+
+impl From<HandlerError> for SessionApiMfaError {
+    fn from(value: HandlerError) -> Self {
+        SessionApiMfaError::ServerError(format!("HandlerError: {}", value))
     }
 }
 
@@ -214,12 +224,16 @@ async fn logout_form<U: SessionUser>(
 
 async fn mfa_route_json<U: SessionUser>(
     mfa_config: MfaConfig<U>,
+    error_handler: ReqData<Rc<Option<Box<dyn FailureHandler>>>>,
+    success_handler: ReqData<Rc<Option<Box<dyn SuccessHandler<User = U>>>>>,
     body: Json<MfaRequestBody>,
     req: HttpRequest,
     session: LoginSession,
 ) -> Result<impl Responder, Error> {
     mfa_internal(
         mfa_config,
+        error_handler.into_inner(),
+        success_handler.into_inner(),
         body.into_inner(),
         req,
         session,
@@ -235,6 +249,8 @@ async fn mfa_route_json<U: SessionUser>(
 
 async fn mfa_route_form<U: SessionUser>(
     mfa_config: MfaConfig<U>,
+    error_handler: ReqData<Rc<Option<Box<dyn FailureHandler>>>>,
+    success_handler: ReqData<Rc<Option<Box<dyn SuccessHandler<User = U>>>>>,
     body: Form<MfaRequestBody>,
     req: HttpRequest,
     routes: Data<Arc<Routes>>,
@@ -247,6 +263,8 @@ async fn mfa_route_form<U: SessionUser>(
 
     match mfa_internal(
         mfa_config,
+        error_handler.into_inner(),
+        success_handler.into_inner(),
         body.into_inner(),
         req.clone(),
         session,
@@ -284,10 +302,11 @@ async fn mfa_route_form<U: SessionUser>(
 
 async fn mfa_internal<U: SessionUser>(
     mfa_config: MfaConfig<U>,
+    error_handler: Rc<Option<Box<dyn FailureHandler>>>,
+    success_handler: Rc<Option<Box<dyn SuccessHandler<User = U>>>>,
     body: MfaRequestBody,
     req: HttpRequest,
     session: LoginSession,
-    // we need the response here, which we want to return to the user
     res: HttpResponseBuilder,
 ) -> Result<HttpResponseBuilder, SessionApiMfaError> {
     if !session.is_mfa_needed() {
@@ -298,10 +317,12 @@ async fn mfa_internal<U: SessionUser>(
 
     if session.no_longer_valid() {
         session.destroy();
+        handle_error(error_handler, req).await?;
         return Err(CheckCodeError::FinallyRejected.into());
     }
 
     if session.get_user::<U>().is_none() {
+        handle_error(error_handler, req).await?;
         return Err(SessionApiMfaError::BadRequest(
             "Mfa route called but no user was present in LoginSession".to_owned(),
         ));
@@ -310,11 +331,19 @@ async fn mfa_internal<U: SessionUser>(
     let user: U = session.get_user().unwrap();
 
     if let Some(f) = mfa_config.get_factor_by_user(&user).await {
-        f.check_code(body.get_code(), &req).await?;
+        match f.check_code(body.get_code(), &req).await {
+            Ok(_) => {}
+            Err(e) => {
+                handle_error(error_handler, req).await?;
+                return Err(e.into());
+            }
+        }
         session.mfa_challenge_done();
+        handle_success(success_handler, req, &user).await?;
         Ok(mfa_config.handle_success(&user, res).await)
     } else {
         session.destroy();
+        handle_error(error_handler, req).await?;
         Err(SessionApiMfaError::ServerError(
             "No factor returned for user".to_owned(),
         ))
@@ -351,6 +380,8 @@ async fn login_internal<T: LoadUserByCredentials<User = U>, U: SessionUser>(
     login_token: LoginToken,
     user_service: Arc<T>,
     mfa_config: MfaConfig<U>,
+    error_handler: Rc<Option<Box<dyn FailureHandler>>>,
+    success_handler: Rc<Option<Box<dyn SuccessHandler<User = U>>>>,
     session: LoginSession,
     req: HttpRequest,
 ) -> Result<LoginSessionResponse, SessionApiLoginError> {
@@ -375,7 +406,7 @@ async fn login_internal<T: LoadUserByCredentials<User = U>, U: SessionUser>(
 
             if !generate_code_if_mfa_necessary(&user, mfa_config.clone(), &req, &session).await? {
                 // MFA not needed, call success handler
-                user_service.on_success_handler(&req, &user).await?;
+                handle_success(success_handler, req, &user).await?;
             } else {
                 // set timeout for login session
                 if let Some(validity) = SystemTime::now()
@@ -401,7 +432,8 @@ async fn login_internal<T: LoadUserByCredentials<User = U>, U: SessionUser>(
             Ok(login_res)
         }
         Err(e) => {
-            user_service.on_error_handler(&req).await?;
+            handle_error(error_handler, req).await?;
+
             session.destroy();
             Err(e.into())
         }
@@ -409,9 +441,12 @@ async fn login_internal<T: LoadUserByCredentials<User = U>, U: SessionUser>(
 }
 
 #[allow(clippy::type_complexity)]
+#[allow(clippy::too_many_arguments)]
 async fn login_form<T: LoadUserByCredentials<User = U>, U: SessionUser>(
     login_token: Form<LoginToken>,
     user_service: ReqData<Arc<T>>,
+    error_handler: ReqData<Rc<Option<Box<dyn FailureHandler>>>>,
+    success_handler: ReqData<Rc<Option<Box<dyn SuccessHandler<User = U>>>>>,
     mfa_config: MfaConfig<U>,
     session: LoginSession,
     req: HttpRequest,
@@ -421,6 +456,8 @@ async fn login_form<T: LoadUserByCredentials<User = U>, U: SessionUser>(
         login_token.into_inner(),
         user_service.into_inner(),
         mfa_config,
+        error_handler.into_inner(),
+        success_handler.into_inner(),
         session,
         req.clone(),
     )
@@ -468,6 +505,8 @@ async fn login_form<T: LoadUserByCredentials<User = U>, U: SessionUser>(
 async fn login_json<T: LoadUserByCredentials<User = U>, U: SessionUser>(
     login_token: Json<LoginToken>,
     user_service: ReqData<Arc<T>>,
+    error_handler: ReqData<Rc<Option<Box<dyn FailureHandler>>>>,
+    success_handler: ReqData<Rc<Option<Box<dyn SuccessHandler<User = U>>>>>,
     mfa_config: MfaConfig<U>,
     session: LoginSession,
     req: HttpRequest,
@@ -476,6 +515,8 @@ async fn login_json<T: LoadUserByCredentials<User = U>, U: SessionUser>(
         login_token.into_inner(),
         user_service.into_inner(),
         mfa_config,
+        error_handler.into_inner(),
+        success_handler.into_inner(),
         session,
         req,
     )
@@ -543,4 +584,27 @@ fn build_login_success_redirect(mut query: HttpQuery, routes: Data<Arc<Routes>>)
             }
         })
         .unwrap_or(routes.get_default_redirect().to_owned())
+}
+
+async fn handle_success<U>(
+    success_handler: Rc<Option<Box<dyn SuccessHandler<User = U>>>>,
+    req: HttpRequest,
+    user: &U,
+) -> Result<(), HandlerError> {
+    if let Some(handler) = success_handler.as_ref() {
+        handler.on_success(user, req).await?
+    }
+
+    Ok(())
+}
+
+async fn handle_error(
+    error_handler: Rc<Option<Box<dyn FailureHandler>>>,
+    req: HttpRequest,
+) -> Result<(), HandlerError> {
+    if let Some(handler) = error_handler.as_ref() {
+        handler.on_failure(req).await?
+    }
+
+    Ok(())
 }

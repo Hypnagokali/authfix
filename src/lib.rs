@@ -9,9 +9,9 @@
 //! are then handled by the SPA.
 //!
 //! # Async traits
-//! To use this library, the user has to implement certrain traits (e.g.: [LoadUserByCredentials](crate::login::LoadUserByCredentials)) and most of them
-//! are async. To make the implementation easier and less verbose, these traits use the [async_trait](https://crates.io/crates/async-trait) crate. Unfortunately, this makes the docs a bit messy, so the
-//! original trait definition is provided in the trait's documentation.
+//! To use this library, the user has to implement certrain traits (e.g.: [MfaHandleMfaRequest](crate::mfa::HandleMfaRequest)) and most of them
+//! are async. To make the implementation easier and less verbose, these traits use the [async_trait](https://crates.io/crates/async-trait) crate. Unfortunately, this makes the docs a bit messy, so all this
+//! traits provide an example.
 //!
 //! *The library is still in the early stages and a work in progress so it can contain security flaws. Please report them or provide a PR: [Authfix Repo](https://github.com/Hypnagokali/authfix)*
 //!
@@ -43,7 +43,6 @@
 //!
 //! // LoadUsersByCredentials uses async_trait, so its needed when implementing the trait for AuthenticationService
 //! // async_trait is re-exported by authfix.
-//! #[async_trait]
 //! impl LoadUserByCredentials for AuthenticationService {
 //!     type User = User;
 //!

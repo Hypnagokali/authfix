@@ -35,6 +35,7 @@ rqrr = "0.9"
 image = "0.25"
 chrono = "0.4"
 env_logger = "0.11"
+lazy_static = "1.5.0"
 authfix = { path = ".", features = ["authenticator", "mfa_send_code"] } 
 
 [features]
