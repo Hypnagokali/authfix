@@ -42,7 +42,6 @@ impl HandleMfaRequest for LoadMfa {
 
 struct ThreeUserService;
 
-#[async_trait]
 impl LoadUserByCredentials for ThreeUserService {
     type User = UserWithMfa;
 

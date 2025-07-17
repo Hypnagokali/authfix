@@ -1,7 +1,6 @@
 use std::{net::SocketAddr, thread};
 
 use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
-use async_trait::async_trait;
 use authfix::{
     login::{LoadUserByCredentials, LoadUserError, LoginToken},
     session::{app_builder::SessionLoginAppBuilder, AccountInfo},
@@ -19,7 +18,6 @@ struct User {
 
 struct LoadUser;
 
-#[async_trait]
 impl LoadUserByCredentials for LoadUser {
     type User = User;
 

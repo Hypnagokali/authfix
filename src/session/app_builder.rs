@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{rc::Rc, sync::Arc};
 
 use actix_session::{
     storage::{CookieSessionStore, SessionStore},
@@ -12,7 +12,7 @@ use actix_web::{
 };
 
 use crate::{
-    login::LoadUserByCredentials,
+    login::{FailureHandler, LoadUserByCredentials, SuccessHandler},
     mfa::MfaConfig,
     middleware::{AuthMiddleware, PathMatcher},
     session::SessionUser,
@@ -30,6 +30,8 @@ where
     session_middleware: SessionMiddleware<ST>,
     path_matcher: PathMatcher,
     load_user_service: Arc<S>,
+    error_handler: Rc<Option<Box<dyn FailureHandler>>>,
+    success_handler: Rc<Option<Box<dyn SuccessHandler<User = U>>>>,
     mfa_config: MfaConfig<U>,
     routes: Routes,
     redirect_flow: bool,
@@ -47,6 +49,46 @@ where
             mfa_config,
             routes: self.routes,
             load_user_service: self.load_user_service,
+            error_handler: self.error_handler,
+            success_handler: self.success_handler,
+            session_middleware: self.session_middleware,
+            redirect_flow: self.redirect_flow,
+        }
+    }
+
+    pub fn set_login_failure_handler<H>(
+        self,
+        login_failure_handler: H,
+    ) -> SessionLoginAppBuilder<U, S, ST>
+    where
+        H: FailureHandler + 'static,
+    {
+        Self {
+            path_matcher: self.path_matcher,
+            mfa_config: self.mfa_config,
+            routes: self.routes,
+            load_user_service: self.load_user_service,
+            error_handler: Rc::new(Some(Box::new(login_failure_handler))),
+            success_handler: self.success_handler,
+            session_middleware: self.session_middleware,
+            redirect_flow: self.redirect_flow,
+        }
+    }
+
+    pub fn set_login_success_handler<H>(
+        self,
+        login_success_handler: H,
+    ) -> SessionLoginAppBuilder<U, S, ST>
+    where
+        H: SuccessHandler<User = U> + 'static,
+    {
+        Self {
+            path_matcher: self.path_matcher,
+            mfa_config: self.mfa_config,
+            routes: self.routes,
+            load_user_service: self.load_user_service,
+            error_handler: self.error_handler,
+            success_handler: Rc::new(Some(Box::new(login_success_handler))),
             session_middleware: self.session_middleware,
             redirect_flow: self.redirect_flow,
         }
@@ -58,6 +100,8 @@ where
             mfa_config: self.mfa_config,
             routes: self.routes,
             load_user_service: self.load_user_service,
+            error_handler: self.error_handler,
+            success_handler: self.success_handler,
             session_middleware: self.session_middleware,
             redirect_flow: true,
         }
@@ -89,6 +133,8 @@ where
             mfa_config: self.mfa_config,
             routes: login_routes,
             load_user_service: self.load_user_service,
+            error_handler: self.error_handler,
+            success_handler: self.success_handler,
             redirect_flow: self.redirect_flow,
         }
     }
@@ -111,6 +157,8 @@ where
             mfa_config: self.mfa_config,
             routes: login_routes,
             load_user_service: self.load_user_service,
+            error_handler: self.error_handler,
+            success_handler: self.success_handler,
             redirect_flow: self.redirect_flow,
         }
     }
@@ -148,6 +196,8 @@ where
         };
 
         provider.set_redirect_flow(self.redirect_flow);
+        provider.set_error_handler_from_rc(self.error_handler);
+        provider.set_success_handler_from_rc(self.success_handler);
 
         let middleware = AuthMiddleware::<_, U>::new(provider, self.path_matcher);
 
@@ -204,6 +254,8 @@ where
             path_matcher: Routes::default().into(),
             session_middleware,
             load_user_service,
+            error_handler: Rc::new(None),
+            success_handler: Rc::new(None),
             mfa_config: MfaConfig::empty(),
             routes: Routes::default(),
             redirect_flow: false,

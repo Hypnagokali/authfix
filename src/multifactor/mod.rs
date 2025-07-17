@@ -39,9 +39,6 @@ impl Default for GetTotpSecretError {
     }
 }
 
-// ToDo:
-// Split Factor in two traits:
-// one should be public, the other needs to be pub (crate) to hide is_condition_met() and generate_code()
 pub trait Factor {
     /// Responsible for generating the code and sending it to the user. Currently its needed to retrieve the user from the request
     fn generate_code(

@@ -1,7 +1,6 @@
 use std::{net::SocketAddr, thread};
 
 use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
-use async_trait::async_trait;
 use authfix::{
     login::LoadUserByCredentials,
     session::{app_builder::SessionLoginAppBuilder, config::Routes},
@@ -14,7 +13,6 @@ mod test_utils;
 
 struct AcceptEveryoneLoginService;
 
-#[async_trait]
 impl LoadUserByCredentials for AcceptEveryoneLoginService {
     type User = User;
 
