@@ -25,7 +25,7 @@ pub struct Routes {
     inner: Rc<RoutesInner>,
 }
 
-pub struct RoutesInner {
+struct RoutesInner {
     login: String,
     logout: String,
     mfa: String,
