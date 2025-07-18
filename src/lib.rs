@@ -9,7 +9,7 @@
 //! are then handled by the SPA.
 //!
 //! # Async traits
-//! To use this library, the user has to implement certrain traits (e.g.: [MfaHandleMfaRequest](crate::mfa::HandleMfaRequest)) and most of them
+//! To use this library, the user has to implement certrain traits (e.g.: [MfaHandleMfaRequest](crate::multifactor::config::HandleMfaRequest)) and most of them
 //! are async. To make the implementation easier and less verbose, these traits use the [async_trait](https://crates.io/crates/async-trait) crate. Unfortunately, this makes the docs a bit messy, so all this
 //! traits provide an example.
 //!
