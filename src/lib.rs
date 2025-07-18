@@ -1,5 +1,5 @@
 //! # Authfix
-//! Authfix makes it easy to add an authentication layer to Actix Web.
+//! Authfix makes it easy to add an authentication layer to an Actix Web app.
 //!
 //! It provides a middleware with which secured paths can be defined globally. It also provides an extractor ([AuthToken]) that can be used to
 //! retrieve the currently logged in user.
@@ -13,9 +13,13 @@
 //! are async. To make the implementation easier and less verbose, these traits use the [async_trait](https://crates.io/crates/async-trait) crate. Unfortunately, this makes the docs a bit messy, so all this
 //! traits provide an example.
 //!
+//! # Disclaimer
 //! *The library is still in the early stages and a work in progress so it can contain security flaws. Please report them or provide a PR: [Authfix Repo](https://github.com/Hypnagokali/authfix)*
 //!
 //! # Examples
+//! ## Example Repository
+//! see: [authfix-examples](https://github.com/Hypnagokali/authfix-examples)
+//! 
 //! ## Session based authentication
 //! The session based authentication is based on: [Actix Session](https://docs.rs/actix-session/latest/actix_session/). Authfix re-exports actix_session, you don't need it as a dependency.
 //! ```no_run
@@ -41,8 +45,6 @@
 //! // Struct that handles the authentication
 //! struct AuthenticationService;
 //!
-//! // LoadUsersByCredentials uses async_trait, so its needed when implementing the trait for AuthenticationService
-//! // async_trait is re-exported by authfix.
 //! impl LoadUserByCredentials for AuthenticationService {
 //!     type User = User;
 //!
@@ -98,9 +100,9 @@ use std::{
 pub mod errors;
 pub mod helper;
 pub mod login;
-pub mod mfa;
 pub mod middleware;
 pub mod multifactor;
+pub mod factor_impl;
 pub mod session;
 
 // re-exports
@@ -160,9 +162,19 @@ where
 ///     ))
 /// }
 /// ```
-#[derive(Clone)]
 pub struct AuthToken<U> {
     inner: Rc<RefCell<AuthTokenInner<U>>>,
+}
+
+impl<U> Clone for AuthToken<U>
+where
+    U: 'static,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner: Rc::clone(&self.inner),
+        }
+    }
 }
 
 impl<U> AuthToken<U> {
@@ -238,8 +250,14 @@ where
 }
 
 /// Extension to get the [AuthToken] from [HttpRequest]
-/// ```ignore
+/// ```no_run
+/// use actix_web::HttpRequest;
 /// use authfix::AuthTokenExt;
+/// use serde::Deserialize;
+/// #[derive(Deserialize)]
+/// struct User {
+///    email: String
+/// }
 ///
 /// fn some_function(req: actix_web::HttpRequest) -> bool {
 ///     req.get_auth_token::<User>().is_some()

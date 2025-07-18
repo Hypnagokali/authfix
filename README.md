@@ -44,8 +44,8 @@ use authfix::{
 };
 use serde::{Deserialize, Serialize};
 
-// A user intended for session authentication must derive or implement Clone, Serialize, and Deserialize.
-#[derive(Clone, Serialize, Deserialize)]
+// A user intended for session authentication must derive or implement Serialize, and Deserialize.
+#[derive(Serialize, Deserialize)]
 struct User {
     name: String,
 }

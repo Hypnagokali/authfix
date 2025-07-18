@@ -8,12 +8,7 @@ use std::{
 use actix_web::{cookie::Key, get, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    login::{FailureHandler, HandlerError, SuccessHandler},
-    mfa::{HandleMfaRequest, MfaConfig, MfaError},
-    multifactor::random_code_auth::{
-        CodeSendError, CodeSender, MfaRandomCode, RandomCode, MFA_ID_RANDOM_CODE,
-    },
-    session::app_builder::SessionLoginAppBuilder,
+    factor_impl::random_code_auth::{CodeSendError, CodeSender, MfaRandomCodeFactor, RandomCode}, login::{FailureHandler, HandlerError, SuccessHandler}, multifactor::config::{HandleMfaRequest, MfaConfig, MfaError}, session::app_builder::SessionLoginAppBuilder
 };
 use reqwest::{redirect::Policy, Client, StatusCode};
 
@@ -95,7 +90,7 @@ impl HandleMfaRequest for OnlyRandomCodeFactor {
     }
 
     async fn get_mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
-        Ok(Some(MFA_ID_RANDOM_CODE.to_owned()))
+        Ok(Some(MfaRandomCodeFactor::id().to_owned()))
     }
 }
 
@@ -232,7 +227,7 @@ fn start_test_server(addr: SocketAddr) {
                 let key = Key::generate();
 
                 HttpServer::new(move || {
-                    let code_factor = Box::new(MfaRandomCode::new(
+                    let code_factor = Box::new(MfaRandomCodeFactor::new(
                         || {
                             RandomCode::new(
                                 "123",

@@ -12,10 +12,7 @@ use actix_web::{
 };
 
 use crate::{
-    login::{FailureHandler, LoadUserByCredentials, SuccessHandler},
-    mfa::MfaConfig,
-    middleware::{AuthMiddleware, PathMatcher},
-    session::SessionUser,
+    login::{FailureHandler, LoadUserByCredentials, SuccessHandler}, middleware::{AuthMiddleware, PathMatcher}, multifactor::config::MfaConfig, session::SessionUser
 };
 
 use super::{config::Routes, handlers::SessionApiHandlers, session_auth::SessionAuthProvider};

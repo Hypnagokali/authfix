@@ -31,5 +31,5 @@ pub trait AccountInfo {
 /// This is a helper trait to bundle all necessary traits needed by a user
 ///
 /// Don't implement it, just derive Serialize, Deserialize from serde, Clone from std and implement AccountInfo
-pub trait SessionUser: AccountInfo + Serialize + DeserializeOwned + Clone {}
-impl<T> SessionUser for T where T: AccountInfo + Serialize + DeserializeOwned + Clone {}
+pub trait SessionUser: AccountInfo + Serialize + DeserializeOwned {}
+impl<T> SessionUser for T where T: AccountInfo + Serialize + DeserializeOwned {}

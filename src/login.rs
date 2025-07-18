@@ -28,9 +28,10 @@ pub trait LoadUserByCredentials {
 /// ```no_run
 /// use authfix::async_trait;
 /// use actix_web::HttpRequest;
-/// use authfix::HandlerError;
-/// use authfix::SuccessHandler;
+/// use authfix::login::HandlerError;
+/// use authfix::login::SuccessHandler;
 /// struct MySuccessHandler;
+/// struct YourUser;
 ///
 /// #[async_trait(?Send)]
 /// impl SuccessHandler for MySuccessHandler {
@@ -54,13 +55,12 @@ pub trait SuccessHandler {
 /// ```no_run
 /// use authfix::async_trait;
 /// use actix_web::HttpRequest;
-/// use authfix::HandlerError;
-/// use authfix::FailureHandler;
+/// use authfix::login::HandlerError;
+/// use authfix::login::FailureHandler;
 /// struct MyFailureHandler;
 ///
 /// #[async_trait(?Send)]
 /// impl FailureHandler for MyFailureHandler {
-///    type User = YourUser;
 ///    async fn on_failure(&self, req: HttpRequest) -> Result<(), HandlerError> {
 ///         // do something meaningful
 ///         Ok(())

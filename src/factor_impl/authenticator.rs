@@ -6,27 +6,51 @@ use std::{
 };
 
 use actix_web::{HttpMessage, HttpRequest};
+use async_trait::async_trait;
 use google_authenticator::GoogleAuthenticator;
 use rand::RngCore;
 use thiserror::Error;
 
 use crate::{
-    multifactor::{CheckCodeError, Factor, GenerateCodeError, TotpSecretRepository},
+    multifactor::factor::{CheckCodeError, Factor, GenerateCodeError},
     AuthToken,
 };
 
 /// ID to reference authenticator mfa
 pub const MFA_ID_AUTHENTICATOR_TOTP: &str = "TOTP_MFA";
 
+#[async_trait]
+pub trait TotpSecretRepository<U> {
+    async fn get_auth_secret(&self, user: &U) -> Result<String, GetTotpSecretError>;
+}
+
+#[derive(Error, Debug)]
+#[error("Retrieving TOTP secret failed: {msg}")]
+pub struct GetTotpSecretError {
+    msg: String,
+}
+
+impl GetTotpSecretError {
+    pub fn new(msg: &str) -> Self {
+        Self {
+            msg: msg.to_owned(),
+        }
+    }
+}
+
+impl Default for GetTotpSecretError {
+    fn default() -> Self {
+        Self {
+            msg: "Cannot get secret".to_owned(),
+        }
+    }
+}
+
+
 /// Authenticator authentication
 ///
 /// Uses [TotpSecretRepository<U>] to retrieve the shared secret
-/// Set discrepancy (in seconds) to accept codes from another time slice, for example in the case of possible clock differences
-///
-/// # Examples
-/// ```ignore
-/// // Needs new example
-/// ```
+/// Set discrepancy (in seconds) to accept codes from another time slice, for example in the case of possible clock differences.
 pub struct AuthenticatorFactor<T, U> {
     totp_secret_repo: Arc<T>,
     discrepancy: u64,
@@ -59,7 +83,7 @@ impl AuthenticatorFactor<(), ()> {
 impl<T, U> Factor for AuthenticatorFactor<T, U>
 where
     T: TotpSecretRepository<U> + 'static,
-    U: Clone + 'static,
+    U: 'static,
 {
     fn generate_code(
         &self,
@@ -88,7 +112,7 @@ where
         let code_to_check = code.to_owned();
         let discrepancy = self.discrepancy;
         Box::pin(async move {
-            let u = token_to_check.get_authenticated_user().clone();
+            let u = token_to_check.get_authenticated_user();
             repo.get_auth_secret(&u)
                 .await
                 .map(|secret| {
@@ -182,9 +206,8 @@ impl Authenticator {
 pub mod tests {
     use google_authenticator::GoogleAuthenticator;
 
-    use crate::multifactor::authenticator::{
-        Authenticator, AuthenticatorFactor, MFA_ID_AUTHENTICATOR_TOTP,
-    };
+
+    use crate::factor_impl::authenticator::{Authenticator, AuthenticatorFactor, MFA_ID_AUTHENTICATOR_TOTP};
 
     use super::TotpSecretGenerator;
 

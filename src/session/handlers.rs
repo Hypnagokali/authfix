@@ -12,9 +12,8 @@ use crate::{
         FailureHandler, HandlerError, LoadUserByCredentials, LoadUserError, LoginToken,
         SuccessHandler,
     },
-    mfa::MfaConfig,
     middleware::PathMatcher,
-    multifactor::{CheckCodeError, GenerateCodeError},
+    multifactor::{config::MfaConfig, factor::{CheckCodeError, GenerateCodeError}},
     session::SessionUser,
     AuthToken,
 };

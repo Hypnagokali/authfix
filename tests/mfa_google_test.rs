@@ -3,13 +3,7 @@ use std::{net::SocketAddr, sync::Arc, thread};
 use actix_web::{cookie::Key, get, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    mfa::{HandleMfaRequest, MfaConfig, MfaError},
-    multifactor::{
-        authenticator::{AuthenticatorFactor, MFA_ID_AUTHENTICATOR_TOTP},
-        Factor,
-    },
-    session::app_builder::SessionLoginAppBuilder,
-    AuthToken,
+    factor_impl::authenticator::AuthenticatorFactor, multifactor::{config::{HandleMfaRequest, MfaConfig, MfaError}, factor::Factor}, session::app_builder::SessionLoginAppBuilder, AuthToken
 };
 
 use google_authenticator::GoogleAuthenticator;
@@ -25,7 +19,7 @@ impl HandleMfaRequest for OnlyAuthenticatorFactor {
     type User = User;
 
     async fn get_mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
-        Ok(Some(MFA_ID_AUTHENTICATOR_TOTP.to_owned()))
+        Ok(Some(AuthenticatorFactor::id().to_owned()))
     }
 
     async fn is_condition_met(&self, user: &Self::User, _req: HttpRequest) -> bool {
@@ -187,6 +181,7 @@ fn start_test_server(addr: SocketAddr) {
                 let totp_secret_repo = Arc::new(TotpTestRepo);
 
                 let app_closure = move || {
+                    
                     let factor: Box<dyn Factor> =
                         Box::new(AuthenticatorFactor::<_, User>::with_discrepancy(
                             Arc::clone(&totp_secret_repo),

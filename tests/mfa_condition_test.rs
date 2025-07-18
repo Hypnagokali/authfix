@@ -6,13 +6,7 @@ use actix_web::{
 };
 use async_trait::async_trait;
 use authfix::{
-    mfa::{HandleMfaRequest, MfaConfig, MfaError},
-    multifactor::{
-        random_code_auth::{MfaRandomCode, MFA_ID_RANDOM_CODE},
-        Factor,
-    },
-    session::app_builder::SessionLoginAppBuilder,
-    AuthToken,
+    factor_impl::random_code_auth::MfaRandomCodeFactor, multifactor::{config::{HandleMfaRequest, MfaConfig, MfaError}, factor::Factor}, session::app_builder::SessionLoginAppBuilder, AuthToken
 };
 use reqwest::{Client, StatusCode};
 use test_utils::{single_code_generator, DoNotSendCode, HardCodedLoadUserService, User};
@@ -26,7 +20,7 @@ impl HandleMfaRequest for LoadMfa {
     type User = User;
 
     async fn get_mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
-        Ok(Some(MFA_ID_RANDOM_CODE.to_owned()))
+        Ok(Some(MfaRandomCodeFactor::id().to_owned()))
     }
 
     async fn is_condition_met(&self, user: &Self::User, req: HttpRequest) -> bool {
@@ -117,7 +111,7 @@ fn start_test_server(addr: SocketAddr) {
             .block_on(async {
                 let sender = Arc::new(DoNotSendCode);
                 let app_closure = move || {
-                    let rand_code: Box<dyn Factor> = Box::new(MfaRandomCode::new(
+                    let rand_code: Box<dyn Factor> = Box::new(MfaRandomCodeFactor::new(
                         single_code_generator,
                         Arc::clone(&sender),
                     ));
