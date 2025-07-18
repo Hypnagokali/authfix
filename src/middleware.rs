@@ -27,7 +27,7 @@ const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 /// But if you have more public pages and you would like to secure just a few paths, you can set the `is_exclusion_list` flag to `false` to specify only the secured paths.
 /// ```no_run
 /// use authfix::middleware::PathMatcher;
-/// 
+///
 /// fn main() {
 ///     PathMatcher::new(vec!["/my-secure-route", "another-secure-route"], false);
 /// }

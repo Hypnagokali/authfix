@@ -6,7 +6,13 @@ use actix_web::{
 };
 use async_trait::async_trait;
 use authfix::{
-    factor_impl::random_code_auth::MfaRandomCodeFactor, multifactor::{config::{HandleMfaRequest, MfaConfig, MfaError}, factor::Factor}, session::app_builder::SessionLoginAppBuilder, AuthToken
+    factor_impl::random_code_auth::MfaRandomCodeFactor,
+    multifactor::{
+        config::{HandleMfaRequest, MfaConfig, MfaError},
+        factor::Factor,
+    },
+    session::app_builder::SessionLoginAppBuilder,
+    AuthToken,
 };
 use reqwest::{Client, StatusCode};
 use test_utils::{single_code_generator, DoNotSendCode, HardCodedLoadUserService, User};

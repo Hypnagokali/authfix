@@ -46,7 +46,6 @@ impl Default for GetTotpSecretError {
     }
 }
 
-
 /// Authenticator authentication
 ///
 /// Uses [TotpSecretRepository<U>] to retrieve the shared secret
@@ -206,8 +205,9 @@ impl Authenticator {
 pub mod tests {
     use google_authenticator::GoogleAuthenticator;
 
-
-    use crate::factor_impl::authenticator::{Authenticator, AuthenticatorFactor, MFA_ID_AUTHENTICATOR_TOTP};
+    use crate::factor_impl::authenticator::{
+        Authenticator, AuthenticatorFactor, MFA_ID_AUTHENTICATOR_TOTP,
+    };
 
     use super::TotpSecretGenerator;
 

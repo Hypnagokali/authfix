@@ -133,12 +133,10 @@ impl UnauthorizedRedirect {
 }
 
 #[derive(Debug, Clone)]
-// I wrapped the error type into an Rc, because the token response Result<AuthToken<U>, UnauthorizedError> could be cached
-// and needs to be cloned
 pub struct UnauthorizedError(Rc<UnauthorizedErrorInner>);
 
 #[derive(Debug)]
-pub struct UnauthorizedErrorInner {
+struct UnauthorizedErrorInner {
     message: String,
     redirect: Option<UnauthorizedRedirect>,
 }

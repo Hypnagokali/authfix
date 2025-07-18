@@ -14,7 +14,7 @@ use crate::middleware::PathMatcher;
 /// ```no_run
 /// use authfix::middleware::PathMatcher;
 /// use authfix::session::config::Routes;
-/// 
+///
 /// fn main() {
 ///     let path_matcher: PathMatcher = Routes::new("/auth", "/login", "/mfa", "/logout").into();
 /// }
@@ -40,7 +40,7 @@ impl Routes {
                 logout: create_uri(prefix, logout),
                 mfa: create_uri(prefix, mfa),
                 default_redirect: normalize_uri_part("/"),
-            })
+            }),
         }
     }
 
@@ -52,7 +52,7 @@ impl Routes {
                 logout: self.inner.logout.clone(),
                 mfa: self.inner.mfa.clone(),
                 default_redirect: normalize_uri_part(redirect),
-            })
+            }),
         }
     }
 

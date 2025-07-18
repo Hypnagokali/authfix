@@ -3,7 +3,14 @@ use std::{net::SocketAddr, sync::Arc, thread};
 use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    factor_impl::{authenticator::AuthenticatorFactor, random_code_auth::MfaRandomCodeFactor}, login::{LoadUserByCredentials, LoadUserError, LoginToken}, multifactor::{config::{HandleMfaRequest, MfaConfig, MfaError}, factor::Factor}, session::{app_builder::SessionLoginAppBuilder, AccountInfo}, AuthToken
+    factor_impl::{authenticator::AuthenticatorFactor, random_code_auth::MfaRandomCodeFactor},
+    login::{LoadUserByCredentials, LoadUserError, LoginToken},
+    multifactor::{
+        config::{HandleMfaRequest, MfaConfig, MfaError},
+        factor::Factor,
+    },
+    session::{app_builder::SessionLoginAppBuilder, AccountInfo},
+    AuthToken,
 };
 
 use google_authenticator::GoogleAuthenticator;

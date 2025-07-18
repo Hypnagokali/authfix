@@ -11,7 +11,7 @@ use std::rc::Rc;
 use thiserror::Error;
 
 ///  Handles the MFA request
-/// 
+///
 /// # Example
 /// ```no_run
 /// use authfix::async_trait;
@@ -21,7 +21,7 @@ use thiserror::Error;
 /// use authfix::factor_impl::authenticator::AuthenticatorFactor;
 /// struct MyMfaHandler;
 /// struct YourUser;
-/// 
+///
 /// #[async_trait(?Send)]
 /// impl HandleMfaRequest for MyMfaHandler {
 ///     type User = YourUser;
@@ -36,7 +36,7 @@ use thiserror::Error;
 ///         // Maybe you want to check if the user has a cookie set
 ///         true
 ///     }
-/// 
+///
 ///     // you can omit this method. This is the default implementation:
 ///     async fn handle_success(&self, user: &Self::User, mut res: HttpResponseBuilder) -> HttpResponseBuilder {
 ///         // Maybe you want to set a cookie here

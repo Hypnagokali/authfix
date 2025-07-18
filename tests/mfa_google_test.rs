@@ -3,7 +3,13 @@ use std::{net::SocketAddr, sync::Arc, thread};
 use actix_web::{cookie::Key, get, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    factor_impl::authenticator::AuthenticatorFactor, multifactor::{config::{HandleMfaRequest, MfaConfig, MfaError}, factor::Factor}, session::app_builder::SessionLoginAppBuilder, AuthToken
+    factor_impl::authenticator::AuthenticatorFactor,
+    multifactor::{
+        config::{HandleMfaRequest, MfaConfig, MfaError},
+        factor::Factor,
+    },
+    session::app_builder::SessionLoginAppBuilder,
+    AuthToken,
 };
 
 use google_authenticator::GoogleAuthenticator;
@@ -181,7 +187,6 @@ fn start_test_server(addr: SocketAddr) {
                 let totp_secret_repo = Arc::new(TotpTestRepo);
 
                 let app_closure = move || {
-                    
                     let factor: Box<dyn Factor> =
                         Box::new(AuthenticatorFactor::<_, User>::with_discrepancy(
                             Arc::clone(&totp_secret_repo),

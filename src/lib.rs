@@ -5,8 +5,15 @@
 //! retrieve the currently logged in user.
 //!
 //! # Session Authentication
-//! Currently, only session authentication is supported (OIDC is planned). It is designed to work with Single Page Applications, so it offers a JSON API for login, logout and mfa verification. Redirects
-//! are then handled by the SPA.
+//! Currently, only session authentication is supported (OIDC is planned). The session authentication can be configured in two modes.
+//!
+//! 1. API based (defdault)
+//!     - It is designed to work with Single Page Applications, so it offers a JSON API for login, logout and mfa verification. Redirects
+//!       are then handled by the SPA.
+//! 2. Redirect based
+//!     - Instead of returning 401 for unauthorized requests, it redirects the user to the login page. The login flow is completely handled by the browser.
+//!       The redirects are going to the same routes as defined in [Routes](crate::session::config::Routes).
+//!       To activate this mode, set `with_redirect_flow()` in [SessionLoginAppBuilder](crate::session::app_builder::SessionLoginAppBuilder).
 //!
 //! # Async traits
 //! To use this library, the user has to implement certrain traits (e.g.: [MfaHandleMfaRequest](crate::multifactor::config::HandleMfaRequest)) and most of them
@@ -19,7 +26,7 @@
 //! # Examples
 //! ## Example Repository
 //! see: [authfix-examples](https://github.com/Hypnagokali/authfix-examples)
-//! 
+//!
 //! ## Session based authentication
 //! The session based authentication is based on: [Actix Session](https://docs.rs/actix-session/latest/actix_session/). Authfix re-exports actix_session, you don't need it as a dependency.
 //! ```no_run
@@ -98,11 +105,11 @@ use std::{
 };
 
 pub mod errors;
+pub mod factor_impl;
 pub mod helper;
 pub mod login;
 pub mod middleware;
 pub mod multifactor;
-pub mod factor_impl;
 pub mod session;
 
 // re-exports
@@ -153,9 +160,16 @@ where
 /// If you inject [AuthToken] in a route that is not secured (a public route), it will respond with 500.
 ///
 /// # Example:
-/// ```ignore
+/// ```no_run
+/// use actix_web::{get, HttpResponse, Responder};
+/// use authfix::AuthToken;
+///
+/// struct User {
+///    email: String,
+/// }
+///
 /// #[get("/secured-route")]
-/// pub async fn secured_route(token: AuthToken<User>) -> impl Responder {
+/// async fn secured_route(token: AuthToken<User>) -> impl Responder {
 ///     HttpResponse::Ok().body(format!(
 ///         "Request from user: {}",
 ///         token.get_authenticated_user().email

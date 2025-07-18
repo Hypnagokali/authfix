@@ -1,6 +1,11 @@
 use async_trait::async_trait;
 use authfix::{
-    factor_impl::{authenticator::{GetTotpSecretError, TotpSecretRepository}, random_code_auth::{CodeSendError, CodeSender, RandomCode}}, login::{LoadUserByCredentials, LoadUserError, LoginToken}, session::{AccountInfo, SessionUser}
+    factor_impl::{
+        authenticator::{GetTotpSecretError, TotpSecretRepository},
+        random_code_auth::{CodeSendError, CodeSender, RandomCode},
+    },
+    login::{LoadUserByCredentials, LoadUserError, LoginToken},
+    session::{AccountInfo, SessionUser},
 };
 use chrono::{Local, TimeDelta};
 use serde::{Deserialize, Serialize};

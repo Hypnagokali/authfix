@@ -1,2 +1,2 @@
-pub mod factor;
 pub mod config;
+pub mod factor;

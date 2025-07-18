@@ -8,7 +8,6 @@ use thiserror::Error;
 
 use crate::multifactor::factor::{CheckCodeError, Factor, GenerateCodeError};
 
-
 /// ID to reference random code mfa
 pub const MFA_ID_RANDOM_CODE: &str = "RNDCODE";
 
@@ -184,7 +183,6 @@ fn cleanup_and_time_is_up_error(session: &Session) -> CheckCodeError {
 #[cfg(test)]
 mod tests {
     use crate::factor_impl::random_code_auth::{MfaRandomCodeFactor, MFA_ID_RANDOM_CODE};
-
 
     #[test]
     fn test_static_id() {

@@ -13,7 +13,10 @@ use crate::{
         SuccessHandler,
     },
     middleware::PathMatcher,
-    multifactor::{config::MfaConfig, factor::{CheckCodeError, GenerateCodeError}},
+    multifactor::{
+        config::MfaConfig,
+        factor::{CheckCodeError, GenerateCodeError},
+    },
     session::SessionUser,
     AuthToken,
 };
