@@ -18,7 +18,7 @@ use thiserror::Error;
 /// use actix_web::{HttpRequest, HttpResponseBuilder};
 /// use authfix::multifactor::config::{HandleMfaRequest, MfaError};
 /// use authfix::multifactor::factor::Factor;
-/// use authfix::factor_impl::authenticator::AuthenticatorFactor;
+/// use authfix::multifactor::factor_impl::authenticator::AuthenticatorFactor;
 /// struct MyMfaHandler;
 /// struct YourUser;
 ///

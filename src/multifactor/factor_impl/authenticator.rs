@@ -205,7 +205,7 @@ impl Authenticator {
 pub mod tests {
     use google_authenticator::GoogleAuthenticator;
 
-    use crate::factor_impl::authenticator::{
+    use crate::multifactor::factor_impl::authenticator::{
         Authenticator, AuthenticatorFactor, MFA_ID_AUTHENTICATOR_TOTP,
     };
 

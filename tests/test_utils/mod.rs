@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use authfix::{
-    factor_impl::{
+    multifactor::factor_impl::{
         authenticator::{GetTotpSecretError, TotpSecretRepository},
         random_code_auth::{CodeSendError, CodeSender, RandomCode},
     },

@@ -3,7 +3,7 @@ use std::{net::SocketAddr, sync::Arc, thread};
 use actix_web::{cookie::Key, get, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    factor_impl::{authenticator::AuthenticatorFactor, random_code_auth::MfaRandomCodeFactor},
+    multifactor::factor_impl::{authenticator::AuthenticatorFactor, random_code_auth::MfaRandomCodeFactor},
     login::{LoadUserByCredentials, LoadUserError, LoginToken},
     multifactor::{
         config::{HandleMfaRequest, MfaConfig, MfaError},

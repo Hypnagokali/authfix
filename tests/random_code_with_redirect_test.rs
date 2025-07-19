@@ -8,7 +8,7 @@ use std::{
 use actix_web::{cookie::Key, get, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    factor_impl::random_code_auth::{CodeSendError, CodeSender, MfaRandomCodeFactor, RandomCode},
+    multifactor::factor_impl::random_code_auth::{CodeSendError, CodeSender, MfaRandomCodeFactor, RandomCode},
     multifactor::config::{HandleMfaRequest, MfaConfig, MfaError},
     session::app_builder::SessionLoginAppBuilder,
 };

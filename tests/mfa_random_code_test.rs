@@ -8,7 +8,7 @@ use actix_session::{storage::CookieSessionStore, SessionExt, SessionMiddleware};
 use actix_web::{cookie::Key, get, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    factor_impl::random_code_auth::{CodeSendError, CodeSender, MfaRandomCodeFactor, RandomCode},
+    multifactor::factor_impl::random_code_auth::{CodeSendError, CodeSender, MfaRandomCodeFactor, RandomCode},
     middleware::{AuthMiddleware, PathMatcher},
     multifactor::config::{HandleMfaRequest, MfaConfig, MfaError},
     session::{config::Routes, handlers::SessionApiHandlers, session_auth::SessionAuthProvider},

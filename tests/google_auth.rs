@@ -1,6 +1,6 @@
 use std::fs;
 
-use authfix::factor_impl::authenticator::TotpSecretGenerator;
+use authfix::multifactor::factor_impl::authenticator::TotpSecretGenerator;
 use image::GrayImage;
 use resvg::{tiny_skia, usvg};
 use test_utils::{test_out_path, TEST_OUT};
