@@ -367,14 +367,18 @@ async fn generate_code_if_mfa_necessary<U: SessionUser>(
 
     let mut mfa_needed = false;
 
-    if let Some(factor) = mfa_config.get_factor_by_user(user).await {
-        if mfa_config.is_condition_met(user, req.clone()).await {
+    if mfa_config.is_condition_met(user, req.clone()).await {
+        if let Some(factor) = mfa_config.get_factor_by_user(user).await {
             factor.generate_code(req).await?;
             session.needs_mfa(&factor.get_unique_id())?;
             mfa_needed = true;
+        } else {
+            return Err(SessionApiLoginError::ServerError(
+                format!("MFA challenge error: No factor found for user: {}", user.get_user_identification()),
+            ));
         }
     }
-
+     
     Ok(mfa_needed)
 }
 
