@@ -195,12 +195,6 @@ where
     fn configure_request(&self, extensions: &mut Extensions) {
         extensions.insert(Rc::clone(&self.mfa_config));
         extensions.insert(Arc::clone(&self.load_user));
-
-        println!(
-            "Success handler available: {}",
-            self.success_handler.is_some()
-        );
-
         extensions.insert(Rc::clone(&self.error_handler));
         extensions.insert(Rc::clone(&self.success_handler));
     }

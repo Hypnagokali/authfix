@@ -305,7 +305,6 @@ async fn should_redirect_to_login_with_error_if_credentials_wrong() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::FOUND);
     let location_header = res.headers().get("location").unwrap().to_str().unwrap();
-    println!("{location_header}");
     assert!(location_header.contains("/login"));
     assert!(location_header.contains("error"));
     assert!(location_header.contains("redirect_uri=%2Fsecured-route%3Fsome%3Dvalue"));

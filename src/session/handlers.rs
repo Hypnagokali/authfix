@@ -46,8 +46,11 @@ use super::{config::Routes, session_auth::LoginSession};
 ///
 /// #[get("/login")]
 /// async fn login(query: Query<LoginError>) -> impl Responder {
-///    println!("Hasen: {}", query.is_error());
-///    HttpResponse::Ok().body("...")
+///     if query.is_error() {
+///        println!("Login failed");
+///     }
+/// 
+///     HttpResponse::Ok().body("...")
 /// }
 /// ```
 #[derive(Deserialize)]
@@ -378,7 +381,7 @@ async fn generate_code_if_mfa_necessary<U: SessionUser>(
             ));
         }
     }
-     
+
     Ok(mfa_needed)
 }
 

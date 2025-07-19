@@ -1,6 +1,6 @@
 use std::{net::SocketAddr, sync::Arc, thread};
 
-use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
+use actix_web::{cookie::Key, get, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
     factor_impl::{authenticator::AuthenticatorFactor, random_code_auth::MfaRandomCodeFactor},
@@ -36,6 +36,10 @@ impl HandleMfaRequest for LoadMfa {
 
     async fn get_mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError> {
         Ok(user.mfa.clone())
+    }
+
+    async fn is_condition_met(&self, user: &Self::User, _: HttpRequest) -> bool {
+        user.mfa.is_some()
     }
 }
 
