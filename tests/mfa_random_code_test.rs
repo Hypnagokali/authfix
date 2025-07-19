@@ -14,7 +14,7 @@ use authfix::{
     session::{config::Routes, handlers::SessionApiHandlers, session_auth::SessionAuthProvider},
     AuthToken,
 };
-use chrono::{DateTime, Duration, Local, TimeDelta};
+use chrono::{Duration, Local, TimeDelta};
 use reqwest::{Client, StatusCode};
 use test_utils::{HardCodedLoadUserService, User};
 
@@ -266,16 +266,8 @@ struct DummySender;
 
 #[async_trait]
 impl CodeSender for DummySender {
-    async fn send_code(&self, code: RandomCode) -> Result<(), CodeSendError> {
-        let st = code.valid_until().to_owned();
-        let date_time: DateTime<Local> = st.into();
-        let now = Local::now();
-        let minutes = date_time.signed_duration_since(now).num_minutes() + 1; // +1 because the first minute is only a fraction
-        println!(
-            "Please enter code: {}, it is valid for {} minutes",
-            code.value(),
-            minutes
-        );
+    async fn send_code(&self, _: RandomCode) -> Result<(), CodeSendError> {
+        // send code
         Ok(())
     }
 }
