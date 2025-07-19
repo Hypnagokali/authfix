@@ -79,7 +79,7 @@ impl LoadUserByCredentials for AuthenticationService {
 // You have access to the user via the AuthToken extractor in secured routes.
 #[get("/secured")]
 async fn secured(auth_token: AuthToken<User>) -> impl Responder {
-    let user = auth_token.get_authenticated_user();
+    let user = auth_token.authenticated_user();
     HttpResponse::Ok().json(&*user)
 }
 

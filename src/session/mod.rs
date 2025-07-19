@@ -11,9 +11,9 @@ use serde::{de::DeserializeOwned, Serialize};
 ///
 /// There is only a semantic difference between disabling a user or locking the account.
 /// In both cases, the user cannot log in.
-/// `get_user_identification` is used for logging.
+/// `user_identification` is used for logging.
 pub trait AccountInfo {
-    fn get_user_identification(&self) -> String {
+    fn user_identification(&self) -> String {
         "user_identification is not implemented".to_owned()
     }
 

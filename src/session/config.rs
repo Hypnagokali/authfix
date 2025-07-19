@@ -5,7 +5,7 @@ use crate::middleware::PathMatcher;
 
 /// Configuration for the auth related API endpoints: login, logout, verify MFA
 ///
-/// The default implementation gives: "/login", "/login/mfa" and "/logout"
+/// The default implementation sets: "/login", "/login/mfa" and "/logout"
 /// ```ignore
 /// let routes = Routes::default();
 /// ```
@@ -56,24 +56,24 @@ impl Routes {
         }
     }
 
-    pub fn get_default_redirect(&self) -> &str {
+    pub fn default_redirect(&self) -> &str {
         &self.inner.default_redirect
     }
 
-    pub fn get_login(&self) -> &str {
+    pub fn login(&self) -> &str {
         &self.inner.login
     }
-    pub fn get_logout(&self) -> &str {
+    pub fn logout(&self) -> &str {
         &self.inner.logout
     }
-    pub fn get_mfa(&self) -> &str {
+    pub fn mfa(&self) -> &str {
         &self.inner.mfa
     }
 }
 
 impl From<Routes> for PathMatcher {
     fn from(value: Routes) -> Self {
-        PathMatcher::new(vec![value.get_login()], true)
+        PathMatcher::new(vec![value.login()], true)
     }
 }
 
@@ -146,7 +146,7 @@ mod test {
     fn should_ignore_empty_prefix() {
         let routes = Routes::new("", "/login", "/mfa", "/logout");
 
-        assert_eq!(routes.get_login(), "/login");
+        assert_eq!(routes.login(), "/login");
     }
 
     #[test]

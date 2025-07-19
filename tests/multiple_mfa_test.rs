@@ -34,7 +34,7 @@ struct LoadMfa;
 impl HandleMfaRequest for LoadMfa {
     type User = UserWithMfa;
 
-    async fn get_mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError> {
+    async fn mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError> {
         Ok(user.mfa.clone())
     }
 

@@ -25,7 +25,7 @@ struct LoadMfa;
 impl HandleMfaRequest for LoadMfa {
     type User = User;
 
-    async fn get_mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
+    async fn mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
         Ok(Some(MfaRandomCodeFactor::id().to_owned()))
     }
 

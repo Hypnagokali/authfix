@@ -24,7 +24,7 @@ struct OnlyAuthenticatorFactor;
 impl HandleMfaRequest for OnlyAuthenticatorFactor {
     type User = User;
 
-    async fn get_mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
+    async fn mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
         Ok(Some(AuthenticatorFactor::id().to_owned()))
     }
 
@@ -37,7 +37,7 @@ impl HandleMfaRequest for OnlyAuthenticatorFactor {
 pub async fn secured_route(token: AuthToken<User>) -> impl Responder {
     HttpResponse::Ok().body(format!(
         "Request from user: {}",
-        token.get_authenticated_user().email
+        token.authenticated_user().email
     ))
 }
 

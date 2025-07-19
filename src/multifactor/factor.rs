@@ -11,7 +11,7 @@ pub trait Factor {
         req: &HttpRequest,
     ) -> Pin<Box<dyn Future<Output = Result<(), GenerateCodeError>>>>;
     /// Identifier for the Factor. Can be any String it only needs to be unique inside the app
-    fn get_unique_id(&self) -> String;
+    fn unique_id(&self) -> String;
     /// checks the code and returns empty Ok if code is correct, an Error otherwise
     fn check_code(
         &self,

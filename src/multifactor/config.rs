@@ -26,7 +26,7 @@ use thiserror::Error;
 /// impl HandleMfaRequest for MyMfaHandler {
 ///     type User = YourUser;
 ///
-///     async fn get_mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError> {
+///     async fn mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError> {
 ///         // if the user uses an authenticator
 ///        Ok(Some(AuthenticatorFactor::id().to_owned()))
 ///     }
@@ -48,7 +48,7 @@ use thiserror::Error;
 pub trait HandleMfaRequest {
     type User;
 
-    async fn get_mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError>;
+    async fn mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError>;
 
     #[allow(unused)]
     async fn is_condition_met(&self, user: &Self::User, req: HttpRequest) -> bool {
@@ -154,7 +154,7 @@ where
         self.inner.is_some()
     }
 
-    pub fn get_timeout_in_seconds(&self) -> u64 {
+    pub fn timeout_in_seconds(&self) -> u64 {
         if let Some(inner) = self.inner.as_ref() {
             inner.timeout
         } else {
@@ -181,10 +181,10 @@ where
         }
     }
 
-    pub async fn get_factor_by_user(&self, user: &U) -> Option<&Box<dyn Factor>> {
+    pub async fn factor_by_user(&self, user: &U) -> Option<&Box<dyn Factor>> {
         if let Some(inner) = self.inner.as_ref() {
-            match inner.handle_mfa.get_mfa_id_by_user(user).await {
-                Ok(Some(mfa)) => inner.factors.iter().find(|f| f.get_unique_id() == mfa),
+            match inner.handle_mfa.mfa_id_by_user(user).await {
+                Ok(Some(mfa)) => inner.factors.iter().find(|f| f.unique_id() == mfa),
                 _ => None,
             }
         } else {

@@ -119,7 +119,7 @@ where
         })
     }
 
-    fn get_unique_id(&self) -> String {
+    fn unique_id(&self) -> String {
         MFA_ID_RANDOM_CODE.to_owned()
     }
 

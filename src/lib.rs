@@ -71,7 +71,7 @@
 //! // You have access to the user via the AuthToken extractor in secured routes.
 //! #[get("/secured")]
 //! async fn secured(auth_token: AuthToken<User>) -> impl Responder {
-//!     let user = auth_token.get_authenticated_user();
+//!     let user = auth_token.authenticated_user();
 //!     HttpResponse::Ok().json(&*user)
 //! }
 //!
@@ -125,7 +125,7 @@ where
 {
     /// Tries to retrieve the logged in user or fails with [UnauthorizedError]
     /// Returns a Future because its likely that this method can be used for calling an external service
-    fn get_auth_token(
+    fn try_get_auth_token(
         &self,
         service_request: &ServiceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
@@ -171,7 +171,7 @@ where
 /// async fn secured_route(token: AuthToken<User>) -> impl Responder {
 ///     HttpResponse::Ok().body(format!(
 ///         "Request from user: {}",
-///         token.get_authenticated_user().email
+///         token.authenticated_user().email
 ///     ))
 /// }
 /// ```
@@ -192,7 +192,7 @@ where
 
 impl<U> AuthToken<U> {
     /// Returns a reference to the logged in user.
-    pub fn get_authenticated_user(&self) -> Ref<U> {
+    pub fn authenticated_user(&self) -> Ref<U> {
         Ref::map(self.inner.borrow(), |inner| &inner.user)
     }
 
@@ -273,15 +273,15 @@ where
 /// }
 ///
 /// fn some_function(req: actix_web::HttpRequest) -> bool {
-///     req.get_auth_token::<User>().is_some()
+///     req.auth_token::<User>().is_some()
 /// }
 /// ```
 pub trait AuthTokenExt {
-    fn get_auth_token<U: 'static>(&self) -> Option<AuthToken<U>>;
+    fn auth_token<U: 'static>(&self) -> Option<AuthToken<U>>;
 }
 
 impl AuthTokenExt for HttpRequest {
-    fn get_auth_token<U: 'static>(&self) -> Option<AuthToken<U>> {
+    fn auth_token<U: 'static>(&self) -> Option<AuthToken<U>> {
         let ext = self.extensions();
         ext.get::<AuthToken<U>>()
             .map(|auth_token_ref| AuthToken::from_ref(auth_token_ref))

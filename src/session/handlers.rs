@@ -174,7 +174,7 @@ where
     }
 
     /// Returns the config that can be used by Actix Web to register the handlers
-    pub fn get_config(self) -> impl FnOnce(&mut ServiceConfig) {
+    pub fn config(self) -> impl FnOnce(&mut ServiceConfig) {
         let routes = web::Data::new(Arc::clone(&self.routes));
 
         |config: &mut ServiceConfig| {
@@ -205,7 +205,7 @@ pub struct MfaRequestBody {
 }
 
 impl MfaRequestBody {
-    pub fn get_code(&self) -> &str {
+    pub fn code(&self) -> &str {
         &self.code
     }
 }
@@ -223,7 +223,7 @@ async fn logout_form<U: SessionUser>(
     token.invalidate();
 
     redirect_response_builder()
-        .insert_header((LOCATION, routes.get_login()))
+        .insert_header((LOCATION, routes.login()))
         .finish()
 }
 
@@ -261,8 +261,8 @@ async fn mfa_route_form<U: SessionUser>(
     routes: Data<Arc<Routes>>,
     session: LoginSession,
 ) -> Result<impl Responder, Error> {
-    let user_ident = match session.get_user::<U>() {
-        Some(u) => u.get_user_identification(),
+    let user_ident = match session.user::<U>() {
+        Some(u) => u.user_identification(),
         None => "Unknown user".to_owned(),
     };
 
@@ -295,7 +295,7 @@ async fn mfa_route_form<U: SessionUser>(
                 Ok(redirect_response_builder()
                     .insert_header((
                         LOCATION,
-                        format!("{}?{}", routes.get_mfa(), query.to_string()),
+                        format!("{}?{}", routes.mfa(), query.to_string()),
                     ))
                     .finish())
             }
@@ -326,17 +326,17 @@ async fn mfa_internal<U: SessionUser>(
         return Err(CheckCodeError::FinallyRejected.into());
     }
 
-    if session.get_user::<U>().is_none() {
+    if session.user::<U>().is_none() {
         handle_error(error_handler, req).await?;
         return Err(SessionApiMfaError::BadRequest(
             "Mfa route called but no user was present in LoginSession".to_owned(),
         ));
     }
 
-    let user: U = session.get_user().unwrap();
+    let user: U = session.user().unwrap();
 
-    if let Some(f) = mfa_config.get_factor_by_user(&user).await {
-        match f.check_code(body.get_code(), &req).await {
+    if let Some(f) = mfa_config.factor_by_user(&user).await {
+        match f.check_code(body.code(), &req).await {
             Ok(_) => {}
             Err(e) => {
                 handle_error(error_handler, req).await?;
@@ -370,14 +370,14 @@ async fn generate_code_if_mfa_necessary<U: SessionUser>(
     let mut mfa_needed = false;
 
     if mfa_config.is_condition_met(user, req.clone()).await {
-        if let Some(factor) = mfa_config.get_factor_by_user(user).await {
+        if let Some(factor) = mfa_config.factor_by_user(user).await {
             factor.generate_code(req).await?;
-            session.needs_mfa(&factor.get_unique_id())?;
+            session.set_needs_mfa(&factor.unique_id())?;
             mfa_needed = true;
         } else {
             session.destroy();
             return Err(SessionApiLoginError::ServerError(
-                format!("MFA challenge error: No factor found for user: {}", user.get_user_identification()),
+                format!("MFA challenge error: No factor found for user: {}", user.user_identification()),
             ));
         }
     }
@@ -400,14 +400,14 @@ async fn login_internal<T: LoadUserByCredentials<User = U>, U: SessionUser>(
             if user.is_user_disabled() {
                 return Err(SessionApiLoginError::Unauthorized(format!(
                     "User '{}' attempt to login but the user is disabled",
-                    user.get_user_identification()
+                    user.user_identification()
                 )));
             }
 
             if user.is_account_locked() {
                 return Err(SessionApiLoginError::Unauthorized(format!(
                     "User '{}' attempt to login but the account is locked",
-                    user.get_user_identification()
+                    user.user_identification()
                 )));
             }
 
@@ -419,10 +419,10 @@ async fn login_internal<T: LoadUserByCredentials<User = U>, U: SessionUser>(
             } else {
                 // set timeout for login session
                 if let Some(validity) = SystemTime::now()
-                    .checked_add(Duration::from_secs(mfa_config.get_timeout_in_seconds()))
+                    .checked_add(Duration::from_secs(mfa_config.timeout_in_seconds()))
                 {
                     session.valid_until(validity)?;
-                    if let Some(mfa_id) = session.get_mfa_id() {
+                    if let Some(mfa_id) = session.mfa_id() {
                         login_res = LoginSessionResponse::needs_mfa(&mfa_id);
                     } else {
                         return Err(SessionApiLoginError::ServerError(
@@ -477,7 +477,7 @@ async fn login_form<T: LoadUserByCredentials<User = U>, U: SessionUser>(
             let mut query: HttpQuery = req.query_string().into();
             query.insert_without_value("error");
             UnauthorizedError::new_redirect(UnauthorizedRedirect::new_with_query_string(
-                routes.get_login(),
+                routes.login(),
                 query,
             ))
             .into()
@@ -495,7 +495,7 @@ async fn login_form<T: LoadUserByCredentials<User = U>, U: SessionUser>(
         Ok(redirect_response_builder()
             .insert_header((
                 LOCATION,
-                format!("{}?{}", routes.get_mfa(), query.to_string()),
+                format!("{}?{}", routes.mfa(), query.to_string()),
             ))
             .finish())
     } else {
@@ -550,15 +550,15 @@ where
     U: SessionUser + 'static,
 {
     fn register(self, config: &mut AppService) {
-        let mut mfa_resource = Resource::new(self.routes.get_mfa())
+        let mut mfa_resource = Resource::new(self.routes.mfa())
             .name("mfa")
             .guard(Post());
 
-        let mut login_resource = Resource::new(self.routes.get_login())
+        let mut login_resource = Resource::new(self.routes.login())
             .name("login")
             .guard(Post());
 
-        let mut logout_resource = Resource::new(self.routes.get_logout())
+        let mut logout_resource = Resource::new(self.routes.logout())
             .name("logout")
             .guard(Post());
 
@@ -583,16 +583,16 @@ fn build_login_success_redirect(mut query: HttpQuery, routes: Data<Arc<Routes>>)
         .remove("redirect_uri")
         .and_then(|uri| urlencoding::decode(&uri).ok().map(|s| s.into_owned()))
         .map(|uri| {
-            if PathMatcher::are_equal(&uri, routes.get_login())
-                || PathMatcher::are_equal(&uri, routes.get_mfa())
-                || PathMatcher::are_equal(&uri, routes.get_logout())
+            if PathMatcher::are_equal(&uri, routes.login())
+                || PathMatcher::are_equal(&uri, routes.mfa())
+                || PathMatcher::are_equal(&uri, routes.logout())
             {
                 "/".to_owned()
             } else {
                 uri
             }
         })
-        .unwrap_or(routes.get_default_redirect().to_owned())
+        .unwrap_or(routes.default_redirect().to_owned())
 }
 
 async fn handle_success<U>(

@@ -129,9 +129,9 @@ where
     ) -> SessionLoginAppBuilder<U, S, ST> {
         let mut path_matcher: PathMatcher = PathMatcher::new(
             vec![
-                login_routes.get_logout(),
-                login_routes.get_mfa(),
-                login_routes.get_logout(),
+                login_routes.logout(),
+                login_routes.mfa(),
+                login_routes.logout(),
             ],
             false,
         );
@@ -212,7 +212,7 @@ where
         let middleware = AuthMiddleware::<_, U>::new(provider, self.path_matcher);
 
         App::new()
-            .configure(handler.get_config())
+            .configure(handler.config())
             .wrap(middleware)
             .wrap(self.session_middleware)
     }

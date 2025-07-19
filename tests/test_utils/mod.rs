@@ -59,7 +59,7 @@ impl<U> TotpSecretRepository<U> for TotpTestRepo
 where
     U: SessionUser,
 {
-    async fn get_auth_secret(&self, _user: &U) -> Result<String, GetTotpSecretError> {
+    async fn auth_secret(&self, _user: &U) -> Result<String, GetTotpSecretError> {
         Ok(SECRET.to_owned())
     }
 }

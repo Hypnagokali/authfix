@@ -200,7 +200,7 @@ where
 
             Box::pin(async move {
                 // Before request: get AuthToken or respond with 401 or 302 (if redirect flow is set up)
-                let token = auth_provider.get_auth_token(&req).await?;
+                let token = auth_provider.try_get_auth_token(&req).await?;
 
                 {
                     let mut extensions = req.extensions_mut();

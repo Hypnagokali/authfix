@@ -38,7 +38,7 @@ struct OnlyRandomCodeFactor;
 impl HandleMfaRequest for OnlyRandomCodeFactor {
     type User = User;
 
-    async fn get_mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
+    async fn mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
         Ok(Some(MfaRandomCodeFactor::id().to_owned()))
     }
 }
@@ -281,7 +281,7 @@ pub async fn secured_route(token: AuthToken<User>, req: HttpRequest) -> impl Res
         .unwrap_or("na".to_owned());
     HttpResponse::Ok().body(format!(
         "User: {}, privateValue: {}",
-        token.get_authenticated_user().email,
+        token.authenticated_user().email,
         pv
     ))
 }
@@ -330,7 +330,7 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
                         .service(secured_route)
                         .configure(
                             SessionApiHandlers::<HardCodedLoadUserService, User>::default()
-                                .get_config(),
+                                .config(),
                         )
                         .wrap(AuthMiddleware::<_, User>::new(
                             SessionAuthProvider::new_with_mfa(
