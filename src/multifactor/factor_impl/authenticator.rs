@@ -108,7 +108,7 @@ where
 
         let token_to_check = AuthToken::from_ref(token);
         let repo = Arc::clone(&self.totp_secret_repo);
-        let code_to_check = code.to_owned();
+        let code_to_check = code.trim().to_owned();
         let discrepancy = self.discrepancy;
         Box::pin(async move {
             let u = token_to_check.get_authenticated_user();

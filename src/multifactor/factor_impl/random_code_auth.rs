@@ -66,7 +66,8 @@ impl RandomCode {
     }
 }
 
-/// Random code implementation of [Factor]
+/// Random code implementation of [Factor] 
+/// *Currently it works only with session based authentication.*
 ///
 /// Takes in a function that should generate a random code and [CodeSender]
 /// The generated code is then saved in the Session.
@@ -128,7 +129,7 @@ where
         req: &HttpRequest,
     ) -> std::pin::Pin<Box<dyn Future<Output = Result<(), CheckCodeError>>>> {
         let session = req.get_session();
-        let owned_code = code.to_owned();
+        let owned_code = code.trim().to_owned();
 
         Box::pin(async move {
             let random_code = session
