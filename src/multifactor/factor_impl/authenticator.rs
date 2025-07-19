@@ -6,27 +6,50 @@ use std::{
 };
 
 use actix_web::{HttpMessage, HttpRequest};
+use async_trait::async_trait;
 use google_authenticator::GoogleAuthenticator;
 use rand::RngCore;
 use thiserror::Error;
 
 use crate::{
-    multifactor::{CheckCodeError, Factor, GenerateCodeError, TotpSecretRepository},
+    multifactor::factor::{CheckCodeError, Factor, GenerateCodeError},
     AuthToken,
 };
 
 /// ID to reference authenticator mfa
 pub const MFA_ID_AUTHENTICATOR_TOTP: &str = "TOTP_MFA";
 
+#[async_trait]
+pub trait TotpSecretRepository<U> {
+    async fn auth_secret(&self, user: &U) -> Result<String, GetTotpSecretError>;
+}
+
+#[derive(Error, Debug)]
+#[error("Retrieving TOTP secret failed: {msg}")]
+pub struct GetTotpSecretError {
+    msg: String,
+}
+
+impl GetTotpSecretError {
+    pub fn new(msg: &str) -> Self {
+        Self {
+            msg: msg.to_owned(),
+        }
+    }
+}
+
+impl Default for GetTotpSecretError {
+    fn default() -> Self {
+        Self {
+            msg: "Cannot get secret".to_owned(),
+        }
+    }
+}
+
 /// Authenticator authentication
 ///
 /// Uses [TotpSecretRepository<U>] to retrieve the shared secret
-/// Set discrepancy (in seconds) to accept codes from another time slice, for example in the case of possible clock differences
-///
-/// # Examples
-/// ```ignore
-/// // Needs new example
-/// ```
+/// Set discrepancy (in seconds) to accept codes from another time slice, for example in the case of possible clock differences.
 pub struct AuthenticatorFactor<T, U> {
     totp_secret_repo: Arc<T>,
     discrepancy: u64,
@@ -59,7 +82,7 @@ impl AuthenticatorFactor<(), ()> {
 impl<T, U> Factor for AuthenticatorFactor<T, U>
 where
     T: TotpSecretRepository<U> + 'static,
-    U: Clone + 'static,
+    U: 'static,
 {
     fn generate_code(
         &self,
@@ -85,11 +108,11 @@ where
 
         let token_to_check = AuthToken::from_ref(token);
         let repo = Arc::clone(&self.totp_secret_repo);
-        let code_to_check = code.to_owned();
+        let code_to_check = code.trim().to_owned();
         let discrepancy = self.discrepancy;
         Box::pin(async move {
-            let u = token_to_check.get_authenticated_user().clone();
-            repo.get_auth_secret(&u)
+            let u = token_to_check.authenticated_user();
+            repo.auth_secret(&u)
                 .await
                 .map(|secret| {
                     if Authenticator::verify(&secret, &code_to_check, discrepancy) {
@@ -107,7 +130,7 @@ where
         })
     }
 
-    fn get_unique_id(&self) -> String {
+    fn unique_id(&self) -> String {
         MFA_ID_AUTHENTICATOR_TOTP.to_owned()
     }
 }
@@ -138,12 +161,12 @@ impl TotpSecretGenerator {
         base32::encode(base32::Alphabet::Rfc4648 { padding: false }, &secret_bytes)
     }
 
-    pub fn get_secret(&self) -> &str {
+    pub fn secret(&self) -> &str {
         &self.secret
     }
 
     /// Generate a QR-Code as SVG for 6 digit codes
-    pub fn get_qr_code(&self) -> Result<String, SecretCodeGenerationError> {
+    pub fn qr_code(&self) -> Result<String, SecretCodeGenerationError> {
         let otpauth_value = format!(
             "otpauth://totp/{}:{}?secret={}&issuer={}&digits=6",
             self.app_name, self.users_email, self.secret, self.app_name
@@ -182,7 +205,7 @@ impl Authenticator {
 pub mod tests {
     use google_authenticator::GoogleAuthenticator;
 
-    use crate::multifactor::authenticator::{
+    use crate::multifactor::factor_impl::authenticator::{
         Authenticator, AuthenticatorFactor, MFA_ID_AUTHENTICATOR_TOTP,
     };
 
@@ -205,7 +228,7 @@ pub mod tests {
     #[test]
     fn twenty_bytes_should_have_32_chars_in_base32() {
         let generator = TotpSecretGenerator::new("my_app", "johnson");
-        let secret = generator.get_secret();
+        let secret = generator.secret();
 
         assert_eq!(secret.len(), 32);
     }
@@ -213,10 +236,10 @@ pub mod tests {
     #[test]
     fn codes_should_not_be_equal() {
         let generator = TotpSecretGenerator::new("my_app", "eli");
-        let secret1 = generator.get_secret();
+        let secret1 = generator.secret();
 
         let gen2 = TotpSecretGenerator::new("my_app", "eli");
-        let secret2 = gen2.get_secret();
+        let secret2 = gen2.secret();
 
         assert_ne!(secret1, secret2);
     }
@@ -224,7 +247,7 @@ pub mod tests {
     #[test]
     fn should_generate_svg_with_200px() {
         let generator = TotpSecretGenerator::new("TestApp", "john.doe@example.org");
-        let qr_code = generator.get_qr_code().unwrap();
+        let qr_code = generator.qr_code().unwrap();
 
         let start_svg =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg width=\"200\" height=\"200\"";

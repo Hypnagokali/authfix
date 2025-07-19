@@ -8,10 +8,8 @@ use std::{
 use actix_web::{cookie::Key, get, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    mfa::{HandleMfaRequest, MfaConfig, MfaError},
-    multifactor::random_code_auth::{
-        CodeSendError, CodeSender, MfaRandomCode, RandomCode, MFA_ID_RANDOM_CODE,
-    },
+    multifactor::factor_impl::random_code_auth::{CodeSendError, CodeSender, MfaRandomCodeFactor, RandomCode},
+    multifactor::config::{HandleMfaRequest, MfaConfig, MfaError},
     session::app_builder::SessionLoginAppBuilder,
 };
 use reqwest::{redirect::Policy, Client, StatusCode};
@@ -30,8 +28,8 @@ impl HandleMfaRequest for OnlyRandomCodeFactor {
         user.email == "anna@example.org"
     }
 
-    async fn get_mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
-        Ok(Some(MFA_ID_RANDOM_CODE.to_owned()))
+    async fn mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
+        Ok(Some(MfaRandomCodeFactor::id().to_owned()))
     }
 }
 
@@ -307,7 +305,6 @@ async fn should_redirect_to_login_with_error_if_credentials_wrong() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::FOUND);
     let location_header = res.headers().get("location").unwrap().to_str().unwrap();
-    println!("{location_header}");
     assert!(location_header.contains("/login"));
     assert!(location_header.contains("error"));
     assert!(location_header.contains("redirect_uri=%2Fsecured-route%3Fsome%3Dvalue"));
@@ -355,7 +352,7 @@ fn start_test_server(addr: SocketAddr) {
                 let key = Key::generate();
 
                 HttpServer::new(move || {
-                    let code_factor = Box::new(MfaRandomCode::new(
+                    let code_factor = Box::new(MfaRandomCodeFactor::new(
                         || {
                             RandomCode::new(
                                 "123",

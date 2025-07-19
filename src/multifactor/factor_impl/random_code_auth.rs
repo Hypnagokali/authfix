@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::{CheckCodeError, Factor, GenerateCodeError};
+use crate::multifactor::factor::{CheckCodeError, Factor, GenerateCodeError};
 
 /// ID to reference random code mfa
 pub const MFA_ID_RANDOM_CODE: &str = "RNDCODE";
@@ -66,16 +66,17 @@ impl RandomCode {
     }
 }
 
-/// Random code implementation of [Factor]
+/// Random code implementation of [Factor] 
+/// *Currently it works only with session based authentication.*
 ///
 /// Takes in a function that should generate a random code and [CodeSender]
 /// The generated code is then saved in the Session.
-pub struct MfaRandomCode<T> {
+pub struct MfaRandomCodeFactor<T> {
     code_generator: fn() -> RandomCode,
     code_sender: Arc<T>,
 }
 
-impl<T: CodeSender> MfaRandomCode<T> {
+impl<T: CodeSender> MfaRandomCodeFactor<T> {
     pub fn new(code_generator: fn() -> RandomCode, code_sender: Arc<T>) -> Self {
         Self {
             code_generator,
@@ -84,13 +85,13 @@ impl<T: CodeSender> MfaRandomCode<T> {
     }
 }
 
-impl MfaRandomCode<()> {
+impl MfaRandomCodeFactor<()> {
     pub fn id() -> String {
         MFA_ID_RANDOM_CODE.to_owned()
     }
 }
 
-impl<T: CodeSender> Factor for MfaRandomCode<T>
+impl<T: CodeSender> Factor for MfaRandomCodeFactor<T>
 where
     T: CodeSender + 'static,
 {
@@ -118,7 +119,7 @@ where
         })
     }
 
-    fn get_unique_id(&self) -> String {
+    fn unique_id(&self) -> String {
         MFA_ID_RANDOM_CODE.to_owned()
     }
 
@@ -128,7 +129,7 @@ where
         req: &HttpRequest,
     ) -> std::pin::Pin<Box<dyn Future<Output = Result<(), CheckCodeError>>>> {
         let session = req.get_session();
-        let owned_code = code.to_owned();
+        let owned_code = code.trim().to_owned();
 
         Box::pin(async move {
             let random_code = session
@@ -182,10 +183,10 @@ fn cleanup_and_time_is_up_error(session: &Session) -> CheckCodeError {
 
 #[cfg(test)]
 mod tests {
-    use crate::multifactor::random_code_auth::{MfaRandomCode, MFA_ID_RANDOM_CODE};
+    use crate::multifactor::factor_impl::random_code_auth::{MfaRandomCodeFactor, MFA_ID_RANDOM_CODE};
 
     #[test]
     fn test_static_id() {
-        assert_eq!(MfaRandomCode::id(), MFA_ID_RANDOM_CODE);
+        assert_eq!(MfaRandomCodeFactor::id(), MFA_ID_RANDOM_CODE);
     }
 }

@@ -11,9 +11,9 @@ use serde::{de::DeserializeOwned, Serialize};
 ///
 /// There is only a semantic difference between disabling a user or locking the account.
 /// In both cases, the user cannot log in.
-/// `get_user_identification` is used for logging.
+/// `user_identification` is used for logging.
 pub trait AccountInfo {
-    fn get_user_identification(&self) -> String {
+    fn user_identification(&self) -> String {
         "user_identification is not implemented".to_owned()
     }
 
@@ -31,5 +31,5 @@ pub trait AccountInfo {
 /// This is a helper trait to bundle all necessary traits needed by a user
 ///
 /// Don't implement it, just derive Serialize, Deserialize from serde, Clone from std and implement AccountInfo
-pub trait SessionUser: AccountInfo + Serialize + DeserializeOwned + Clone {}
-impl<T> SessionUser for T where T: AccountInfo + Serialize + DeserializeOwned + Clone {}
+pub trait SessionUser: AccountInfo + Serialize + DeserializeOwned {}
+impl<T> SessionUser for T where T: AccountInfo + Serialize + DeserializeOwned {}

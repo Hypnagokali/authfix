@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 use authfix::{
-    login::{LoadUserByCredentials, LoadUserError, LoginToken},
-    multifactor::{
+    multifactor::factor_impl::{
+        authenticator::{GetTotpSecretError, TotpSecretRepository},
         random_code_auth::{CodeSendError, CodeSender, RandomCode},
-        GetTotpSecretError, TotpSecretRepository,
     },
+    login::{LoadUserByCredentials, LoadUserError, LoginToken},
     session::{AccountInfo, SessionUser},
 };
 use chrono::{Local, TimeDelta};
@@ -25,7 +25,7 @@ pub fn test_out_path(path: &str) -> String {
 //
 // For login and mfa tests:
 //
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct User {
     pub email: String,
     pub name: String,
@@ -59,7 +59,7 @@ impl<U> TotpSecretRepository<U> for TotpTestRepo
 where
     U: SessionUser,
 {
-    async fn get_auth_secret(&self, _user: &U) -> Result<String, GetTotpSecretError> {
+    async fn auth_secret(&self, _user: &U) -> Result<String, GetTotpSecretError> {
         Ok(SECRET.to_owned())
     }
 }

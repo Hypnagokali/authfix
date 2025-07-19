@@ -44,8 +44,8 @@ use authfix::{
 };
 use serde::{Deserialize, Serialize};
 
-// A user intended for session authentication must derive or implement Clone, Serialize, and Deserialize.
-#[derive(Clone, Serialize, Deserialize)]
+// A user intended for session authentication must derive or implement Serialize, and Deserialize.
+#[derive(Serialize, Deserialize)]
 struct User {
     name: String,
 }
@@ -79,7 +79,7 @@ impl LoadUserByCredentials for AuthenticationService {
 // You have access to the user via the AuthToken extractor in secured routes.
 #[get("/secured")]
 async fn secured(auth_token: AuthToken<User>) -> impl Responder {
-    let user = auth_token.get_authenticated_user();
+    let user = auth_token.authenticated_user();
     HttpResponse::Ok().json(&*user)
 }
 

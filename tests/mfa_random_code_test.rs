@@ -8,15 +8,13 @@ use actix_session::{storage::CookieSessionStore, SessionExt, SessionMiddleware};
 use actix_web::{cookie::Key, get, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    mfa::{HandleMfaRequest, MfaConfig, MfaError},
+    multifactor::factor_impl::random_code_auth::{CodeSendError, CodeSender, MfaRandomCodeFactor, RandomCode},
     middleware::{AuthMiddleware, PathMatcher},
-    multifactor::random_code_auth::{
-        CodeSendError, CodeSender, MfaRandomCode, RandomCode, MFA_ID_RANDOM_CODE,
-    },
+    multifactor::config::{HandleMfaRequest, MfaConfig, MfaError},
     session::{config::Routes, handlers::SessionApiHandlers, session_auth::SessionAuthProvider},
     AuthToken,
 };
-use chrono::{DateTime, Duration, Local, TimeDelta};
+use chrono::{Duration, Local, TimeDelta};
 use reqwest::{Client, StatusCode};
 use test_utils::{HardCodedLoadUserService, User};
 
@@ -40,8 +38,8 @@ struct OnlyRandomCodeFactor;
 impl HandleMfaRequest for OnlyRandomCodeFactor {
     type User = User;
 
-    async fn get_mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
-        Ok(Some(MFA_ID_RANDOM_CODE.to_owned()))
+    async fn mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
+        Ok(Some(MfaRandomCodeFactor::id().to_owned()))
     }
 }
 
@@ -268,16 +266,8 @@ struct DummySender;
 
 #[async_trait]
 impl CodeSender for DummySender {
-    async fn send_code(&self, code: RandomCode) -> Result<(), CodeSendError> {
-        let st = code.valid_until().to_owned();
-        let date_time: DateTime<Local> = st.into();
-        let now = Local::now();
-        let minutes = date_time.signed_duration_since(now).num_minutes() + 1; // +1 because the first minute is only a fraction
-        println!(
-            "Please enter code: {}, it is valid for {} minutes",
-            code.value(),
-            minutes
-        );
+    async fn send_code(&self, _: RandomCode) -> Result<(), CodeSendError> {
+        // send code
         Ok(())
     }
 }
@@ -291,7 +281,7 @@ pub async fn secured_route(token: AuthToken<User>, req: HttpRequest) -> impl Res
         .unwrap_or("na".to_owned());
     HttpResponse::Ok().body(format!(
         "User: {}, privateValue: {}",
-        token.get_authenticated_user().email,
+        token.authenticated_user().email,
         pv
     ))
 }
@@ -332,14 +322,15 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
                     // Hint:
                     // This is the manual configuration of the auth middleware with a session provider and handlers.
 
-                    let code_factor = Box::new(MfaRandomCode::new(generator, Arc::clone(&sender)));
+                    let code_factor =
+                        Box::new(MfaRandomCodeFactor::new(generator, Arc::clone(&sender)));
                     let mfa_config = MfaConfig::new(vec![code_factor], OnlyRandomCodeFactor);
                     let load_user_service = Arc::new(HardCodedLoadUserService);
                     App::new()
                         .service(secured_route)
                         .configure(
                             SessionApiHandlers::<HardCodedLoadUserService, User>::default()
-                                .get_config(),
+                                .config(),
                         )
                         .wrap(AuthMiddleware::<_, User>::new(
                             SessionAuthProvider::new_with_mfa(

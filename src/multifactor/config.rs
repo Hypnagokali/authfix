@@ -1,6 +1,6 @@
 //! This module contains MFA realated types and traits
 
-use crate::multifactor::Factor;
+use crate::multifactor::factor::Factor;
 use actix_web::{
     dev::Payload, FromRequest, HttpMessage, HttpRequest, HttpResponseBuilder, ResponseError,
 };
@@ -11,18 +11,35 @@ use std::rc::Rc;
 use thiserror::Error;
 
 ///  Handles the MFA request
-/// ```ignore
+///
+/// # Example
+/// ```no_run
+/// use authfix::async_trait;
+/// use actix_web::{HttpRequest, HttpResponseBuilder};
+/// use authfix::multifactor::config::{HandleMfaRequest, MfaError};
+/// use authfix::multifactor::factor::Factor;
+/// use authfix::multifactor::factor_impl::authenticator::AuthenticatorFactor;
+/// struct MyMfaHandler;
+/// struct YourUser;
+///
 /// #[async_trait(?Send)]
-/// pub trait HandleMfaRequest {
-///     type User;
+/// impl HandleMfaRequest for MyMfaHandler {
+///     type User = YourUser;
 ///
-///     async fn get_mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError>;
+///     async fn mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError> {
+///         // if the user uses an authenticator
+///        Ok(Some(AuthenticatorFactor::id().to_owned()))
+///     }
 ///
+///     // you can omit this method. This is the default implementation:
 ///     async fn is_condition_met(&self, user: &Self::User, req: HttpRequest) -> bool {
+///         // Maybe you want to check if the user has a cookie set
 ///         true
 ///     }
 ///
-///     async fn handle_success(&self, user: &Self::User, mut res: HttpResponse) -> HttpResponse {
+///     // you can omit this method. This is the default implementation:
+///     async fn handle_success(&self, user: &Self::User, mut res: HttpResponseBuilder) -> HttpResponseBuilder {
+///         // Maybe you want to set a cookie here
 ///         res
 ///     }
 /// }
@@ -31,7 +48,7 @@ use thiserror::Error;
 pub trait HandleMfaRequest {
     type User;
 
-    async fn get_mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError>;
+    async fn mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError>;
 
     #[allow(unused)]
     async fn is_condition_met(&self, user: &Self::User, req: HttpRequest) -> bool {
@@ -78,12 +95,22 @@ struct MfaConfigInner<U> {
     timeout: u64,
 }
 
-#[derive(Clone)]
 pub struct MfaConfig<U>
 where
     U: 'static,
 {
     inner: Rc<Option<MfaConfigInner<U>>>,
+}
+
+impl<U> Clone for MfaConfig<U>
+where
+    U: 'static,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner: Rc::clone(&self.inner),
+        }
+    }
 }
 
 impl<U> MfaConfig<U>
@@ -127,7 +154,7 @@ where
         self.inner.is_some()
     }
 
-    pub fn get_timeout_in_seconds(&self) -> u64 {
+    pub fn timeout_in_seconds(&self) -> u64 {
         if let Some(inner) = self.inner.as_ref() {
             inner.timeout
         } else {
@@ -154,10 +181,10 @@ where
         }
     }
 
-    pub async fn get_factor_by_user(&self, user: &U) -> Option<&Box<dyn Factor>> {
+    pub async fn factor_by_user(&self, user: &U) -> Option<&Box<dyn Factor>> {
         if let Some(inner) = self.inner.as_ref() {
-            match inner.handle_mfa.get_mfa_id_by_user(user).await {
-                Ok(Some(mfa)) => inner.factors.iter().find(|f| f.get_unique_id() == mfa),
+            match inner.handle_mfa.mfa_id_by_user(user).await {
+                Ok(Some(mfa)) => inner.factors.iter().find(|f| f.unique_id() == mfa),
                 _ => None,
             }
         } else {

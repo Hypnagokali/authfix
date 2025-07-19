@@ -1,19 +1,31 @@
 //! General configuration for session auth
+use std::rc::Rc;
+
 use crate::middleware::PathMatcher;
 
 /// Configuration for the auth related API endpoints: login, logout, verify MFA
 ///
-/// The default implementation gives: "/login", "/login/mfa" and "/logout"
+/// The default implementation sets: "/login", "/login/mfa" and "/logout"
 /// ```ignore
 /// let routes = Routes::default();
 /// ```
 ///
 /// Routes implements [From] for [PathMatcher], the resulting PathMatcher is then configured for securing all routes by default.
-/// ```ignore
-/// let path_matcher: PathMatcher = Routes::new("/auth", "/login", "/mfa", "/logout").into();
+/// ```no_run
+/// use authfix::middleware::PathMatcher;
+/// use authfix::session::config::Routes;
+///
+/// fn main() {
+///     let path_matcher: PathMatcher = Routes::new("/auth", "/login", "/mfa", "/logout").into();
+/// }
 /// ```
+
 #[derive(Clone)]
 pub struct Routes {
+    inner: Rc<RoutesInner>,
+}
+
+struct RoutesInner {
     login: String,
     logout: String,
     mfa: String,
@@ -23,51 +35,57 @@ pub struct Routes {
 impl Routes {
     pub fn new(prefix: &str, login: &str, mfa: &str, logout: &str) -> Self {
         Self {
-            login: create_uri(prefix, login),
-            logout: create_uri(prefix, logout),
-            mfa: create_uri(prefix, mfa),
-            default_redirect: normalize_uri_part("/"),
+            inner: Rc::new(RoutesInner {
+                login: create_uri(prefix, login),
+                logout: create_uri(prefix, logout),
+                mfa: create_uri(prefix, mfa),
+                default_redirect: normalize_uri_part("/"),
+            }),
         }
     }
 
     /// Sets the default redirect URI, where the user is redirected after a successful login.
     pub fn set_default_redirect(self, redirect: &str) -> Self {
         Self {
-            login: self.login,
-            logout: self.logout,
-            mfa: self.mfa,
-            default_redirect: normalize_uri_part(redirect),
+            inner: Rc::new(RoutesInner {
+                login: self.inner.login.clone(),
+                logout: self.inner.logout.clone(),
+                mfa: self.inner.mfa.clone(),
+                default_redirect: normalize_uri_part(redirect),
+            }),
         }
     }
 
-    pub fn get_default_redirect(&self) -> &str {
-        &self.default_redirect
+    pub fn default_redirect(&self) -> &str {
+        &self.inner.default_redirect
     }
 
-    pub fn get_login(&self) -> &str {
-        &self.login
+    pub fn login(&self) -> &str {
+        &self.inner.login
     }
-    pub fn get_logout(&self) -> &str {
-        &self.logout
+    pub fn logout(&self) -> &str {
+        &self.inner.logout
     }
-    pub fn get_mfa(&self) -> &str {
-        &self.mfa
+    pub fn mfa(&self) -> &str {
+        &self.inner.mfa
     }
 }
 
 impl From<Routes> for PathMatcher {
     fn from(value: Routes) -> Self {
-        PathMatcher::new(vec![value.get_login()], true)
+        PathMatcher::new(vec![value.login()], true)
     }
 }
 
 impl Default for Routes {
     fn default() -> Self {
         Self {
-            login: "/login".to_owned(),
-            logout: "/logout".to_owned(),
-            mfa: "/login/mfa".to_owned(),
-            default_redirect: normalize_uri_part("/"),
+            inner: Rc::new(RoutesInner {
+                login: "/login".to_owned(),
+                logout: "/logout".to_owned(),
+                mfa: "/login/mfa".to_owned(),
+                default_redirect: normalize_uri_part("/"),
+            }),
         }
     }
 }
@@ -128,7 +146,7 @@ mod test {
     fn should_ignore_empty_prefix() {
         let routes = Routes::new("", "/login", "/mfa", "/logout");
 
-        assert_eq!(routes.get_login(), "/login");
+        assert_eq!(routes.login(), "/login");
     }
 
     #[test]

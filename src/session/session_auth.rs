@@ -19,8 +19,8 @@ use crate::{
     errors::UnauthorizedRedirect,
     helper::redirect_response_builder,
     login::{FailureHandler, LoadUserByCredentials, SuccessHandler},
-    mfa::MfaConfig,
     middleware::PathMatcher,
+    multifactor::config::MfaConfig,
     session::{config::Routes, SessionUser},
     AuthState, AuthToken, AuthenticationProvider, UnauthorizedError,
 };
@@ -116,7 +116,7 @@ where
         self.success_handler = success_handler;
     }
 
-    pub fn get_auth_token_from_session(&self, req: &actix_web::HttpRequest) -> AuthTokenResult<U> {
+    pub fn auth_token_from_session(&self, req: &actix_web::HttpRequest) -> AuthTokenResult<U> {
         // use cached result if available
         if let Some(result) = req.extensions().get::<AuthTokenResult<U>>() {
             return result.clone();
@@ -167,18 +167,18 @@ where
             return None;
         }
 
-        let auth_token_req = self.get_auth_token_from_session(req).ok();
+        let auth_token_req = self.auth_token_from_session(req).ok();
 
         if let Some(token) = auth_token_req {
             if token.is_authenticated()
                 && self.redirect_flow
-                && (PathMatcher::are_equal(self.routes.get_login(), req.path())
-                    || PathMatcher::are_equal(self.routes.get_mfa(), req.path()))
+                && (PathMatcher::are_equal(self.routes.login(), req.path())
+                    || PathMatcher::are_equal(self.routes.mfa(), req.path()))
             {
                 // redirect to "default" if already logged in
                 return Some(
                     redirect_response_builder()
-                        .insert_header((LOCATION, self.routes.get_default_redirect()))
+                        .insert_header((LOCATION, self.routes.default_redirect()))
                         .finish(),
                 );
             }
@@ -188,31 +188,25 @@ where
     }
 
     fn is_request_config_required(&self, req: &HttpRequest) -> bool {
-        PathMatcher::are_equal(self.routes.get_login(), req.path())
-            || PathMatcher::are_equal(self.routes.get_mfa(), req.path())
+        PathMatcher::are_equal(self.routes.login(), req.path())
+            || PathMatcher::are_equal(self.routes.mfa(), req.path())
     }
 
     fn configure_request(&self, extensions: &mut Extensions) {
         extensions.insert(Rc::clone(&self.mfa_config));
         extensions.insert(Arc::clone(&self.load_user));
-
-        println!(
-            "Success handler available: {}",
-            self.success_handler.is_some()
-        );
-
         extensions.insert(Rc::clone(&self.error_handler));
         extensions.insert(Rc::clone(&self.success_handler));
     }
 
-    fn get_auth_token(
+    fn try_get_auth_token(
         &self,
         req: &ServiceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>> {
         let request_path = req.request().path().to_owned();
 
-        let auth_token_req = self.get_auth_token_from_session(req.request());
-        let mfa_route = self.routes.get_mfa().to_owned();
+        let auth_token_req = self.auth_token_from_session(req.request());
+        let mfa_route = self.routes.mfa().to_owned();
 
         let error = build_error(self, req.request());
         Box::pin(async move {
@@ -242,7 +236,7 @@ impl LoginSession {
         self.session.remove(SESSION_KEY_NEED_MFA);
     }
 
-    pub fn needs_mfa(&self, mfa_id: &str) -> Result<(), SessionInsertError> {
+    pub fn set_needs_mfa(&self, mfa_id: &str) -> Result<(), SessionInsertError> {
         self.session.insert(SESSION_KEY_NEED_MFA, mfa_id)
     }
 
@@ -257,7 +251,7 @@ impl LoginSession {
         self.session.insert(SESSION_KEY_USER, user)
     }
 
-    pub fn get_user<U: SessionUser>(&self) -> Option<U> {
+    pub fn user<U: SessionUser>(&self) -> Option<U> {
         match self.session.get::<U>(SESSION_KEY_USER) {
             Ok(Some(user)) => Some(user),
             _ => None,
@@ -279,7 +273,7 @@ impl LoginSession {
         }
     }
 
-    pub fn get_mfa_id(&self) -> Option<String> {
+    pub fn mfa_id(&self) -> Option<String> {
         self.session
             .get::<String>(SESSION_KEY_NEED_MFA)
             .unwrap_or_default()
@@ -333,7 +327,7 @@ where
             .and_then(|v| v.to_str().ok())
             .filter(|v| v.contains("text/html"))
             .map(|_| {
-                let redirect_to_login = session_provider.routes.get_login();
+                let redirect_to_login = session_provider.routes.login();
                 UnauthorizedError::new_redirect(UnauthorizedRedirect::new_with_redirect_uri(
                     redirect_to_login,
                     req.path(),

@@ -25,15 +25,21 @@ const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 /// the user. For this default configuration where all paths are secured except `/login` and `/register` use [`PathMatcher::default`]
 ///
 /// But if you have more public pages and you would like to secure just a few paths, you can set the `is_exclusion_list` flag to `false` to specify only the secured paths.
-/// ```ignore
-/// PathMatcher::new(vec!["/my-secure-route", "another-secure-route"], false)
+/// ```no_run
+/// use authfix::middleware::PathMatcher;
+///
+/// fn main() {
+///     PathMatcher::new(vec!["/my-secure-route", "another-secure-route"], false);
+/// }
 /// ```
 ///
 /// You can use wildcards for path matching like
-/// ```ignore
-/// PathMatcher::new(vec!["/private/*"], false)
+/// ```no_run
+/// use authfix::middleware::PathMatcher;
+/// fn main() {
+///     PathMatcher::new(vec!["/private/*"], false);
+/// }
 /// ```
-#[derive(Clone)]
 pub struct PathMatcher {
     is_exclusion_list: bool,
     path_regex_list: Vec<Regex>,
@@ -123,11 +129,6 @@ fn transform_to_encoded_regex(input: &str) -> String {
 /// Currently only [SessionAuthProvider](crate::session::session_auth::SessionAuthProvider) implements [AuthenticationProvider]. Internally it uses
 /// [Actix Session](https://crates.io/crates/actix-session). For session authentication it is important to wrap the `SessionMiddleware`
 /// after the `AuthMiddleware`, so that the session is created/handled before the `AuthMiddleware`.
-///  
-/// # Examples
-/// coming soon after applying lib in a reference project
-///
-///
 #[derive(Clone)]
 pub struct AuthMiddleware<AuthProvider, U>
 where
@@ -199,7 +200,7 @@ where
 
             Box::pin(async move {
                 // Before request: get AuthToken or respond with 401 or 302 (if redirect flow is set up)
-                let token = auth_provider.get_auth_token(&req).await?;
+                let token = auth_provider.try_get_auth_token(&req).await?;
 
                 {
                     let mut extensions = req.extensions_mut();

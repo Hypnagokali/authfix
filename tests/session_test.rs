@@ -31,7 +31,7 @@ impl LoadUserByCredentials for AcceptEveryoneLoginService {
 pub async fn public_route(token: AuthToken<User>) -> impl Responder {
     HttpResponse::Ok().body(format!(
         "Request from user: {}",
-        token.get_authenticated_user().email
+        token.authenticated_user().email
     ))
 }
 
@@ -39,7 +39,7 @@ pub async fn public_route(token: AuthToken<User>) -> impl Responder {
 pub async fn secured_route(token: AuthToken<User>) -> impl Responder {
     HttpResponse::Ok().body(format!(
         "Request from user: {}",
-        token.get_authenticated_user().email
+        token.authenticated_user().email
     ))
 }
 

@@ -1,6 +1,6 @@
 use std::fs;
 
-use authfix::multifactor::authenticator::TotpSecretGenerator;
+use authfix::multifactor::factor_impl::authenticator::TotpSecretGenerator;
 use image::GrayImage;
 use resvg::{tiny_skia, usvg};
 use test_utils::{test_out_path, TEST_OUT};
@@ -10,8 +10,8 @@ mod test_utils;
 #[test]
 fn should_contain_valid_url() {
     let gen = TotpSecretGenerator::new("TestApp", "john.doe@example.org");
-    let secret = gen.get_secret();
-    let qr_code = gen.get_qr_code().unwrap();
+    let secret = gen.secret();
+    let qr_code = gen.qr_code().unwrap();
 
     let options = usvg::Options::default();
     let tree = usvg::Tree::from_str(&qr_code, &options).unwrap();

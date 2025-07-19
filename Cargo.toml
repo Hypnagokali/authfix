@@ -1,11 +1,24 @@
 [package]
 name = "authfix"
-description = "Authfix adds an authentication layer to Actix Web"
+description = "Authfix offers an easy-to-configure authentication layer for Actix Web."
 authors = ["Stefan Simon <stefan.j.c.simon@gmail.com>"]
-keywords = ["authentication", "session", "actix", "actix-web", "middleware", "auth", "web", "login", "user", "users"]
-exclude = [".gitignore"]
+homepage = "https://github.com/Hypnagokali/authfix"
+repository = "https://github.com/Hypnagokali/authfix"
+keywords = ["authentication", "auth", "session", "actix", "actix-web", "middleware", "security", "login"]
+categories = ["authentication", "web-programming"]
+exclude = [".gitignore", ".github/", "tests/", "target/", "test-out/", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
 version = "0.1.0"
 edition = "2021"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+authenticator = ["dep:google-authenticator", "dep:qrcode-generator", "dep:rand", "dep:base32"]
+mfa_send_code = []
 
 [dependencies]
 actix-web="4.10"
@@ -37,7 +50,3 @@ chrono = "0.4"
 env_logger = "0.11"
 lazy_static = "1.5.0"
 authfix = { path = ".", features = ["authenticator", "mfa_send_code"] } 
-
-[features]
-authenticator = ["dep:google-authenticator", "dep:qrcode-generator", "dep:rand", "dep:base32"]
-mfa_send_code = []

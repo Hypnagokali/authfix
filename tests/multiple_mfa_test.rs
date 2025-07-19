@@ -1,14 +1,13 @@
 use std::{net::SocketAddr, sync::Arc, thread};
 
-use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
+use actix_web::{cookie::Key, get, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
+    multifactor::factor_impl::{authenticator::AuthenticatorFactor, random_code_auth::MfaRandomCodeFactor},
     login::{LoadUserByCredentials, LoadUserError, LoginToken},
-    mfa::{HandleMfaRequest, MfaConfig, MfaError},
     multifactor::{
-        authenticator::{AuthenticatorFactor, MFA_ID_AUTHENTICATOR_TOTP},
-        random_code_auth::{MfaRandomCode, MFA_ID_RANDOM_CODE},
-        Factor,
+        config::{HandleMfaRequest, MfaConfig, MfaError},
+        factor::Factor,
     },
     session::{app_builder::SessionLoginAppBuilder, AccountInfo},
     AuthToken,
@@ -35,8 +34,12 @@ struct LoadMfa;
 impl HandleMfaRequest for LoadMfa {
     type User = UserWithMfa;
 
-    async fn get_mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError> {
+    async fn mfa_id_by_user(&self, user: &Self::User) -> Result<Option<String>, MfaError> {
         Ok(user.mfa.clone())
+    }
+
+    async fn is_condition_met(&self, user: &Self::User, _: HttpRequest) -> bool {
+        user.mfa.is_some()
     }
 }
 
@@ -49,11 +52,11 @@ impl LoadUserByCredentials for ThreeUserService {
         match login_token.email.as_ref() {
             "joe" => Ok(UserWithMfa {
                 name: "Joe".into(),
-                mfa: Some(MFA_ID_AUTHENTICATOR_TOTP.into()),
+                mfa: Some(AuthenticatorFactor::id().into()),
             }),
             "anna" => Ok(UserWithMfa {
                 name: "anna".into(),
-                mfa: Some(MFA_ID_RANDOM_CODE.into()),
+                mfa: Some(MfaRandomCodeFactor::id().into()),
             }),
             "linda" => Ok(UserWithMfa {
                 name: "linda".into(),
@@ -175,7 +178,7 @@ fn start_test_server(addr: SocketAddr) {
                             Arc::clone(&totp_secret_repo),
                             3,
                         ));
-                    let rand_code: Box<dyn Factor> = Box::new(MfaRandomCode::new(
+                    let rand_code: Box<dyn Factor> = Box::new(MfaRandomCodeFactor::new(
                         single_code_generator,
                         Arc::clone(&sender),
                     ));

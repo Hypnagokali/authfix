@@ -3,10 +3,10 @@ use std::{net::SocketAddr, sync::Arc, thread};
 use actix_web::{cookie::Key, get, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    mfa::{HandleMfaRequest, MfaConfig, MfaError},
+    multifactor::factor_impl::authenticator::AuthenticatorFactor,
     multifactor::{
-        authenticator::{AuthenticatorFactor, MFA_ID_AUTHENTICATOR_TOTP},
-        Factor,
+        config::{HandleMfaRequest, MfaConfig, MfaError},
+        factor::Factor,
     },
     session::app_builder::SessionLoginAppBuilder,
     AuthToken,
@@ -24,8 +24,8 @@ struct OnlyAuthenticatorFactor;
 impl HandleMfaRequest for OnlyAuthenticatorFactor {
     type User = User;
 
-    async fn get_mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
-        Ok(Some(MFA_ID_AUTHENTICATOR_TOTP.to_owned()))
+    async fn mfa_id_by_user(&self, _: &Self::User) -> Result<Option<String>, MfaError> {
+        Ok(Some(AuthenticatorFactor::id().to_owned()))
     }
 
     async fn is_condition_met(&self, user: &Self::User, _req: HttpRequest) -> bool {
@@ -37,7 +37,7 @@ impl HandleMfaRequest for OnlyAuthenticatorFactor {
 pub async fn secured_route(token: AuthToken<User>) -> impl Responder {
     HttpResponse::Ok().body(format!(
         "Request from user: {}",
-        token.get_authenticated_user().email
+        token.authenticated_user().email
     ))
 }
 

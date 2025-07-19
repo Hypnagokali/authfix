@@ -1,21 +1,32 @@
 //! # Authfix
-//! Authfix makes it easy to add an authentication layer to Actix Web.
+//! Authfix makes it easy to add an authentication layer to an Actix Web app.
 //!
 //! It provides a middleware with which secured paths can be defined globally. It also provides an extractor ([AuthToken]) that can be used to
 //! retrieve the currently logged in user.
 //!
 //! # Session Authentication
-//! Currently, only session authentication is supported (OIDC is planned). It is designed to work with Single Page Applications, so it offers a JSON API for login, logout and mfa verification. Redirects
-//! are then handled by the SPA.
+//! Currently, only session authentication is supported (OIDC is planned). The session authentication can be configured in two modes.
+//!
+//! 1. API based (defdault)
+//!     - It is designed to work with Single Page Applications, so it offers a JSON API for login, logout and mfa verification. Redirects
+//!       are then handled by the SPA.
+//! 2. Redirect based
+//!     - Instead of returning 401 for unauthorized requests, it redirects the user to the login page. The login flow is completely handled by the browser.
+//!       The redirects are going to the same routes as defined in [Routes](crate::session::config::Routes).
+//!       To activate this mode, set `with_redirect_flow()` in [SessionLoginAppBuilder](crate::session::app_builder::SessionLoginAppBuilder).
 //!
 //! # Async traits
-//! To use this library, the user has to implement certrain traits (e.g.: [MfaHandleMfaRequest](crate::mfa::HandleMfaRequest)) and most of them
+//! To use this library, the user has to implement certrain traits (e.g.: [MfaHandleMfaRequest](crate::multifactor::config::HandleMfaRequest)) and most of them
 //! are async. To make the implementation easier and less verbose, these traits use the [async_trait](https://crates.io/crates/async-trait) crate. Unfortunately, this makes the docs a bit messy, so all this
 //! traits provide an example.
 //!
+//! # Disclaimer
 //! *The library is still in the early stages and a work in progress so it can contain security flaws. Please report them or provide a PR: [Authfix Repo](https://github.com/Hypnagokali/authfix)*
 //!
 //! # Examples
+//! ## Example Repository
+//! see: [authfix-examples](https://github.com/Hypnagokali/authfix-examples)
+//!
 //! ## Session based authentication
 //! The session based authentication is based on: [Actix Session](https://docs.rs/actix-session/latest/actix_session/). Authfix re-exports actix_session, you don't need it as a dependency.
 //! ```no_run
@@ -41,8 +52,6 @@
 //! // Struct that handles the authentication
 //! struct AuthenticationService;
 //!
-//! // LoadUsersByCredentials uses async_trait, so its needed when implementing the trait for AuthenticationService
-//! // async_trait is re-exported by authfix.
 //! impl LoadUserByCredentials for AuthenticationService {
 //!     type User = User;
 //!
@@ -62,7 +71,7 @@
 //! // You have access to the user via the AuthToken extractor in secured routes.
 //! #[get("/secured")]
 //! async fn secured(auth_token: AuthToken<User>) -> impl Responder {
-//!     let user = auth_token.get_authenticated_user();
+//!     let user = auth_token.authenticated_user();
 //!     HttpResponse::Ok().json(&*user)
 //! }
 //!
@@ -98,7 +107,6 @@ use std::{
 pub mod errors;
 pub mod helper;
 pub mod login;
-pub mod mfa;
 pub mod middleware;
 pub mod multifactor;
 pub mod session;
@@ -117,7 +125,7 @@ where
 {
     /// Tries to retrieve the logged in user or fails with [UnauthorizedError]
     /// Returns a Future because its likely that this method can be used for calling an external service
-    fn get_auth_token(
+    fn try_get_auth_token(
         &self,
         service_request: &ServiceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
@@ -151,23 +159,40 @@ where
 /// If you inject [AuthToken] in a route that is not secured (a public route), it will respond with 500.
 ///
 /// # Example:
-/// ```ignore
+/// ```no_run
+/// use actix_web::{get, HttpResponse, Responder};
+/// use authfix::AuthToken;
+///
+/// struct User {
+///    email: String,
+/// }
+///
 /// #[get("/secured-route")]
-/// pub async fn secured_route(token: AuthToken<User>) -> impl Responder {
+/// async fn secured_route(token: AuthToken<User>) -> impl Responder {
 ///     HttpResponse::Ok().body(format!(
 ///         "Request from user: {}",
-///         token.get_authenticated_user().email
+///         token.authenticated_user().email
 ///     ))
 /// }
 /// ```
-#[derive(Clone)]
 pub struct AuthToken<U> {
     inner: Rc<RefCell<AuthTokenInner<U>>>,
 }
 
+impl<U> Clone for AuthToken<U>
+where
+    U: 'static,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner: Rc::clone(&self.inner),
+        }
+    }
+}
+
 impl<U> AuthToken<U> {
     /// Returns a reference to the logged in user.
-    pub fn get_authenticated_user(&self) -> Ref<U> {
+    pub fn authenticated_user(&self) -> Ref<U> {
         Ref::map(self.inner.borrow(), |inner| &inner.user)
     }
 
@@ -238,19 +263,25 @@ where
 }
 
 /// Extension to get the [AuthToken] from [HttpRequest]
-/// ```ignore
+/// ```no_run
+/// use actix_web::HttpRequest;
 /// use authfix::AuthTokenExt;
+/// use serde::Deserialize;
+/// #[derive(Deserialize)]
+/// struct User {
+///    email: String
+/// }
 ///
 /// fn some_function(req: actix_web::HttpRequest) -> bool {
-///     req.get_auth_token::<User>().is_some()
+///     req.auth_token::<User>().is_some()
 /// }
 /// ```
 pub trait AuthTokenExt {
-    fn get_auth_token<U: 'static>(&self) -> Option<AuthToken<U>>;
+    fn auth_token<U: 'static>(&self) -> Option<AuthToken<U>>;
 }
 
 impl AuthTokenExt for HttpRequest {
-    fn get_auth_token<U: 'static>(&self) -> Option<AuthToken<U>> {
+    fn auth_token<U: 'static>(&self) -> Option<AuthToken<U>> {
         let ext = self.extensions();
         ext.get::<AuthToken<U>>()
             .map(|auth_token_ref| AuthToken::from_ref(auth_token_ref))

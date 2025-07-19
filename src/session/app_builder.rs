@@ -13,14 +13,14 @@ use actix_web::{
 
 use crate::{
     login::{FailureHandler, LoadUserByCredentials, SuccessHandler},
-    mfa::MfaConfig,
     middleware::{AuthMiddleware, PathMatcher},
+    multifactor::config::MfaConfig,
     session::SessionUser,
 };
 
 use super::{config::Routes, handlers::SessionApiHandlers, session_auth::SessionAuthProvider};
 
-/// A builder that build an [actix_web::App] configured with session authentication
+/// A builder that builds an [App](https://docs.rs/actix-web/4.11.0/actix_web/struct.App.html) configured with session authentication
 pub struct SessionLoginAppBuilder<U, S, ST>
 where
     U: SessionUser + 'static,
@@ -43,6 +43,7 @@ where
     S: LoadUserByCredentials<User = U> + 'static,
     ST: SessionStore,
 {
+    /// Configures multifactor authentication.
     pub fn set_mfa(self, mfa_config: MfaConfig<U>) -> SessionLoginAppBuilder<U, S, ST> {
         Self {
             path_matcher: self.path_matcher,
@@ -56,6 +57,9 @@ where
         }
     }
 
+    /// Sets a [FailureHandler].
+    ///
+    /// The handler is called if the login failed.
     pub fn set_login_failure_handler<H>(
         self,
         login_failure_handler: H,
@@ -75,6 +79,9 @@ where
         }
     }
 
+    /// Sets a [SuccessHandler].
+    ///
+    /// The handler is called after a successful login.
     pub fn set_login_success_handler<H>(
         self,
         login_success_handler: H,
@@ -94,6 +101,9 @@ where
         }
     }
 
+    /// Sets the login mode to `redirect`.
+    ///
+    /// The complete login flow will be handled by redirects.
     pub fn with_redirect_flow(self) -> SessionLoginAppBuilder<U, S, ST> {
         Self {
             path_matcher: self.path_matcher,
@@ -107,7 +117,7 @@ where
         }
     }
 
-    /// Sets the login routes and adds additional paths that are secured
+    /// Sets the login routes and adds additional secured paths.
     ///
     /// If this method is used, **all paths are public** by default and only the given additional paths will be secured.
     /// In most cases [SessionLoginAppBuilder::set_login_routes_and_public_paths] is the way to go, because it will secure all paths by default.
@@ -119,9 +129,9 @@ where
     ) -> SessionLoginAppBuilder<U, S, ST> {
         let mut path_matcher: PathMatcher = PathMatcher::new(
             vec![
-                login_routes.get_logout(),
-                login_routes.get_mfa(),
-                login_routes.get_logout(),
+                login_routes.logout(),
+                login_routes.mfa(),
+                login_routes.logout(),
             ],
             false,
         );
@@ -139,9 +149,9 @@ where
         }
     }
 
-    /// Sets the login routes and adds additional paths that are public
+    /// Sets the login routes and adds additional public paths.
     ///
-    /// Only the additional paths are public if this method is used
+    /// If this method is used, only the additional paths are public; all others are secured by default.
     /// This call overrides [SessionLoginAppBuilder::set_login_routes_and_secured_paths]
     pub fn set_login_routes_and_public_paths(
         self,
@@ -202,7 +212,7 @@ where
         let middleware = AuthMiddleware::<_, U>::new(provider, self.path_matcher);
 
         App::new()
-            .configure(handler.get_config())
+            .configure(handler.config())
             .wrap(middleware)
             .wrap(self.session_middleware)
     }
@@ -213,14 +223,14 @@ where
     U: SessionUser + 'static,
     S: LoadUserByCredentials<User = U> + 'static,
 {
-    /// Creates an app builder with defaults
+    /// Creates an app builder with default settings.
     ///
-    /// If you need to use the instance of the type that implements LoadUserByCredentials later, you can use [SessionLoginAppBuilder::create_from_shared] instead.
+    /// For a shared `LoadUserByCredentials` use [SessionLoginAppBuilder::create_from_shared] instead.
     pub fn create(load_user_service: S, key: Key) -> Self {
         Self::create_from_shared(Arc::new(load_user_service), key)
     }
 
-    /// Creates an app builder with defaults
+    /// Creates an app builder with default settings.
     pub fn create_from_shared(load_user_service: Arc<S>, key: Key) -> Self {
         Self::create_from_shared_with_session_middleware(
             load_user_service,
@@ -235,7 +245,7 @@ where
     S: LoadUserByCredentials<User = U> + 'static,
     ST: SessionStore,
 {
-    // Creates an app builder with a specific session configuration
+    /// Creates an app builder with a specific session configuration.
     pub fn create_with_session_middleware(
         load_user_service: S,
         session_middleware: SessionMiddleware<ST>,
@@ -246,6 +256,7 @@ where
         )
     }
 
+    /// Creates an app builder with a specific session configuration.
     pub fn create_from_shared_with_session_middleware(
         load_user_service: Arc<S>,
         session_middleware: SessionMiddleware<ST>,

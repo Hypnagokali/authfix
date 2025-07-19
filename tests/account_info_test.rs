@@ -41,7 +41,7 @@ impl LoadUserByCredentials for LoadUser {
 }
 
 impl AccountInfo for User {
-    fn get_user_identification(&self) -> String {
+    fn user_identification(&self) -> String {
         self.name.clone()
     }
 
