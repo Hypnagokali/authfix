@@ -355,7 +355,6 @@ async fn mfa_internal<U: SessionUser>(
 /// Triggers the code generation and sets the login state to mfa needed
 /// Returns true if mfa needed
 async fn generate_code_if_mfa_necessary<U: SessionUser>(
-    // U will need a trait bound like 'HasFactor' -> user.get_factor() -> String
     user: &U,
     mfa_config: MfaConfig<U>,
     req: &HttpRequest,
@@ -373,6 +372,7 @@ async fn generate_code_if_mfa_necessary<U: SessionUser>(
             session.needs_mfa(&factor.get_unique_id())?;
             mfa_needed = true;
         } else {
+            session.destroy();
             return Err(SessionApiLoginError::ServerError(
                 format!("MFA challenge error: No factor found for user: {}", user.get_user_identification()),
             ));
