@@ -1,11 +1,10 @@
-use async_trait::async_trait;
 use authfix::{
+    login::{LoadUserByCredentials, LoadUserError, LoginToken},
     multifactor::factor_impl::{
         authenticator::{GetTotpSecretError, TotpSecretRepository},
         random_code_auth::{CodeSendError, CodeSender, RandomCode},
     },
-    login::{LoadUserByCredentials, LoadUserError, LoginToken},
-    session::{AccountInfo, SessionUser},
+    session::AccountInfo,
 };
 use chrono::{Local, TimeDelta};
 use serde::{Deserialize, Serialize};
@@ -25,7 +24,7 @@ pub fn test_out_path(path: &str) -> String {
 //
 // For login and mfa tests:
 //
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct User {
     pub email: String,
     pub name: String,
@@ -54,12 +53,9 @@ impl LoadUserByCredentials for HardCodedLoadUserService {
 
 pub struct TotpTestRepo;
 
-#[async_trait]
-impl<U> TotpSecretRepository<U> for TotpTestRepo
-where
-    U: SessionUser,
-{
-    async fn auth_secret(&self, _user: &U) -> Result<String, GetTotpSecretError> {
+impl TotpSecretRepository for TotpTestRepo {
+    type User = User;
+    async fn auth_secret(&self, _user: &Self::User) -> Result<String, GetTotpSecretError> {
         Ok(SECRET.to_owned())
     }
 }

@@ -191,18 +191,17 @@ where
             Error = Error,
         >,
     > {
-        let shared_routes = Arc::new(self.routes);
         let handler: SessionApiHandlers<S, U> =
-            SessionApiHandlers::new(Arc::clone(&shared_routes), self.redirect_flow);
+            SessionApiHandlers::new(self.routes.clone(), self.redirect_flow);
 
         let mut provider = if self.mfa_config.is_configured() {
             SessionAuthProvider::new_with_mfa(
                 self.load_user_service,
                 self.mfa_config,
-                shared_routes,
+                self.routes.clone(),
             )
         } else {
-            SessionAuthProvider::new(Arc::clone(&self.load_user_service), shared_routes)
+            SessionAuthProvider::new(Arc::clone(&self.load_user_service), self.routes)
         };
 
         provider.set_redirect_flow(self.redirect_flow);

@@ -1,5 +1,5 @@
 //! General configuration for session auth
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::middleware::PathMatcher;
 
@@ -15,14 +15,12 @@ use crate::middleware::PathMatcher;
 /// use authfix::middleware::PathMatcher;
 /// use authfix::session::config::Routes;
 ///
-/// fn main() {
-///     let path_matcher: PathMatcher = Routes::new("/auth", "/login", "/mfa", "/logout").into();
-/// }
+/// let path_matcher: PathMatcher = Routes::new("/auth", "/login", "/mfa", "/logout").into();
 /// ```
 
 #[derive(Clone)]
 pub struct Routes {
-    inner: Rc<RoutesInner>,
+    inner: Arc<RoutesInner>,
 }
 
 struct RoutesInner {
@@ -35,7 +33,7 @@ struct RoutesInner {
 impl Routes {
     pub fn new(prefix: &str, login: &str, mfa: &str, logout: &str) -> Self {
         Self {
-            inner: Rc::new(RoutesInner {
+            inner: Arc::new(RoutesInner {
                 login: create_uri(prefix, login),
                 logout: create_uri(prefix, logout),
                 mfa: create_uri(prefix, mfa),
@@ -47,7 +45,7 @@ impl Routes {
     /// Sets the default redirect URI, where the user is redirected after a successful login.
     pub fn set_default_redirect(self, redirect: &str) -> Self {
         Self {
-            inner: Rc::new(RoutesInner {
+            inner: Arc::new(RoutesInner {
                 login: self.inner.login.clone(),
                 logout: self.inner.logout.clone(),
                 mfa: self.inner.mfa.clone(),
@@ -80,7 +78,7 @@ impl From<Routes> for PathMatcher {
 impl Default for Routes {
     fn default() -> Self {
         Self {
-            inner: Rc::new(RoutesInner {
+            inner: Arc::new(RoutesInner {
                 login: "/login".to_owned(),
                 logout: "/logout".to_owned(),
                 mfa: "/login/mfa".to_owned(),

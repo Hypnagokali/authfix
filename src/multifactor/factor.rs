@@ -109,7 +109,8 @@ impl ResponseError for CheckCodeError {
 #[cfg(test)]
 mod tests {
     use crate::{
-        multifactor::factor_impl::authenticator::GetTotpSecretError, multifactor::factor::GenerateCodeError,
+        multifactor::factor::GenerateCodeError,
+        multifactor::factor_impl::authenticator::GetTotpSecretError,
     };
 
     #[test]

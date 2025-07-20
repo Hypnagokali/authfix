@@ -6,7 +6,6 @@ use std::{
 };
 
 use actix_web::{HttpMessage, HttpRequest};
-use async_trait::async_trait;
 use google_authenticator::GoogleAuthenticator;
 use rand::RngCore;
 use thiserror::Error;
@@ -19,9 +18,12 @@ use crate::{
 /// ID to reference authenticator mfa
 pub const MFA_ID_AUTHENTICATOR_TOTP: &str = "TOTP_MFA";
 
-#[async_trait]
-pub trait TotpSecretRepository<U> {
-    async fn auth_secret(&self, user: &U) -> Result<String, GetTotpSecretError>;
+pub trait TotpSecretRepository {
+    type User;
+    fn auth_secret(
+        &self,
+        user: &Self::User,
+    ) -> impl Future<Output = Result<String, GetTotpSecretError>>;
 }
 
 #[derive(Error, Debug)]
@@ -58,7 +60,7 @@ pub struct AuthenticatorFactor<T, U> {
 
 impl<T, U> AuthenticatorFactor<T, U>
 where
-    T: TotpSecretRepository<U>,
+    T: TotpSecretRepository<User = U>,
 {
     pub fn new(totp_secret_repo: Arc<T>) -> Self {
         Self::with_discrepancy(totp_secret_repo, 0)
@@ -81,8 +83,8 @@ impl AuthenticatorFactor<(), ()> {
 
 impl<T, U> Factor for AuthenticatorFactor<T, U>
 where
-    T: TotpSecretRepository<U> + 'static,
-    U: 'static,
+    T: TotpSecretRepository<User = U> + 'static,
+    U: Clone + 'static,
 {
     fn generate_code(
         &self,
@@ -111,8 +113,8 @@ where
         let code_to_check = code.trim().to_owned();
         let discrepancy = self.discrepancy;
         Box::pin(async move {
-            let u = token_to_check.authenticated_user();
-            repo.auth_secret(&u)
+            // let u = token_to_check.authenticated_user();
+            repo.auth_secret(&token_to_check.authenticated_user_owned())
                 .await
                 .map(|secret| {
                     if Authenticator::verify(&secret, &code_to_check, discrepancy) {
