@@ -66,7 +66,6 @@ where
 
 pub struct DoNotSendCode;
 
-#[async_trait]
 impl CodeSender for DoNotSendCode {
     async fn send_code(&self, _: RandomCode) -> Result<(), CodeSendError> {
         Ok(())
