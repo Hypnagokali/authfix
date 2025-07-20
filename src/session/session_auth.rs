@@ -46,7 +46,7 @@ where
     load_user: Arc<L>,
     error_handler: Rc<Option<Box<dyn FailureHandler>>>,
     success_handler: Rc<Option<Box<dyn SuccessHandler<User = U>>>>,
-    routes: Arc<Routes>,
+    routes: Routes,
     redirect_flow: bool,
     phantom_data: PhantomData<U>,
 }
@@ -59,7 +59,7 @@ where
     /// Creates a new SessionAuthProvider without mfa.
     ///
     /// Arc is used here because L could be a service that is shared across the application (e.g. UserService)
-    pub fn new(load_user: Arc<L>, routes: Arc<Routes>) -> Self {
+    pub fn new(load_user: Arc<L>, routes: Routes) -> Self {
         Self {
             mfa_config: Rc::new(MfaConfig::empty()),
             load_user,
@@ -72,7 +72,7 @@ where
     }
 
     /// Creates a new SessionAuthProvider with mfa
-    pub fn new_with_mfa(load_user: Arc<L>, mfa_config: MfaConfig<U>, routes: Arc<Routes>) -> Self {
+    pub fn new_with_mfa(load_user: Arc<L>, mfa_config: MfaConfig<U>, routes: Routes) -> Self {
         Self {
             mfa_config: Rc::new(mfa_config),
             load_user,

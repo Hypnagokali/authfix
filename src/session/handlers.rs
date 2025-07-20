@@ -49,7 +49,7 @@ use super::{config::Routes, session_auth::LoginSession};
 ///     if query.is_error() {
 ///        println!("Login failed");
 ///     }
-/// 
+///
 ///     HttpResponse::Ok().body("...")
 /// }
 /// ```
@@ -155,7 +155,7 @@ impl LoginSessionResponse {
 #[allow(clippy::type_complexity)]
 #[derive(Clone)]
 pub struct SessionApiHandlers<T: LoadUserByCredentials<User = U>, U> {
-    routes: Arc<Routes>,
+    routes: Routes,
     redirect_flow: bool,
     phantom_data: PhantomData<T>,
 }
@@ -165,7 +165,7 @@ where
     U: SessionUser + 'static,
     T: LoadUserByCredentials<User = U> + 'static,
 {
-    pub fn new(routes: Arc<Routes>, redirect_flow: bool) -> Self {
+    pub fn new(routes: Routes, redirect_flow: bool) -> Self {
         Self {
             routes,
             redirect_flow,
@@ -175,7 +175,7 @@ where
 
     /// Returns the config that can be used by Actix Web to register the handlers
     pub fn config(self) -> impl FnOnce(&mut ServiceConfig) {
-        let routes = web::Data::new(Arc::clone(&self.routes));
+        let routes = web::Data::new(self.routes.clone());
 
         |config: &mut ServiceConfig| {
             config.service(self);
@@ -191,7 +191,7 @@ where
 {
     fn default() -> Self {
         Self {
-            routes: Arc::new(Routes::default()),
+            routes: Routes::default(),
             redirect_flow: false,
             phantom_data: PhantomData,
         }
@@ -216,10 +216,7 @@ async fn logout_json<U: SessionUser>(token: AuthToken<U>) -> impl Responder {
     HttpResponse::Ok()
 }
 
-async fn logout_form<U: SessionUser>(
-    routes: Data<Arc<Routes>>,
-    token: AuthToken<U>,
-) -> impl Responder {
+async fn logout_form<U: SessionUser>(routes: Data<Routes>, token: AuthToken<U>) -> impl Responder {
     token.invalidate();
 
     redirect_response_builder()
@@ -258,7 +255,7 @@ async fn mfa_route_form<U: SessionUser>(
     success_handler: ReqData<Rc<Option<Box<dyn SuccessHandler<User = U>>>>>,
     body: Form<MfaRequestBody>,
     req: HttpRequest,
-    routes: Data<Arc<Routes>>,
+    routes: Data<Routes>,
     session: LoginSession,
 ) -> Result<impl Responder, Error> {
     let user_ident = match session.user::<U>() {
@@ -293,10 +290,7 @@ async fn mfa_route_form<U: SessionUser>(
                 query.insert_without_value("error");
 
                 Ok(redirect_response_builder()
-                    .insert_header((
-                        LOCATION,
-                        format!("{}?{}", routes.mfa(), query.to_string()),
-                    ))
+                    .insert_header((LOCATION, format!("{}?{}", routes.mfa(), query.to_string())))
                     .finish())
             }
             SessionApiMfaError::BadRequest(msg) => Err(ErrorBadRequest(msg)),
@@ -376,9 +370,10 @@ async fn generate_code_if_mfa_necessary<U: SessionUser>(
             mfa_needed = true;
         } else {
             session.destroy();
-            return Err(SessionApiLoginError::ServerError(
-                format!("MFA challenge error: No factor found for user: {}", user.user_identification()),
-            ));
+            return Err(SessionApiLoginError::ServerError(format!(
+                "MFA challenge error: No factor found for user: {}",
+                user.user_identification()
+            )));
         }
     }
 
@@ -459,7 +454,7 @@ async fn login_form<T: LoadUserByCredentials<User = U>, U: SessionUser>(
     mfa_config: MfaConfig<U>,
     session: LoginSession,
     req: HttpRequest,
-    routes: Data<Arc<Routes>>,
+    routes: Data<Routes>,
 ) -> Result<impl Responder, Error> {
     let login_res = login_internal(
         login_token.into_inner(),
@@ -493,10 +488,7 @@ async fn login_form<T: LoadUserByCredentials<User = U>, U: SessionUser>(
         query.remove("error");
 
         Ok(redirect_response_builder()
-            .insert_header((
-                LOCATION,
-                format!("{}?{}", routes.mfa(), query.to_string()),
-            ))
+            .insert_header((LOCATION, format!("{}?{}", routes.mfa(), query.to_string())))
             .finish())
     } else {
         let mut query: HttpQuery = req.query_string().into();
@@ -550,9 +542,7 @@ where
     U: SessionUser + 'static,
 {
     fn register(self, config: &mut AppService) {
-        let mut mfa_resource = Resource::new(self.routes.mfa())
-            .name("mfa")
-            .guard(Post());
+        let mut mfa_resource = Resource::new(self.routes.mfa()).name("mfa").guard(Post());
 
         let mut login_resource = Resource::new(self.routes.login())
             .name("login")
@@ -578,7 +568,7 @@ where
     }
 }
 
-fn build_login_success_redirect(mut query: HttpQuery, routes: Data<Arc<Routes>>) -> String {
+fn build_login_success_redirect(mut query: HttpQuery, routes: Data<Routes>) -> String {
     query
         .remove("redirect_uri")
         .and_then(|uri| urlencoding::decode(&uri).ok().map(|s| s.into_owned()))

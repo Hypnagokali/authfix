@@ -28,17 +28,14 @@ const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 /// ```no_run
 /// use authfix::middleware::PathMatcher;
 ///
-/// fn main() {
-///     PathMatcher::new(vec!["/my-secure-route", "another-secure-route"], false);
-/// }
+/// PathMatcher::new(vec!["/my-secure-route", "another-secure-route"], false);
 /// ```
 ///
 /// You can use wildcards for path matching like
 /// ```no_run
 /// use authfix::middleware::PathMatcher;
-/// fn main() {
-///     PathMatcher::new(vec!["/private/*"], false);
-/// }
+///
+/// PathMatcher::new(vec!["/private/*"], false);
 /// ```
 pub struct PathMatcher {
     is_exclusion_list: bool,

@@ -190,6 +190,12 @@ where
     }
 }
 
+impl<U: Clone> AuthToken<U> {
+    pub fn authenticated_user_owned(&self) -> U {
+        self.authenticated_user().clone()
+    }
+}
+
 impl<U> AuthToken<U> {
     /// Returns a reference to the logged in user.
     pub fn authenticated_user(&self) -> Ref<U> {

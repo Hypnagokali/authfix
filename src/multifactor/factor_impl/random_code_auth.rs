@@ -14,7 +14,10 @@ const MFA_RANDOM_CODE_KEY: &str = "mfa_random_code";
 
 /// Interface for sending the code to the user
 pub trait CodeSender {
-    fn send_code(&self, random_code: RandomCode) -> impl Future<Output = Result<(), CodeSendError>> + Send;
+    fn send_code(
+        &self,
+        random_code: RandomCode,
+    ) -> impl Future<Output = Result<(), CodeSendError>> + Send;
 }
 
 #[derive(Error, Debug)]
@@ -64,7 +67,7 @@ impl RandomCode {
     }
 }
 
-/// Random code implementation of [Factor] 
+/// Random code implementation of [Factor]
 /// *Currently it works only with session based authentication.*
 ///
 /// Takes in a function that should generate a random code and [CodeSender]
@@ -181,7 +184,9 @@ fn cleanup_and_time_is_up_error(session: &Session) -> CheckCodeError {
 
 #[cfg(test)]
 mod tests {
-    use crate::multifactor::factor_impl::random_code_auth::{MfaRandomCodeFactor, MFA_ID_RANDOM_CODE};
+    use crate::multifactor::factor_impl::random_code_auth::{
+        MfaRandomCodeFactor, MFA_ID_RANDOM_CODE,
+    };
 
     #[test]
     fn test_static_id() {

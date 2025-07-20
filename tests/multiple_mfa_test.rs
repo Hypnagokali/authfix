@@ -3,11 +3,14 @@ use std::{net::SocketAddr, sync::Arc, thread};
 use actix_web::{cookie::Key, get, HttpRequest, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authfix::{
-    multifactor::factor_impl::{authenticator::AuthenticatorFactor, random_code_auth::MfaRandomCodeFactor},
     login::{LoadUserByCredentials, LoadUserError, LoginToken},
     multifactor::{
         config::{HandleMfaRequest, MfaConfig, MfaError},
         factor::Factor,
+        factor_impl::{
+            authenticator::{AuthenticatorFactor, GetTotpSecretError, TotpSecretRepository},
+            random_code_auth::MfaRandomCodeFactor,
+        },
     },
     session::{app_builder::SessionLoginAppBuilder, AccountInfo},
     AuthToken,
@@ -16,7 +19,7 @@ use authfix::{
 use google_authenticator::GoogleAuthenticator;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
-use test_utils::{single_code_generator, DoNotSendCode, TotpTestRepo, SECRET};
+use test_utils::{single_code_generator, DoNotSendCode, SECRET};
 
 mod test_utils;
 
@@ -27,6 +30,15 @@ struct UserWithMfa {
 }
 
 impl AccountInfo for UserWithMfa {}
+
+struct TotpRepositoryForUserWithMfa;
+
+impl TotpSecretRepository for TotpRepositoryForUserWithMfa {
+    type User = UserWithMfa;
+    async fn auth_secret(&self, _user: &Self::User) -> Result<String, GetTotpSecretError> {
+        Ok(SECRET.to_owned())
+    }
+}
 
 struct LoadMfa;
 
@@ -52,11 +64,11 @@ impl LoadUserByCredentials for ThreeUserService {
         match login_token.email.as_ref() {
             "joe" => Ok(UserWithMfa {
                 name: "Joe".into(),
-                mfa: Some(AuthenticatorFactor::id().into()),
+                mfa: Some(AuthenticatorFactor::id()),
             }),
             "anna" => Ok(UserWithMfa {
                 name: "anna".into(),
-                mfa: Some(MfaRandomCodeFactor::id().into()),
+                mfa: Some(MfaRandomCodeFactor::id()),
             }),
             "linda" => Ok(UserWithMfa {
                 name: "linda".into(),
@@ -170,7 +182,7 @@ fn start_test_server(addr: SocketAddr) {
     thread::spawn(move || {
         actix_rt::System::new()
             .block_on(async {
-                let totp_secret_repo = Arc::new(TotpTestRepo);
+                let totp_secret_repo = Arc::new(TotpRepositoryForUserWithMfa);
                 let sender = Arc::new(DoNotSendCode);
                 let app_closure = move || {
                     let authenticator: Box<dyn Factor> =
