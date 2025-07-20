@@ -99,7 +99,6 @@ impl HandleMfaRequest for OnlyRandomCodeFactor {
 
 struct DummySender;
 
-#[async_trait]
 impl CodeSender for DummySender {
     async fn send_code(&self, _random_code: RandomCode) -> Result<(), CodeSendError> {
         Ok(())

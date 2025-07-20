@@ -264,7 +264,6 @@ async fn should_not_be_logged_in_after_time_is_up() {
 
 struct DummySender;
 
-#[async_trait]
 impl CodeSender for DummySender {
     async fn send_code(&self, _: RandomCode) -> Result<(), CodeSendError> {
         // send code

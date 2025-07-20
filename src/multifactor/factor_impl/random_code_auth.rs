@@ -2,7 +2,6 @@ use std::{future::Future, sync::Arc, time::SystemTime};
 
 use actix_session::{Session, SessionExt};
 use actix_web::HttpRequest;
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -14,9 +13,8 @@ pub const MFA_ID_RANDOM_CODE: &str = "RNDCODE";
 const MFA_RANDOM_CODE_KEY: &str = "mfa_random_code";
 
 /// Interface for sending the code to the user
-#[async_trait]
 pub trait CodeSender {
-    async fn send_code(&self, random_code: RandomCode) -> Result<(), CodeSendError>;
+    fn send_code(&self, random_code: RandomCode) -> impl Future<Output = Result<(), CodeSendError>> + Send;
 }
 
 #[derive(Error, Debug)]
