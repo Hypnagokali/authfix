@@ -98,10 +98,11 @@ use actix_web::{
 use errors::UnauthorizedError;
 
 use std::{
-    cell::{Ref, RefCell},
+    cell::RefCell,
     future::{ready, Future, Ready},
     pin::Pin,
     rc::Rc,
+    sync::Arc,
 };
 
 pub mod errors;
@@ -176,7 +177,8 @@ where
 /// }
 /// ```
 pub struct AuthToken<U> {
-    inner: Rc<RefCell<AuthTokenInner<U>>>,
+    inner_state: Rc<RefCell<AuthTokenInner>>,
+    user: Arc<U>,
 }
 
 impl<U> Clone for AuthToken<U>
@@ -185,54 +187,51 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            inner: Rc::clone(&self.inner),
+            inner_state: Rc::clone(&self.inner_state),
+            user: Arc::clone(&self.user),
         }
-    }
-}
-
-impl<U: Clone> AuthToken<U> {
-    pub fn authenticated_user_owned(&self) -> U {
-        self.authenticated_user().clone()
     }
 }
 
 impl<U> AuthToken<U> {
     /// Returns a reference to the logged in user.
-    pub fn authenticated_user(&self) -> Ref<U> {
-        Ref::map(self.inner.borrow(), |inner| &inner.user)
+    pub fn authenticated_user(&self) -> Arc<U> {
+        Arc::clone(&self.user)
     }
 
     /// Invalidates the AuthToken. This triggers [AuthenticationProvider::invalidate]
     pub fn invalidate(&self) {
-        let mut inner = self.inner.borrow_mut();
+        let mut inner = self.inner_state.borrow_mut();
         inner.auth_state = AuthState::Invalid;
     }
 
     pub(crate) fn is_mfa_needed(&self) -> bool {
-        let inner: Ref<'_, AuthTokenInner<U>> = self.inner.borrow();
+        let inner = self.inner_state.borrow();
         inner.auth_state == AuthState::NeedsMfa
     }
 
     pub(crate) fn is_valid(&self) -> bool {
-        let inner = self.inner.borrow();
+        let inner = self.inner_state.borrow();
         inner.auth_state != AuthState::Invalid
     }
 
     #[allow(unused)]
     pub(crate) fn is_authenticated(&self) -> bool {
-        let inner = self.inner.borrow();
+        let inner = self.inner_state.borrow();
         inner.auth_state == AuthState::Authenticated
     }
 
     pub(crate) fn new(user: U, auth_state: AuthState) -> Self {
         Self {
-            inner: Rc::new(RefCell::new(AuthTokenInner { user, auth_state })),
+            inner_state: Rc::new(RefCell::new(AuthTokenInner { auth_state })),
+            user: Arc::new(user),
         }
     }
 
     pub(crate) fn from_ref(token: &AuthToken<U>) -> Self {
         AuthToken {
-            inner: Rc::clone(&token.inner),
+            inner_state: Rc::clone(&token.inner_state),
+            user: Arc::clone(&token.user),
         }
     }
 }
@@ -244,8 +243,7 @@ pub enum AuthState {
     Invalid,
 }
 
-struct AuthTokenInner<U> {
-    user: U,
+struct AuthTokenInner {
     auth_state: AuthState,
 }
 
