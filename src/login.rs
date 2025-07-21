@@ -19,7 +19,7 @@ pub trait LoadUserByCredentials {
     fn load_user(
         &self,
         login_token: &LoginToken,
-    ) -> impl Future<Output = Result<Self::User, LoadUserError>> + Send;
+    ) -> impl Future<Output = Result<Self::User, LoadUserError>>;
 }
 
 /// This trait is called, if the login was successful
