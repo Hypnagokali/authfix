@@ -84,7 +84,7 @@ impl AuthenticatorFactor<(), ()> {
 impl<T, U> Factor for AuthenticatorFactor<T, U>
 where
     T: TotpSecretRepository<User = U> + 'static,
-    U: Clone + 'static,
+    U: 'static,
 {
     fn generate_code(
         &self,
@@ -113,8 +113,7 @@ where
         let code_to_check = code.trim().to_owned();
         let discrepancy = self.discrepancy;
         Box::pin(async move {
-            // let u = token_to_check.authenticated_user();
-            repo.auth_secret(&token_to_check.authenticated_user_owned())
+            repo.auth_secret(&token_to_check.authenticated_user())
                 .await
                 .map(|secret| {
                     if Authenticator::verify(&secret, &code_to_check, discrepancy) {
