@@ -20,7 +20,7 @@ use crate::{
 
 use super::{config::Routes, handlers::SessionApiHandlers, session_auth::SessionAuthProvider};
 
-/// A builder that builds an [App](https://docs.rs/actix-web/4.11.0/actix_web/struct.App.html) configured with session authentication
+/// A builder that builds an [App](https://docs.rs/actix-web/latest/actix_web/struct.App.html) configured with session authentication
 pub struct SessionLoginAppBuilder<U, S, ST>
 where
     U: SessionUser + 'static,

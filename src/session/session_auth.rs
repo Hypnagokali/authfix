@@ -33,8 +33,10 @@ type AuthTokenResult<U> = Result<AuthToken<U>, UnauthorizedError>;
 
 /// Provider for session based authentication.
 ///
-/// Uses [Actix-Session](https://docs.rs/actix-session/latest/actix_session/), so it must be set as middleware. If you use
-/// the [SessionLoginAppBuilder](crate::session::app_builder::SessionLoginAppBuilder) it is set by default.
+/// The provider is built on [Actix-Session](https://docs.rs/actix-session/latest/actix_session/). To use it, the `SessionMiddleware` must be set as middleware 
+/// after [AuthMiddleware](crate::middleware::AuthMiddleware), so that it is called first. 
+/// 
+/// If you use the [SessionLoginAppBuilder](crate::session::app_builder::SessionLoginAppBuilder) this is all handled by the builder.
 #[derive(Clone)]
 pub struct SessionAuthProvider<U, L>
 where
@@ -159,7 +161,7 @@ where
         Box::pin(ready(()))
     }
 
-    fn response_before_request_handling(
+    fn respond_before_request_handling(
         &self,
         req: &HttpRequest,
     ) -> Option<actix_web::HttpResponse> {

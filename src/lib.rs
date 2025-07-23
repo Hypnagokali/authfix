@@ -1,27 +1,29 @@
-//! # Authfix
-//! Authfix makes it easy to add an authentication layer to an Actix Web app.
+//! Easily add authentication to your [Actix Web](https://crates.io/crates/actix-web) app with Authfix.
 //!
-//! It provides a middleware with which secured paths can be defined globally. It also provides an extractor ([AuthToken]) that can be used to
-//! retrieve the currently logged in user.
+//! It provides the [AuthToken] extractor for retrieving the authenticated user in handlers.
 //!
 //! # Session Authentication
 //! Currently, only session authentication is supported (OIDC is planned). The session authentication can be configured in two modes.
 //!
-//! 1. API based (defdault)
+//! 1. API based (default)
 //!     - It is designed to work with Single Page Applications, so it offers a JSON API for login, logout and mfa verification. Redirects
 //!       are then handled by the SPA.
 //! 2. Redirect based
 //!     - Instead of returning 401 for unauthorized requests, it redirects the user to the login page. The login flow is completely handled by the browser.
-//!       The redirects are going to the same routes as defined in [Routes](crate::session::config::Routes).
+//!       You just have to define the login, mfa and logout pages. The redirects are going to the same routes as defined in [Routes](crate::session::config::Routes).
 //!       To activate this mode, set `with_redirect_flow()` in [SessionLoginAppBuilder](crate::session::app_builder::SessionLoginAppBuilder).
 //!
 //! # Async traits
-//! To use this library, the user has to implement certrain traits (e.g.: [MfaHandleMfaRequest](crate::multifactor::config::HandleMfaRequest)) and most of them
-//! are async. To make the implementation easier and less verbose, these traits use the [async_trait](https://crates.io/crates/async-trait) crate. Unfortunately, this makes the docs a bit messy, so all this
-//! traits provide an example.
+//! To use this library, it is necessary to implement certrain traits (e.g.: [LoadUserByCredentials](crate::login::LoadUserByCredentials)).
+//! Wherever possible, native async syntax is supported.
+//! 
+//! However, some of the traits must be `dyn compatible`, so the [async_trait](https://crates.io/crates/async-trait) crate 
+//! is used for those (e.g. for [MfaHandleMfaRequest](crate::multifactor::config::HandleMfaRequest)).
+//! 
+//! Authfix re-exports the [authfix::async_trait](crate::async_trait) macro.
 //!
 //! # Disclaimer
-//! *The library is still in the early stages and a work in progress so it can contain security flaws. Please report them or provide a PR: [Authfix Repo](https://github.com/Hypnagokali/authfix)*
+//! *The library is still in the early stages and a work in progress so it can contain security flaws. Please report them or provide a PR: [Authfix repo](https://github.com/Hypnagokali/authfix)*
 //!
 //! # Examples
 //! ## Example Repository
@@ -39,8 +41,8 @@
 //! };
 //! use serde::{Deserialize, Serialize};
 //!
-//! // A user intended for session authentication must derive or implement Clone, Serialize, and Deserialize.
-//! #[derive(Clone, Serialize, Deserialize)]
+//! // A user intended for session authentication must derive Serialize and Deserialize.
+//! #[derive(Serialize, Deserialize)]
 //! struct User {
 //!     name: String,
 //! }
@@ -77,6 +79,8 @@
 //!
 //! #[actix_web::main]
 //! async fn main() -> std::io::Result<()> {
+//!     // In production, you should read the key from an external source so that you can use sessions across restarts
+//!     // see: https://docs.rs/actix-session/latest/actix_session/
 //!     let key = Key::generate();
 //!     HttpServer::new(move || {
 //!         // SessionLoginAppBuilder is the simplest way to create an App instance configured with session based authentication
@@ -84,6 +88,81 @@
 //!         SessionLoginAppBuilder::create(AuthenticationService, key.clone())
 //!             .build()
 //!             .service(secured)
+//!     })
+//!     .bind("127.0.0.1:7080")?
+//!     .run()
+//!     .await
+//! }
+//! ```
+//! 
+//! ## Configure the session
+//! 
+//! ```no_run
+//! use authfix::actix_session::{
+//!     SessionMiddleware,
+//!     config::{PersistentSession, SessionLifecycle},
+//!     storage::CookieSessionStore,
+//! };
+//! use actix_web::{HttpResponse, HttpServer, Responder, cookie::Key, get, middleware::Logger};
+//! use authfix::{
+//!     AuthToken,
+//!     login::{LoadUserByCredentials, LoadUserError, LoginToken},
+//!     session::{AccountInfo, app_builder::SessionLoginAppBuilder, config::Routes},
+//! };
+//! use serde::{Deserialize, Serialize};
+//! 
+//! #[derive(Serialize, Deserialize)]
+//! struct User {
+//!     name: String,
+//! }
+//! 
+//! impl AccountInfo for User {}
+//! 
+//! struct AuthenticationService;
+//! 
+//! impl LoadUserByCredentials for AuthenticationService {
+//!     type User = User;
+//! 
+//!     async fn load_user(&self, login_token: &LoginToken) -> Result<Self::User, LoadUserError> {
+//!         if login_token.email == "test@example.org" && login_token.password == "password" {
+//!             Ok(User {
+//!                 name: "Johnny".to_owned(),
+//!             })
+//!         } else {
+//!             Err(LoadUserError::LoginFailed)
+//!         }
+//!     }
+//! }
+//! 
+//! #[get("/secured")]
+//! async fn secured(auth_token: AuthToken<User>) -> impl Responder {
+//!     let user = auth_token.authenticated_user();
+//!     HttpResponse::Ok().json(&*user)
+//! }
+//! 
+//! pub fn session_config(key: Key) -> SessionMiddleware<CookieSessionStore> {
+//!     let persistent_session = PersistentSession::default();
+//!     let lc = SessionLifecycle::PersistentSession(persistent_session);
+//!     SessionMiddleware::builder(CookieSessionStore::default(), key)
+//!         .cookie_name("sessionId".to_string())
+//!         .cookie_http_only(true)
+//!         .cookie_same_site(actix_web::cookie::SameSite::Strict)
+//!         .cookie_secure(false)
+//!         .session_lifecycle(lc)
+//!         .build()
+//! }
+//! 
+//! #[actix_web::main]
+//! async fn main() -> std::io::Result<()> {
+//!     let key = Key::generate();
+//!     HttpServer::new(move || {
+//!         SessionLoginAppBuilder::create_with_session_middleware(
+//!             AuthenticationService,
+//!             session_config(key.clone()),
+//!         )
+//!         .build()
+//!         .wrap(Logger::default())
+//!         .service(secured)
 //!     })
 //!     .bind("127.0.0.1:7080")?
 //!     .run()
@@ -106,26 +185,29 @@ use std::{
 };
 
 pub mod errors;
-pub mod helper;
+mod helper;
 pub mod login;
 pub mod middleware;
 pub mod multifactor;
 pub mod session;
 
 // re-exports
+/// Re-exported `async_trait` macro for use in trait definitions.
 pub use async_trait::async_trait;
+/// Session management primitives from `actix-session`.
+pub use actix_session;
 
-/// Main component used by the middleware to handle the authentication mechanism
+/// Main component used by the middleware to handle the actual authentication mechanism
 ///
-/// Its responsible for checking if the user is authorized and for invalidating the session/token/whatever after logout.
-/// Additionally it is responsible for configuring special request (injecting services), such as for login or mfa.
-/// If you want to implement your custom authentication mechanism, implement this trait and provide a way to store the user
+/// Its main responsibility is to attempt retrieving the logged-in user or respond with an [UnauthorizedError].
+/// Additionally it is responsible for configuring special request (e.g. injecting services), such as for login or mfa.
+/// 
+/// Currently only [SessionAuthProvider](crate::session::session_auth::SessionAuthProvider) implements [AuthenticationProvider].
 pub trait AuthenticationProvider<U>
 where
     U: 'static,
 {
     /// Tries to retrieve the logged in user or fails with [UnauthorizedError]
-    /// Returns a Future because its likely that this method can be used for calling an external service
     fn try_get_auth_token(
         &self,
         service_request: &ServiceRequest,
@@ -133,17 +215,16 @@ where
 
     /// This is a hook that is called before the request is handled.
     /// It should be used to analyze the request and return a response if needed.
-    /// Its not intended for checking whether the user is authenticated (use `get_auth_token` for that).
+    /// Its not intended for checking whether the user is authenticated (use `try_get_auth_token` for that).
     ///
     /// Returns a response that is sent before the request is handled.
     /// This is useful for example to redirect the user to root if he tried accessing the login page although he is already authenticated.
     #[allow(unused)]
-    fn response_before_request_handling(&self, req: &HttpRequest) -> Option<HttpResponse> {
+    fn respond_before_request_handling(&self, req: &HttpRequest) -> Option<HttpResponse> {
         None
     }
 
-    /// Invalidates the authentication after [AuthToken] has been set to [AuthState::Invalid].
-    /// Returns a Future: same as for `get_auth_token`
+    /// Invalidates the authentication after [AuthToken] has been set to invalid.
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
 
     fn is_request_config_required(&self, req: &HttpRequest) -> bool;
@@ -155,11 +236,11 @@ where
     fn configure_request(&self, extensions: &mut Extensions);
 }
 
-/// Extractor that holds the authenticated user
+/// Extractor that holds the authenticated user.
 ///
-/// If you inject [AuthToken] in a route that is not secured (a public route), it will respond with 500.
+/// Injecting [AuthToken] into an unsecured (public) route currently results in a 500 error.
 ///
-/// # Example:
+/// # Example
 /// ```no_run
 /// use actix_web::{get, HttpResponse, Responder};
 /// use authfix::AuthToken;
@@ -237,7 +318,7 @@ impl<U> AuthToken<U> {
 }
 
 #[derive(PartialEq, Debug)]
-pub enum AuthState {
+enum AuthState {
     Authenticated,
     NeedsMfa,
     Invalid,

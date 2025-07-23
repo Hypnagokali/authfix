@@ -50,7 +50,7 @@ impl Default for GetTotpSecretError {
 
 /// Authenticator authentication
 ///
-/// Uses [TotpSecretRepository<U>] to retrieve the shared secret
+/// Uses [TotpSecretRepository] to retrieve the shared secret
 /// Set discrepancy (in seconds) to accept codes from another time slice, for example in the case of possible clock differences.
 pub struct AuthenticatorFactor<T, U> {
     totp_secret_repo: Arc<T>,
