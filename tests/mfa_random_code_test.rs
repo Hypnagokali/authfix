@@ -1,8 +1,4 @@
-use std::{
-    net::SocketAddr,
-    sync::{Arc, Once},
-    thread,
-};
+use std::{net::SocketAddr, sync::Arc, thread};
 
 use actix_session::{storage::CookieSessionStore, SessionExt, SessionMiddleware};
 use actix_web::{cookie::Key, get, App, HttpRequest, HttpResponse, HttpServer, Responder};
@@ -10,29 +6,19 @@ use async_trait::async_trait;
 use authfix::{
     middleware::{AuthMiddleware, PathMatcher},
     multifactor::config::{HandleMfaRequest, MfaConfig, MfaError},
-    multifactor::factor_impl::random_code_auth::{
-        CodeSendError, CodeSender, MfaRandomCodeFactor, RandomCode,
+    session::{
+        config::Routes,
+        factor_impl::random_code_auth::{
+            CodeSendError, CodeSender, MfaRandomCodeFactor, RandomCode,
+        },
+        handlers::SessionApiHandlers,
+        session_auth::SessionAuthProvider,
     },
-    session::{config::Routes, handlers::SessionApiHandlers, session_auth::SessionAuthProvider},
     AuthToken,
 };
+use authfix_test_utils::{HardCodedLoadUserService, User};
 use chrono::{Duration, Local, TimeDelta};
 use reqwest::{Client, StatusCode};
-use test_utils::{HardCodedLoadUserService, User};
-
-mod test_utils;
-
-static _INIT_LOGGER: Once = Once::new();
-
-fn _setup_logger() {
-    _INIT_LOGGER.call_once(|| {
-        env_logger::builder()
-            .is_test(true)
-            .filter_level(log::LevelFilter::Debug)
-            .try_init()
-            .unwrap();
-    });
-}
 
 struct OnlyRandomCodeFactor;
 
@@ -267,7 +253,8 @@ async fn should_not_be_logged_in_after_time_is_up() {
 struct DummySender;
 
 impl CodeSender for DummySender {
-    async fn send_code(&self, _: RandomCode) -> Result<(), CodeSendError> {
+    type User = User;
+    async fn send_code(&self, _: &User, _: RandomCode) -> Result<(), CodeSendError> {
         // send code
         Ok(())
     }
@@ -319,6 +306,7 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
             .block_on(async {
                 let sender = Arc::new(DummySender);
 
+                let load_user_service = Arc::new(HardCodedLoadUserService);
                 HttpServer::new(move || {
                     // Hint:
                     // This is the manual configuration of the auth middleware with a session provider and handlers.
@@ -326,7 +314,7 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
                     let code_factor =
                         Box::new(MfaRandomCodeFactor::new(generator, Arc::clone(&sender)));
                     let mfa_config = MfaConfig::new(vec![code_factor], OnlyRandomCodeFactor);
-                    let load_user_service = Arc::new(HardCodedLoadUserService);
+
                     App::new()
                         .service(secured_route)
                         .configure(
@@ -335,7 +323,7 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
                         )
                         .wrap(AuthMiddleware::<_, User>::new(
                             SessionAuthProvider::new_with_mfa(
-                                load_user_service,
+                                load_user_service.clone(),
                                 mfa_config,
                                 Routes::default(),
                             ),

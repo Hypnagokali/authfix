@@ -12,6 +12,9 @@ readme = "README.md"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+members = [".", "test-utils"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
@@ -50,3 +53,4 @@ chrono = "0.4"
 env_logger = "0.11"
 lazy_static = "1.5.0"
 authfix = { path = ".", features = ["authenticator", "mfa_send_code"] } 
+authfix-test-utils = { path = "./test-utils" }

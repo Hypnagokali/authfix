@@ -12,11 +12,9 @@ use authfix::{
     AuthToken,
 };
 
+use authfix_test_utils::{HardCodedLoadUserService, TotpTestRepo, User, SECRET};
 use google_authenticator::GoogleAuthenticator;
 use reqwest::{Client, StatusCode};
-use test_utils::{HardCodedLoadUserService, TotpTestRepo, User, SECRET};
-
-mod test_utils;
 
 struct OnlyAuthenticatorFactor;
 
