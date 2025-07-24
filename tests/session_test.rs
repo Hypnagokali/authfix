@@ -6,10 +6,8 @@ use authfix::{
     session::{app_builder::SessionLoginAppBuilder, config::Routes},
     AuthToken,
 };
+use authfix_test_utils::User;
 use reqwest::{Client, StatusCode};
-use test_utils::User;
-
-mod test_utils;
 
 struct AcceptEveryoneLoginService;
 

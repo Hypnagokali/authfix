@@ -484,6 +484,7 @@ dependencies = [
  "actix-web",
  "async-trait",
  "authfix",
+ "authfix-test-utils",
  "base32 0.5.1",
  "chrono",
  "env_logger",
@@ -501,6 +502,24 @@ dependencies = [
  "serde",
  "thiserror 2.0.12",
  "urlencoding",
+]
+
+[[package]]
+name = "authfix-test-utils"
+version = "0.1.0"
+dependencies = [
+ "actix-rt",
+ "actix-session",
+ "actix-test",
+ "authfix",
+ "chrono",
+ "env_logger",
+ "image 0.25.5",
+ "lazy_static",
+ "reqwest",
+ "resvg",
+ "rqrr",
+ "serde",
 ]
 
 [[package]]

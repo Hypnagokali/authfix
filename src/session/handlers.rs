@@ -356,28 +356,19 @@ async fn generate_code_if_mfa_necessary<U: SessionUser>(
     mfa_config: MfaConfig<U>,
     req: &HttpRequest,
     session: &LoginSession,
-) -> Result<bool, SessionApiLoginError> {
-    if !mfa_config.is_configured() {
-        return Ok(false);
+) -> Result<(), SessionApiLoginError> {
+    if let Some(factor) = mfa_config.factor_by_user(user).await {
+        factor.generate_code(req).await?;
+        session.set_needs_mfa(&factor.unique_id())?;
+    } else {
+        session.destroy();
+        return Err(SessionApiLoginError::ServerError(format!(
+            "MFA challenge error: No factor found for user: {}",
+            user.user_identification()
+        )));
     }
 
-    let mut mfa_needed = false;
-
-    if mfa_config.is_condition_met(user, req.clone()).await {
-        if let Some(factor) = mfa_config.factor_by_user(user).await {
-            factor.generate_code(req).await?;
-            session.set_needs_mfa(&factor.unique_id())?;
-            mfa_needed = true;
-        } else {
-            session.destroy();
-            return Err(SessionApiLoginError::ServerError(format!(
-                "MFA challenge error: No factor found for user: {}",
-                user.user_identification()
-            )));
-        }
-    }
-
-    Ok(mfa_needed)
+    Ok(())
 }
 
 async fn login_internal<T: LoadUserByCredentials<User = U>, U: SessionUser>(
@@ -408,31 +399,41 @@ async fn login_internal<T: LoadUserByCredentials<User = U>, U: SessionUser>(
 
             let mut login_res = LoginSessionResponse::success();
 
-            if !generate_code_if_mfa_necessary(&user, mfa_config.clone(), &req, &session).await? {
-                // MFA not needed, call success handler
-                handle_success(success_handler, req, &user).await?;
-            } else {
-                // set timeout for login session
+            if mfa_config.is_configured() && mfa_config.is_condition_met(&user, req.clone()).await {
+                // Set session validity
                 if let Some(validity) = SystemTime::now()
                     .checked_add(Duration::from_secs(mfa_config.timeout_in_seconds()))
                 {
                     session.valid_until(validity)?;
-                    if let Some(mfa_id) = session.mfa_id() {
-                        login_res = LoginSessionResponse::needs_mfa(&mfa_id);
-                    } else {
-                        return Err(SessionApiLoginError::ServerError(
-                            "Generate MFA challenge error: No mfa_id in session found".to_owned(),
-                        ));
-                    }
                 } else {
                     return Err(SessionApiLoginError::ServerError(
                         "Generate MFA challenge error: Cannot create login session timeout"
                             .to_owned(),
                     ));
                 }
+
+                session.set_user(&user).inspect_err(|_| {
+                    session.destroy();
+                })?;
+
+                generate_code_if_mfa_necessary(&user, mfa_config.clone(), &req, &session)
+                    .await
+                    .inspect_err(|_| {
+                        session.destroy();
+                    })?;
+
+                if let Some(mfa_id) = session.mfa_id() {
+                    login_res = LoginSessionResponse::needs_mfa(&mfa_id);
+                } else {
+                    return Err(SessionApiLoginError::ServerError(
+                        "Generate MFA challenge error: No mfa_id in session found".to_owned(),
+                    ));
+                }
+            } else {
+                handle_success(success_handler, req, &user).await?;
             }
 
-            session.set_user(user)?;
+            session.set_user(&user)?;
             Ok(login_res)
         }
         Err(e) => {

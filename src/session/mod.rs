@@ -1,11 +1,16 @@
 pub mod app_builder;
 pub mod config;
+pub mod factor_impl;
 pub mod handlers;
 pub mod session_auth;
 
 pub use actix_session;
 
 use serde::{de::DeserializeOwned, Serialize};
+
+pub(in crate::session) const SESSION_KEY_USER: &str = "authfix__user";
+pub(in crate::session) const SESSION_KEY_NEED_MFA: &str = "authfix__needs_mfa";
+pub(in crate::session) const SESSION_KEY_LOGIN_VALID_UNTIL: &str = "authfix__login_valid_until";
 
 /// Contains the information about the user account.
 ///

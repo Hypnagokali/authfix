@@ -10,16 +10,15 @@ use async_trait::async_trait;
 use authfix::{
     login::{FailureHandler, HandlerError, SuccessHandler},
     multifactor::config::{HandleMfaRequest, MfaConfig, MfaError},
-    multifactor::factor_impl::random_code_auth::{
-        CodeSendError, CodeSender, MfaRandomCodeFactor, RandomCode,
+    session::{
+        app_builder::SessionLoginAppBuilder,
+        factor_impl::random_code_auth::{
+            CodeSendError, CodeSender, MfaRandomCodeFactor, RandomCode,
+        },
     },
-    session::app_builder::SessionLoginAppBuilder,
 };
+use authfix_test_utils::{HardCodedLoadUserService, User};
 use reqwest::{redirect::Policy, Client, StatusCode};
-
-use crate::test_utils::{HardCodedLoadUserService, User};
-
-mod test_utils;
 
 // -- Start Helper section: struct and function, to check if a method has been called
 struct MethodCallUtil {
@@ -102,7 +101,8 @@ impl HandleMfaRequest for OnlyRandomCodeFactor {
 struct DummySender;
 
 impl CodeSender for DummySender {
-    async fn send_code(&self, _random_code: RandomCode) -> Result<(), CodeSendError> {
+    type User = User;
+    async fn send_code(&self, _: &User, _: RandomCode) -> Result<(), CodeSendError> {
         Ok(())
     }
 }
