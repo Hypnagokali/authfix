@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::{future::Future, sync::Arc, time::SystemTime};
 
 use actix_session::{Session, SessionExt};
@@ -6,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::multifactor::factor::{CheckCodeError, Factor, GenerateCodeError};
+use crate::session::{SessionUser, SESSION_KEY_USER};
 
 /// ID to reference random code mfa
 pub const MFA_ID_RANDOM_CODE: &str = "RNDCODE";
@@ -14,8 +16,10 @@ const MFA_RANDOM_CODE_KEY: &str = "mfa_random_code";
 
 /// Interface for sending the code to the user
 pub trait CodeSender {
+    type User;
     fn send_code(
         &self,
+        user: &Self::User,
         random_code: RandomCode,
     ) -> impl Future<Output = Result<(), CodeSendError>> + Send;
 }
@@ -71,29 +75,32 @@ impl RandomCode {
 ///
 /// It generates a [RandomCode] via a generator function and sends the code via [CodeSender] to the user.
 /// *Currently it only works with the [SessionAuthProvider](crate::session::session_auth::SessionAuthProvider).*
-pub struct MfaRandomCodeFactor<T> {
+pub struct MfaRandomCodeFactor<U, T> {
     code_generator: fn() -> RandomCode,
     code_sender: Arc<T>,
+    phantom_data: PhantomData<U>,
 }
 
-impl<T: CodeSender> MfaRandomCodeFactor<T> {
+impl<U, T: CodeSender<User = U>> MfaRandomCodeFactor<U, T> {
     pub fn new(code_generator: fn() -> RandomCode, code_sender: Arc<T>) -> Self {
         Self {
             code_generator,
             code_sender,
+            phantom_data: PhantomData,
         }
     }
 }
 
-impl MfaRandomCodeFactor<()> {
+impl MfaRandomCodeFactor<(), ()> {
     pub fn id() -> String {
         MFA_ID_RANDOM_CODE.to_owned()
     }
 }
 
-impl<T: CodeSender> Factor for MfaRandomCodeFactor<T>
+impl<U, T> Factor for MfaRandomCodeFactor<U, T>
 where
-    T: CodeSender + 'static,
+    T: CodeSender<User = U> + 'static,
+    U: SessionUser + 'static,
 {
     fn generate_code(
         &self,
@@ -103,7 +110,23 @@ where
         let session = req.get_session();
         let sender = Arc::clone(&self.code_sender);
 
+        let cloned_req = req.clone();
         Box::pin(async move {
+            let user = match cloned_req.get_session().get::<U>(SESSION_KEY_USER) {
+                Ok(Some(user)) => user,
+                Err(e) => {
+                    return Err(purge_session_and_error(
+                        &session,
+                        "Could not read user from session",
+                        e,
+                    ));
+                }
+                _ => {
+                    session.purge();
+                    return Err(GenerateCodeError::new("No user in session"));
+                }
+            };
+
             session
                 .insert(MFA_RANDOM_CODE_KEY, random_code.clone())
                 .map_err(|e| {
@@ -111,7 +134,7 @@ where
                 })?;
 
             sender
-                .send_code(random_code)
+                .send_code(&user, random_code)
                 .await
                 .map_err(|e| purge_session_and_error(&session, "Could not send code to user", e))?;
 
@@ -183,9 +206,7 @@ fn cleanup_and_time_is_up_error(session: &Session) -> CheckCodeError {
 
 #[cfg(test)]
 mod tests {
-    use crate::multifactor::factor_impl::random_code_auth::{
-        MfaRandomCodeFactor, MFA_ID_RANDOM_CODE,
-    };
+    use crate::session::factor_impl::random_code_auth::{MfaRandomCodeFactor, MFA_ID_RANDOM_CODE};
 
     #[test]
     fn test_static_id() {

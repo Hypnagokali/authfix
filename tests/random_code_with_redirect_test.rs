@@ -9,16 +9,13 @@ use actix_web::{cookie::Key, get, HttpRequest, HttpResponse, HttpServer, Respond
 use async_trait::async_trait;
 use authfix::{
     multifactor::config::{HandleMfaRequest, MfaConfig, MfaError},
-    multifactor::factor_impl::random_code_auth::{
+    session::app_builder::SessionLoginAppBuilder,
+    session::factor_impl::random_code_auth::{
         CodeSendError, CodeSender, MfaRandomCodeFactor, RandomCode,
     },
-    session::app_builder::SessionLoginAppBuilder,
 };
+use authfix_test_utils::{HardCodedLoadUserService, User};
 use reqwest::{redirect::Policy, Client, StatusCode};
-
-use crate::test_utils::{HardCodedLoadUserService, User};
-
-mod test_utils;
 
 struct OnlyRandomCodeFactor;
 
@@ -38,7 +35,8 @@ impl HandleMfaRequest for OnlyRandomCodeFactor {
 struct DummySender;
 
 impl CodeSender for DummySender {
-    async fn send_code(&self, _random_code: RandomCode) -> Result<(), CodeSendError> {
+    type User = User;
+    async fn send_code(&self, _: &User, _random_code: RandomCode) -> Result<(), CodeSendError> {
         Ok(())
     }
 }

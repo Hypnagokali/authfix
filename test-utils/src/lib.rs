@@ -1,36 +1,33 @@
 use authfix::{
     login::{LoadUserByCredentials, LoadUserError, LoginToken},
-    multifactor::factor_impl::{
-        authenticator::{GetTotpSecretError, TotpSecretRepository},
-        random_code_auth::{CodeSendError, CodeSender, RandomCode},
+    multifactor::factor_impl::authenticator::{GetTotpSecretError, TotpSecretRepository},
+    session::{
+        factor_impl::random_code_auth::{CodeSendError, CodeSender, RandomCode},
+        AccountInfo,
     },
-    session::AccountInfo,
 };
 use chrono::{Local, TimeDelta};
 use serde::{Deserialize, Serialize};
 
-// I am really not sure why cargo suddenly complains that TEST_OUT and test_out_path is not used. For now I mark it as allow(dead_code)
-#[allow(dead_code)]
 pub const TEST_OUT: &str = "test-out";
 
-#[allow(dead_code)]
 pub const SECRET: &str = "I3VFM3JKMNDJCDH5BMBEEQAW6KJ6NOE3";
 
-#[allow(dead_code)]
 pub fn test_out_path(path: &str) -> String {
     format!("{TEST_OUT}/{path}")
 }
 
-//
-// For login and mfa tests:
-//
 #[derive(Clone, Serialize, Deserialize)]
 pub struct User {
     pub email: String,
     pub name: String,
 }
 
-impl AccountInfo for User {}
+impl AccountInfo for User {
+    fn user_identification(&self) -> String {
+        self.name.clone()
+    }
+}
 
 pub struct HardCodedLoadUserService;
 
@@ -63,12 +60,12 @@ impl TotpSecretRepository for TotpTestRepo {
 pub struct DoNotSendCode;
 
 impl CodeSender for DoNotSendCode {
-    async fn send_code(&self, _: RandomCode) -> Result<(), CodeSendError> {
+    type User = User;
+    async fn send_code(&self, _: &User, _: RandomCode) -> Result<(), CodeSendError> {
         Ok(())
     }
 }
 
-#[allow(dead_code)]
 pub fn single_code_generator() -> RandomCode {
     let valid_until = Local::now()
         .checked_add_signed(TimeDelta::minutes(5))

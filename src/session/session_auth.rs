@@ -21,13 +21,12 @@ use crate::{
     login::{FailureHandler, LoadUserByCredentials, SuccessHandler},
     middleware::PathMatcher,
     multifactor::config::MfaConfig,
-    session::{config::Routes, SessionUser},
+    session::{
+        config::Routes, SessionUser, SESSION_KEY_LOGIN_VALID_UNTIL, SESSION_KEY_NEED_MFA,
+        SESSION_KEY_USER,
+    },
     AuthState, AuthToken, AuthenticationProvider, UnauthorizedError,
 };
-
-const SESSION_KEY_USER: &str = "authfix__user";
-const SESSION_KEY_NEED_MFA: &str = "authfix__needs_mfa";
-const SESSION_KEY_LOGIN_VALID_UNTIL: &str = "authfix__login_valid_until";
 
 type AuthTokenResult<U> = Result<AuthToken<U>, UnauthorizedError>;
 
@@ -249,7 +248,7 @@ impl LoginSession {
         )
     }
 
-    pub fn set_user<U: SessionUser>(&self, user: U) -> Result<(), SessionInsertError> {
+    pub fn set_user<U: SessionUser>(&self, user: &U) -> Result<(), SessionInsertError> {
         self.session.insert(SESSION_KEY_USER, user)
     }
 

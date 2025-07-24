@@ -1,11 +1,9 @@
 use std::fs;
 
 use authfix::multifactor::factor_impl::authenticator::TotpSecretGenerator;
+use authfix_test_utils::{test_out_path, TEST_OUT};
 use image::GrayImage;
 use resvg::{tiny_skia, usvg};
-use test_utils::{test_out_path, TEST_OUT};
-
-mod test_utils;
 
 #[test]
 fn should_contain_valid_url() {

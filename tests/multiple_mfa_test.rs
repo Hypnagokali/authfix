@@ -7,21 +7,24 @@ use authfix::{
     multifactor::{
         config::{HandleMfaRequest, MfaConfig, MfaError},
         factor::Factor,
-        factor_impl::{
-            authenticator::{AuthenticatorFactor, GetTotpSecretError, TotpSecretRepository},
-            random_code_auth::MfaRandomCodeFactor,
+        factor_impl::authenticator::{
+            AuthenticatorFactor, GetTotpSecretError, TotpSecretRepository,
         },
     },
-    session::{app_builder::SessionLoginAppBuilder, AccountInfo},
+    session::{
+        app_builder::SessionLoginAppBuilder,
+        factor_impl::random_code_auth::{
+            CodeSendError, CodeSender, MfaRandomCodeFactor, RandomCode,
+        },
+        AccountInfo,
+    },
     AuthToken,
 };
 
+use authfix_test_utils::{single_code_generator, SECRET};
 use google_authenticator::GoogleAuthenticator;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
-use test_utils::{single_code_generator, DoNotSendCode, SECRET};
-
-mod test_utils;
 
 #[derive(Serialize, Deserialize, Clone)]
 struct UserWithMfa {
@@ -52,6 +55,16 @@ impl HandleMfaRequest for LoadMfa {
 
     async fn is_condition_met(&self, user: &Self::User, _: HttpRequest) -> bool {
         user.mfa.is_some()
+    }
+}
+
+struct SomeCodeSender;
+
+impl CodeSender for SomeCodeSender {
+    type User = UserWithMfa;
+
+    async fn send_code(&self, _: &Self::User, _: RandomCode) -> Result<(), CodeSendError> {
+        Ok(())
     }
 }
 
@@ -152,7 +165,7 @@ async fn should_be_logged_in_using_random_code() {
 
     let client = Client::builder().cookie_store(true).build().unwrap();
 
-    client
+    let login = client
         .post(format!("http://{addr}/login"))
         .body(r#"{ "email": "anna", "password": "test123" }"#)
         .header("Content-Type", "application/json")
@@ -160,13 +173,17 @@ async fn should_be_logged_in_using_random_code() {
         .await
         .unwrap();
 
-    client
+    println!("LOGIN: {}", login.status());
+
+    let muh = client
         .post(format!("http://{addr}/login/mfa"))
         .body(format!("{{ \"code\": \"{}\" }}", "123abc"))
         .header("Content-Type", "application/json")
         .send()
         .await
         .unwrap();
+
+    println!("MFA: {}", muh.status());
 
     let res = client
         .get(format!("http://{addr}/secured-route"))
@@ -183,7 +200,7 @@ fn start_test_server(addr: SocketAddr) {
         actix_rt::System::new()
             .block_on(async {
                 let totp_secret_repo = Arc::new(TotpRepositoryForUserWithMfa);
-                let sender = Arc::new(DoNotSendCode);
+                let sender = Arc::new(SomeCodeSender);
                 let app_closure = move || {
                     let authenticator: Box<dyn Factor> =
                         Box::new(AuthenticatorFactor::<_, UserWithMfa>::with_discrepancy(
