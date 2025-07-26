@@ -21,7 +21,7 @@ pub trait CodeSender {
         &self,
         user: &Self::User,
         random_code: RandomCode,
-    ) -> impl Future<Output = Result<(), CodeSendError>> + Send;
+    ) -> impl Future<Output = Result<(), CodeSendError>>;
 }
 
 #[derive(Error, Debug)]
