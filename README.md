@@ -2,7 +2,6 @@
 > Authentication layer for Actix-Web
 
 [![CI](https://github.com/hypnagokali/authfix/actions/workflows/ci.yml/badge.svg)](https://github.com/hypnagokali/authfix/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/github/Hypnagokali/authfix/graph/badge.svg?token=1L5NOPZAK5)](https://codecov.io/github/Hypnagokali/authfix)
 
 This library offers an authentication middleware for [Actix Web](https://github.com/actix/actix-web). It's easy to use and quick to set up.
 
