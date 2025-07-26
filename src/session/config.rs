@@ -5,7 +5,7 @@ use crate::middleware::PathMatcher;
 
 /// Configuration for the auth related API endpoints: login, logout, verify MFA
 ///
-/// The default implementation sets: "/login", "/login/mfa" and "/logout"
+/// The default routes are: "/login", "/login/mfa" and "/logout"
 /// ```ignore
 /// let routes = Routes::default();
 /// ```

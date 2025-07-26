@@ -115,17 +115,10 @@ fn transform_to_encoded_regex(input: &str) -> String {
     encoded.replace(PATH_MATCHER_ANY_ENCODED, ".*")
 }
 
-/// A middleware that can simplify handling of authentication in [Actix Web](https://actix.rs/)
+/// Verifies if the user has access to the resource.
 ///
-/// [`AuthMiddleware`] checks if a user is logged in and if not, it responses with 401. If a user is present it gets injected into the `Actix Web`-pipeline and
-/// you can then retrieve it in request handlers by using the [AuthToken] extractor.
-/// Furthermore [`AuthMiddleware`] checks, if the `AuthToken` is still valid, if not it invalidates the underlying authentication.
-///
-/// To decide, if a user is logged in or not, [`AuthMiddleware`] uses the [AuthenticationProvider] trait to get the user from the underlying mechanism/store.
-///
-/// Currently only [SessionAuthProvider](crate::session::session_auth::SessionAuthProvider) implements [AuthenticationProvider]. Internally it uses
-/// [Actix Session](https://crates.io/crates/actix-session). For session authentication it is important to wrap the `SessionMiddleware`
-/// after the `AuthMiddleware`, so that the session is created/handled before the `AuthMiddleware`.
+/// It is responsible for securing the routes and managing the lifetime of the authentication.
+/// It delegates the authentication logic to the [AuthenticationProvider].
 #[derive(Clone)]
 pub struct AuthMiddleware<AuthProvider, U>
 where
@@ -151,6 +144,7 @@ where
     }
 }
 
+#[doc(hidden)]
 pub struct AuthMiddlewareInner<S, AuthProvider, U>
 where
     AuthProvider: AuthenticationProvider<U>,
@@ -187,7 +181,7 @@ where
             auth_provider.configure_request(&mut extensions);
         }
 
-        if let Some(response) = auth_provider.response_before_request_handling(req.request()) {
+        if let Some(response) = auth_provider.respond_before_request_handling(req.request()) {
             let res = ServiceResponse::new(req.into_parts().0, response);
             return Box::pin(async move { Ok(res) });
         }

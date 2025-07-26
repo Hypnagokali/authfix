@@ -11,7 +11,7 @@ use authfix::{
         factor_impl::random_code_auth::{
             CodeSendError, CodeSender, MfaRandomCodeFactor, RandomCode,
         },
-        handlers::SessionApiHandlers,
+        auth_flow::SessionAuthFlow,
         session_auth::SessionAuthProvider,
     },
     AuthToken,
@@ -318,10 +318,10 @@ fn start_test_server(addr: SocketAddr, generator: fn() -> RandomCode) {
                     App::new()
                         .service(secured_route)
                         .configure(
-                            SessionApiHandlers::<HardCodedLoadUserService, User>::default()
+                            SessionAuthFlow::<HardCodedLoadUserService, User>::default()
                                 .config(),
                         )
-                        .wrap(AuthMiddleware::<_, User>::new(
+                        .wrap(AuthMiddleware::new(
                             SessionAuthProvider::new_with_mfa(
                                 load_user_service.clone(),
                                 mfa_config,

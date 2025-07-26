@@ -18,9 +18,9 @@ use crate::{
     session::SessionUser,
 };
 
-use super::{config::Routes, handlers::SessionApiHandlers, session_auth::SessionAuthProvider};
+use super::{config::Routes, auth_flow::SessionAuthFlow, session_auth::SessionAuthProvider};
 
-/// A builder that builds an [App](https://docs.rs/actix-web/4.11.0/actix_web/struct.App.html) configured with session authentication
+/// A builder that builds an [App](https://docs.rs/actix-web/latest/actix_web/struct.App.html) configured with session authentication
 pub struct SessionLoginAppBuilder<U, S, ST>
 where
     U: SessionUser + 'static,
@@ -191,8 +191,8 @@ where
             Error = Error,
         >,
     > {
-        let handler: SessionApiHandlers<S, U> =
-            SessionApiHandlers::new(self.routes.clone(), self.redirect_flow);
+        let handler: SessionAuthFlow<S, U> =
+            SessionAuthFlow::new(self.routes.clone(), self.redirect_flow);
 
         let mut provider = if self.mfa_config.is_configured() {
             SessionAuthProvider::new_with_mfa(

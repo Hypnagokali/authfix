@@ -12,6 +12,31 @@ pub struct LoginToken {
     pub password: String,
 }
 /// Loads the users by their credentials
+/// # Example
+/// ```no_run
+/// use authfix::login::{LoginToken, LoadUserByCredentials, LoadUserError};
+/// struct User {
+///     name: String,
+/// }
+/// 
+/// struct AuthenticationService;
+/// 
+/// impl LoadUserByCredentials for AuthenticationService {
+///     type User = User;
+/// 
+///     async fn load_user(&self, login_token: &LoginToken) -> Result<Self::User, LoadUserError> {
+///         // Currently Authfix does not provide hashing functions, you can use for example https://docs.rs/argon2/latest/argon2/
+///         // This is a simplified example:
+///         if login_token.email == "test@example.org" && login_token.password == "password" {
+///             Ok(User {
+///                 name: "Johnny".to_owned(),
+///             })
+///         } else {
+///             Err(LoadUserError::LoginFailed)
+///         }
+///     }
+/// }
+/// ```
 pub trait LoadUserByCredentials {
     type User;
 

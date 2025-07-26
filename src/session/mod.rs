@@ -1,7 +1,7 @@
 pub mod app_builder;
 pub mod config;
 pub mod factor_impl;
-pub mod handlers;
+pub mod auth_flow;
 pub mod session_auth;
 
 pub use actix_session;
@@ -35,6 +35,6 @@ pub trait AccountInfo {
 
 /// This is a helper trait to bundle all necessary traits needed by a user
 ///
-/// Don't implement it, just derive Serialize, Deserialize from serde, Clone from std and implement AccountInfo
+/// A SessionUser needs from serde: Serialize and Deserialize. And AccountInfo must be implemented.
 pub trait SessionUser: AccountInfo + Serialize + DeserializeOwned {}
 impl<T> SessionUser for T where T: AccountInfo + Serialize + DeserializeOwned {}

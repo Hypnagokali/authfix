@@ -1,3 +1,19 @@
+//! Authentication flow for [SessionAuthProvider](crate::session::session_auth::SessionAuthProvider)
+//! 
+//! Its main component is [SessionAuthFlow] which configures the authentication related handlers like: login, logout, mfa.
+//! If you use the `redirect_flow`, you can use [LoginError] to check whether an error has occurred.
+//! 
+//! *It should not be necessary to construct the [SessionAuthFlow] by hand, instead you should really use 
+//! [SessionLoginAppBuilder](crate::session::app_builder::SessionLoginAppBuilder) to construct an [App](actix_web::App) with session authentication.*
+//! 
+//! # Example
+//! ```ignore
+//! App::new()
+//!     .configure(
+//!         SessionAuthFlow::<YourLoadUserByCredentialsType, User>::default().config())
+//!     .wrap(/* AuthMiddleware with AuthProvider */)
+//!     .wrap(/* SessionMiddleware (actix) */);
+//! ```
 use std::{
     marker::PhantomData,
     rc::Rc,
@@ -36,13 +52,13 @@ use thiserror::Error;
 
 use super::{config::Routes, session_auth::LoginSession};
 
-/// This struct can be used in combination with the Query extractor to capture the error parameter
+/// This struct can be used in combination with [Query](actix_web::web::Query) to capture the error parameter
 /// The error parameter is set, if the login fails or the user provides an invalid MFA code.
 ///
 /// # Example
 /// ```no_run
 /// use actix_web::{get, web::Query, Responder, HttpResponse};
-/// use authfix::session::handlers::LoginError;
+/// use authfix::session::auth_flow::LoginError;
 ///
 /// #[get("/login")]
 /// async fn login(query: Query<LoginError>) -> impl Responder {
@@ -151,16 +167,16 @@ impl LoginSessionResponse {
     }
 }
 
-/// An [Actix Web handler](https://actix.rs/docs/handlers/) for login, logout and multi factor auth validation
+/// Registers [Actix Web handler](https://actix.rs/docs/handlers/) for login, logout and mfa.
 #[allow(clippy::type_complexity)]
 #[derive(Clone)]
-pub struct SessionApiHandlers<T: LoadUserByCredentials<User = U>, U> {
+pub struct SessionAuthFlow<T: LoadUserByCredentials<User = U>, U> {
     routes: Routes,
     redirect_flow: bool,
     phantom_data: PhantomData<T>,
 }
 
-impl<T, U> SessionApiHandlers<T, U>
+impl<T, U> SessionAuthFlow<T, U>
 where
     U: SessionUser + 'static,
     T: LoadUserByCredentials<User = U> + 'static,
@@ -184,7 +200,7 @@ where
     }
 }
 
-impl<T, U> Default for SessionApiHandlers<T, U>
+impl<T, U> Default for SessionAuthFlow<T, U>
 where
     U: SessionUser + 'static,
     T: LoadUserByCredentials<User = U> + 'static,
@@ -537,7 +553,7 @@ async fn login_json<T: LoadUserByCredentials<User = U>, U: SessionUser>(
     Ok(HttpResponse::Ok().json(login_res))
 }
 
-impl<T, U> HttpServiceFactory for SessionApiHandlers<T, U>
+impl<T, U> HttpServiceFactory for SessionAuthFlow<T, U>
 where
     T: LoadUserByCredentials<User = U> + 'static,
     U: SessionUser + 'static,

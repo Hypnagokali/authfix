@@ -48,10 +48,11 @@ impl Default for GetTotpSecretError {
     }
 }
 
-/// Authenticator authentication
+/// Authenticator factor.
 ///
-/// Uses [TotpSecretRepository<U>] to retrieve the shared secret
-/// Set discrepancy (in seconds) to accept codes from another time slice, for example in the case of possible clock differences.
+/// Uses [TotpSecretRepository] to retrieve the shared secret.
+/// 
+/// You can use [AuthenticatorFactor::with_discrepancy] to set the discrepancy in seconds, to accept codes from another time slice (for example in the case of possible clock differences).
 pub struct AuthenticatorFactor<T, U> {
     totp_secret_repo: Arc<T>,
     discrepancy: u64,
@@ -192,9 +193,12 @@ pub enum SecretCodeGenerationError {
 pub struct Authenticator;
 
 impl Authenticator {
-    /// Verifies the given code for a given secret
+    /// Verifies the provided code for a given secret.
     ///
-    /// discrepancy adds a tolerance in seconds - how long the generation of the code might be
+    /// Discrepancy adds a tolerance in seconds, indicating how long ago the code could have been generated.
+    /// 
+    /// To verify the secret via a code before saving it, you should set the discrepancy to the same value
+    /// as used in [AuthenticatorFactor].
     pub fn verify(secret: &str, code: &str, discrepancy: u64) -> bool {
         let authenticator = GoogleAuthenticator::new();
 
