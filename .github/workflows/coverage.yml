@@ -36,6 +36,12 @@ jobs:
       - name: Analyze files
         run: head -n 20 lcov.info
 
+      - name: Correct paths
+        run: sed -i "s|SF:$(pwd)/|SF:|g" lcov.info
+      
+      - name: Analyze files
+        run: head -n 20 lcov.info
+
       # - name: Upload results to Codecov
       #   uses: codecov/codecov-action@v5
       #   with:
