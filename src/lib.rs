@@ -1,9 +1,12 @@
-//! Easily add authentication to your [Actix Web](https://crates.io/crates/actix-web) app with Authfix.
+//! Easily add authentication to your [Actix Web](https://crates.io/crates/actix-web) app with `Authfix`.
 //!
 //! It provides the [AuthToken] extractor for retrieving the authenticated user in handlers.
 //!
 //! # Session Authentication
-//! Currently, only session authentication is supported (OIDC is planned). The session authentication can be configured in two modes.
+//! Currently, only session authentication is supported (OIDC support is planned). This implementation is built on 
+//! [actix-session](https://docs.rs/actix-session/latest/actix_session/index.html). The session module **re-exports** `actix-session`.
+//! 
+//! The session authentication can be configured in two modes.
 //!
 //! 1. API based (default)
 //!     - It is designed to work with Single Page Applications, so it offers a JSON API for login, logout and mfa verification. Redirects
@@ -12,6 +15,7 @@
 //!     - Instead of returning 401 for unauthorized requests, it redirects the user to the login page. The login flow is completely handled by the browser.
 //!       You just have to define the login, mfa and logout pages. The redirects are going to the same routes as defined in [Routes](crate::session::config::Routes).
 //!       To activate this mode, set `with_redirect_flow()` in [SessionLoginAppBuilder](crate::session::app_builder::SessionLoginAppBuilder).
+//! `Actix Session`
 //!
 //! # Async traits
 //! To use this library, it is necessary to implement certrain traits (e.g.: [LoadUserByCredentials](crate::login::LoadUserByCredentials)).
@@ -30,7 +34,6 @@
 //! see: [authfix-examples](https://github.com/Hypnagokali/authfix-examples)
 //!
 //! ## Session based authentication
-//! The session based authentication is based on: [Actix Session](https://docs.rs/actix-session/latest/actix_session/). Authfix re-exports actix_session, you don't need it as a dependency.
 //! ```no_run
 //! use actix_web::{HttpResponse, HttpServer, Responder, cookie::Key, get};
 //! use authfix::{
@@ -96,9 +99,9 @@
 //! ```
 //! 
 //! ## Configure the session
-//! 
+//! The session based authentication is built on [Actix Session](https://docs.rs/actix-session/latest/actix_session/). Authfix re-exports it, you don't need it as a dependency.
 //! ```no_run
-//! use authfix::actix_session::{
+//! use authfix::session::actix_session::{
 //!     SessionMiddleware,
 //!     config::{PersistentSession, SessionLifecycle},
 //!     storage::CookieSessionStore,
@@ -194,8 +197,6 @@ pub mod session;
 // re-exports
 /// Re-exported `async_trait` macro for use in trait definitions.
 pub use async_trait::async_trait;
-/// Session management primitives from `actix-session`.
-pub use actix_session;
 
 /// Main component used by the middleware to handle the actual authentication mechanism
 ///
@@ -213,7 +214,7 @@ where
         service_request: &ServiceRequest,
     ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
 
-    /// This is a hook that is called before the request is handled.
+    /// This is a hook that is called before any request is handled.
     /// It should be used to analyze the request and return a response if needed.
     /// Its not intended for checking whether the user is authenticated (use `try_get_auth_token` for that).
     ///
