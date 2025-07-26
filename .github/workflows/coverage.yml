@@ -33,6 +33,9 @@ jobs:
       - name: Generate coverage report
         run: cargo llvm-cov --workspace --lcov --output-path lcov.info
 
+      - name: Show first 20 lines of coverage file
+        run: head -20 lcov.info
+
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v5
         with:
@@ -40,4 +43,5 @@ jobs:
           fail_ci_if_error: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          CODECOV_DEBUG: "true"
           
