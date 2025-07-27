@@ -32,9 +32,9 @@ type AuthTokenResult<U> = Result<AuthToken<U>, UnauthorizedError>;
 
 /// Provider for session based authentication.
 ///
-/// The provider is built on [Actix-Session](https://docs.rs/actix-session/latest/actix_session/). To use it, the `SessionMiddleware` must be set as middleware 
-/// after [AuthMiddleware](crate::middleware::AuthMiddleware), so that it is called first. 
-/// 
+/// The provider is built on [Actix-Session](https://docs.rs/actix-session/latest/actix_session/). To use it, the `SessionMiddleware` must be set as middleware
+/// after [AuthMiddleware](crate::middleware::AuthMiddleware), so that it is called first.
+///
 /// If you use the [SessionLoginAppBuilder](crate::session::app_builder::SessionLoginAppBuilder) this is all handled by the builder.
 #[derive(Clone)]
 pub struct SessionAuthProvider<U, L>
@@ -128,7 +128,7 @@ where
         let user = match session.get::<U>(SESSION_KEY_USER) {
             Ok(Some(user)) => user,
             _ => {
-                error!("No user in session. Cannot read {}", SESSION_KEY_USER);
+                error!("No user in session. Cannot read {SESSION_KEY_USER}");
                 return Err(build_error_cache_result(self, req));
             }
         };
@@ -137,7 +137,7 @@ where
             Ok(Some(_mfa_id)) => AuthState::NeedsMfa,
             Ok(None) => AuthState::Authenticated,
             Err(_) => {
-                error!("Cannot read '{}' value from session", SESSION_KEY_NEED_MFA);
+                error!("Cannot read '{SESSION_KEY_NEED_MFA}' value from session");
                 return Err(build_error_cache_result(self, req));
             }
         };

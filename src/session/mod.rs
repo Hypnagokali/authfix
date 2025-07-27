@@ -1,7 +1,7 @@
 pub mod app_builder;
+pub mod auth_flow;
 pub mod config;
 pub mod factor_impl;
-pub mod auth_flow;
 pub mod session_auth;
 
 pub use actix_session;

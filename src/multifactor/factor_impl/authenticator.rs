@@ -51,7 +51,7 @@ impl Default for GetTotpSecretError {
 /// Authenticator factor.
 ///
 /// Uses [TotpSecretRepository] to retrieve the shared secret.
-/// 
+///
 /// You can use [AuthenticatorFactor::with_discrepancy] to set the discrepancy in seconds, to accept codes from another time slice (for example in the case of possible clock differences).
 pub struct AuthenticatorFactor<T, U> {
     totp_secret_repo: Arc<T>,
@@ -125,8 +125,7 @@ where
                 })
                 .unwrap_or_else(|e| {
                     Err(CheckCodeError::UnknownError(format!(
-                        "Cannot check code: {}",
-                        e
+                        "Cannot check code: {e}"
                     )))
                 })
         })
@@ -196,7 +195,7 @@ impl Authenticator {
     /// Verifies the provided code for a given secret.
     ///
     /// Discrepancy adds a tolerance in seconds, indicating how long ago the code could have been generated.
-    /// 
+    ///
     /// To verify the secret via a code before saving it, you should set the discrepancy to the same value
     /// as used in [AuthenticatorFactor].
     pub fn verify(secret: &str, code: &str, discrepancy: u64) -> bool {

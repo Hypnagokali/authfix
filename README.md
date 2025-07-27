@@ -23,7 +23,6 @@ Check out the examples repo for detailed and working examples: [Authfix examples
 use actix_web::{HttpResponse, HttpServer, Responder, cookie::Key, get};
 use authfix::{
     AuthToken,
-    async_trait::async_trait,
     login::{LoadUserByCredentials, LoadUserError, LoginToken},
     session::{AccountInfo, app_builder::SessionLoginAppBuilder},
 };
@@ -44,7 +43,6 @@ struct AuthenticationService;
 
 // LoadUsersByCredentials uses async_trait, so its needed when implementing the trait for AuthenticationService
 // async_trait is re-exported by authfix.
-#[async_trait]
 impl LoadUserByCredentials for AuthenticationService {
     type User = User;
 

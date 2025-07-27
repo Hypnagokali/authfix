@@ -18,12 +18,12 @@ pub struct LoginToken {
 /// struct User {
 ///     name: String,
 /// }
-/// 
+///
 /// struct AuthenticationService;
-/// 
+///
 /// impl LoadUserByCredentials for AuthenticationService {
 ///     type User = User;
-/// 
+///
 ///     async fn load_user(&self, login_token: &LoginToken) -> Result<Self::User, LoadUserError> {
 ///         // Currently Authfix does not provide hashing functions, you can use for example https://docs.rs/argon2/latest/argon2/
 ///         // This is a simplified example:

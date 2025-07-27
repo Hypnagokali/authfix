@@ -1,12 +1,12 @@
 [package]
 name = "authfix"
-description = "Authfix offers an easy-to-configure authentication layer for Actix Web."
+description = "Authfix provides an easy-to-configure authentication layer for Actix Web."
 authors = ["Stefan Simon <stefan.j.c.simon@gmail.com>"]
 homepage = "https://github.com/Hypnagokali/authfix"
 repository = "https://github.com/Hypnagokali/authfix"
-keywords = ["authentication", "auth", "session", "actix", "actix-web", "middleware", "security", "login"]
+keywords = ["authentication", "session", "actix", "web", "middleware", "security", "login"]
 categories = ["authentication", "web-programming"]
-exclude = [".gitignore", ".github/", "tests/", "target/", "test-out/", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md"]
+exclude = [".gitignore", ".github/", "tests/", "target/", "test-out/", "test-utils/", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 version = "0.1.0"
@@ -24,7 +24,7 @@ authenticator = ["dep:google-authenticator", "dep:qrcode-generator", "dep:rand",
 mfa_send_code = []
 
 [dependencies]
-actix-web="4.10"
+actix-web="4.11"
 log = "0.4"
 serde = { version = "1.0", features = ["derive"]}
 actix-session = { version = "0.10", features = ["cookie-session"] }
@@ -33,7 +33,7 @@ regex = "1.11"
 urlencoding = "2.1"
 thiserror = "2.0"
 # used for public api like the trait `LoadUserService`
-async-trait = "0.1.88"
+async-trait = "0.1"
 
 # feature: authenticator
 google-authenticator = { version = "0.4", optional = true }
@@ -47,10 +47,10 @@ actix-session = { version = "0.10", features = ["cookie-session"]}
 actix-rt = "2.10.0"
 actix-test = "0.1.5"
 resvg = "0.45"
-rqrr = "0.9"
+rqrr = "0.10"
 image = "0.25"
 chrono = "0.4"
 env_logger = "0.11"
-lazy_static = "1.5.0"
+lazy_static = "1.5"
 authfix = { path = ".", features = ["authenticator", "mfa_send_code"] } 
 authfix-test-utils = { path = "./test-utils" }

@@ -78,7 +78,7 @@ async fn should_return_401_if_calling_mfa_without_login() {
 
     let res = client
         .post(format!("http://{addr}/login/mfa"))
-        .body(format!("{{ \"code\": \"{}\" }}", code))
+        .body(format!("{{ \"code\": \"{code}\" }}"))
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -128,7 +128,7 @@ async fn should_be_logged_in_after_mfa() {
 
     let mut res = client
         .post(format!("http://{addr}/login/mfa"))
-        .body(format!("{{ \"code\": \"{}\" }}", code))
+        .body(format!("{{ \"code\": \"{code}\" }}"))
         .header("Content-Type", "application/json")
         .send()
         .await

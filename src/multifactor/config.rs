@@ -11,14 +11,14 @@ use std::rc::Rc;
 use thiserror::Error;
 
 ///  Determines whether a login attempt requires MFA and which type.
-/// 
+///
 /// The only method that is required is:
 /// - `mfa_id_by_user` - Returns which factor is registered for the user.
-/// 
+///
 /// Methods with default implementation:
 /// - `is_condition_met` - Determines wether an additional factor is required (default: true).
 /// - `handle_success` - With this method you can modify the response, if the code has been accepted (default: unmodified HttpResponseBuilder).
-/// 
+///
 /// *Notice for session authentication: if `is_condition_met` returns true, but `mfa_id_by_user` returns None, it will lead to an error.*
 ///
 /// # Example
@@ -105,7 +105,7 @@ struct MfaConfigInner<U> {
 }
 
 /// Mutlifactor configuration and extractor.
-/// 
+///
 /// Registers the [factors](Factor) and the [HandleMfaRequest].
 /// There is a timeout for MFA attempts, the default is 300 seconds.
 /// [MfaConfig::new_with_timeout] constructs a config with a custom timeout.
