@@ -187,7 +187,7 @@ where
         }
 
         if self.path_matcher.matches(&request_path) {
-            debug!("Secured route: '{}'", debug_path);
+            debug!("Secured route: '{debug_path}'");
 
             Box::pin(async move {
                 // Before request: get AuthToken or respond with 401 or 302 (if redirect flow is set up)
@@ -212,7 +212,7 @@ where
                 };
 
                 if !token_valid {
-                    debug!("AuthToken no longer valid (maybe logged out). Invalidate authentication. (Triggered by path: {})", debug_path);
+                    debug!("AuthToken no longer valid (maybe logged out). Invalidate authentication. (Triggered by path: {debug_path})");
                     let req = res.request().clone();
                     auth_provider.invalidate(req).await;
                 }
@@ -220,7 +220,7 @@ where
                 Ok(res)
             })
         } else {
-            trace!("Route is not secured: {}", debug_path);
+            trace!("Route is not secured: {debug_path}");
             Box::pin(async move { service.call(req).await })
         }
     }

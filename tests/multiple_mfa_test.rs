@@ -142,7 +142,7 @@ async fn should_be_logged_in_using_authenticator() {
 
     let mut res = client
         .post(format!("http://{addr}/login/mfa"))
-        .body(format!("{{ \"code\": \"{}\" }}", code))
+        .body(format!("{{ \"code\": \"{code}\" }}"))
         .header("Content-Type", "application/json")
         .send()
         .await

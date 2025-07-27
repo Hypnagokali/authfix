@@ -1,11 +1,11 @@
 //! Authentication flow for [SessionAuthProvider](crate::session::session_auth::SessionAuthProvider)
-//! 
+//!
 //! Its main component is [SessionAuthFlow] which configures the authentication related handlers like: login, logout, mfa.
 //! If you use the `redirect_flow`, you can use [LoginError] to check whether an error has occurred.
-//! 
-//! *It should not be necessary to construct the [SessionAuthFlow] by hand, instead you should really use 
+//!
+//! *It should not be necessary to construct the [SessionAuthFlow] by hand, instead you should really use
 //! [SessionLoginAppBuilder](crate::session::app_builder::SessionLoginAppBuilder) to construct an [App](actix_web::App) with session authentication.*
-//! 
+//!
 //! # Example
 //! ```ignore
 //! App::new()
@@ -98,7 +98,7 @@ impl From<CheckCodeError> for SessionApiMfaError {
 
 impl From<HandlerError> for SessionApiMfaError {
     fn from(value: HandlerError) -> Self {
-        SessionApiMfaError::ServerError(format!("HandlerError: {}", value))
+        SessionApiMfaError::ServerError(format!("HandlerError: {value}"))
     }
 }
 
@@ -112,26 +112,26 @@ enum SessionApiLoginError {
 
 impl From<HandlerError> for SessionApiLoginError {
     fn from(value: HandlerError) -> Self {
-        SessionApiLoginError::ServerError(format!("HandlerError: {}", value))
+        SessionApiLoginError::ServerError(format!("HandlerError: {value}"))
     }
 }
 
 impl From<SessionInsertError> for SessionApiLoginError {
     fn from(value: SessionInsertError) -> Self {
-        SessionApiLoginError::ServerError(format!("SessionInsertError: {}", value))
+        SessionApiLoginError::ServerError(format!("SessionInsertError: {value}"))
     }
 }
 
 impl From<LoadUserError> for SessionApiLoginError {
     fn from(value: LoadUserError) -> Self {
         // happens, if user not found or password wrong
-        SessionApiLoginError::Unauthorized(format!("LoadUserError: {}", value))
+        SessionApiLoginError::Unauthorized(format!("LoadUserError: {value}"))
     }
 }
 
 impl From<GenerateCodeError> for SessionApiLoginError {
     fn from(value: GenerateCodeError) -> Self {
-        SessionApiLoginError::ServerError(format!("GenerateCodeError: {}", value))
+        SessionApiLoginError::ServerError(format!("GenerateCodeError: {value}"))
     }
 }
 
@@ -300,7 +300,7 @@ async fn mfa_route_form<U: SessionUser>(
         }
         Err(err) => match err {
             SessionApiMfaError::CodeError(check_code_error) => {
-                debug!("{}: {}", user_ident, check_code_error);
+                debug!("{user_ident}: {check_code_error}");
 
                 let mut query: HttpQuery = req.query_string().into();
                 query.insert_without_value("error");

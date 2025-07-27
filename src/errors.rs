@@ -186,7 +186,7 @@ impl ResponseError for UnauthorizedError {
         if let Some(redirect) = &self.0.redirect {
             let location = &redirect.location;
             let location_header = match &redirect.query_string {
-                Some(redirect_query) => &format!("{}?{}", location, redirect_query),
+                Some(redirect_query) => &format!("{location}?{redirect_query}"),
                 None => location,
             };
             HttpResponse::Found()

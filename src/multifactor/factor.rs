@@ -119,7 +119,7 @@ mod tests {
         let code_error = GenerateCodeError::new_with_cause("error", orig);
 
         assert_eq!(
-            format!("{}", code_error),
+            format!("{code_error}"),
             "GenerateCodeError: error, caused by: Retrieving TOTP secret failed: orig error"
         );
     }

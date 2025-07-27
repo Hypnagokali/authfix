@@ -33,8 +33,7 @@ fn should_contain_valid_url() {
     assert_eq!(
         content,
         format!(
-            "otpauth://totp/TestApp:john.doe@example.org?secret={}&issuer=TestApp&digits=6",
-            secret
+            "otpauth://totp/TestApp:john.doe@example.org?secret={secret}&issuer=TestApp&digits=6"
         )
     );
 }
