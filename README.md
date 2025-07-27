@@ -1,6 +1,7 @@
 # Authfix
 > Authentication layer for Actix-Web
 
+[![crates.io](https://img.shields.io/crates/v/authfix?label=latest)](https://crates.io/crates/authfix)
 [![CI](https://github.com/hypnagokali/authfix/actions/workflows/ci.yml/badge.svg)](https://github.com/hypnagokali/authfix/actions/workflows/ci.yml)
 
 This library offers an authentication middleware for [Actix Web](https://github.com/actix/actix-web). It's easy to use and quick to set up.
