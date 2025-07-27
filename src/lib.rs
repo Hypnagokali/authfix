@@ -179,6 +179,7 @@
 //! }
 //! ```
 
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 use actix_web::{
     dev::{Extensions, ServiceRequest},
     Error, FromRequest, HttpMessage, HttpRequest, HttpResponse,
