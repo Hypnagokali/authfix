@@ -1,6 +1,6 @@
 [package]
 name = "authfix"
-description = "Authfix provides an easy-to-configure authentication layer for Actix Web."
+description = "A simple and extensible authentication layer for Actix Web, designed for fast integration and easy configuration."
 authors = ["Stefan Simon <stefan.j.c.simon@gmail.com>"]
 homepage = "https://github.com/Hypnagokali/authfix"
 repository = "https://github.com/Hypnagokali/authfix"
