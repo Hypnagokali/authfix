@@ -1,12 +1,15 @@
-//! Easily add authentication to your [Actix Web](https://crates.io/crates/actix-web) app with `Authfix`.
+//! Authfix provides a quick and easy way to add authentication to your [Actix Web](https://docs.rs/actix-web/latest/actix_web/index.html) app.
 //!
-//! It provides the [AuthToken] extractor for retrieving the authenticated user in handlers.
+//! The [AuthToken] extractor enables straightforward access to the authenticated user in secured handlers.
+//! 
+//! # Quick start
+//! For a quick start, use the working examples from [authfix-examples](https://github.com/Hypnagokali/authfix-examples)
 //!
 //! # Session Authentication
 //! Currently, only session authentication is supported (OIDC support is planned). This implementation is built on 
-//! [actix-session](https://docs.rs/actix-session/latest/actix_session/index.html). The session module **re-exports** `actix-session`.
+//! [actix-session](https://docs.rs/actix-session/latest/actix_session/index.html). Authfix re-exports actix-session for this reason.
 //! 
-//! The session authentication can be configured in two modes.
+//! The session authentication flow can be configured in two modes.
 //!
 //! 1. API based (default)
 //!     - It is designed to work with Single Page Applications, so it offers a JSON API for login, logout and mfa verification. Redirects
@@ -15,7 +18,6 @@
 //!     - Instead of returning 401 for unauthorized requests, it redirects the user to the login page. The login flow is completely handled by the browser.
 //!       You just have to define the login, mfa and logout pages. The redirects are going to the same routes as defined in [Routes](crate::session::config::Routes).
 //!       To activate this mode, set `with_redirect_flow()` in [SessionLoginAppBuilder](crate::session::app_builder::SessionLoginAppBuilder).
-//! `Actix Session`
 //!
 //! # Async traits
 //! To use this library, it is necessary to implement certrain traits (e.g.: [LoadUserByCredentials](crate::login::LoadUserByCredentials)).
@@ -26,40 +28,35 @@
 //! 
 //! Authfix re-exports the [authfix::async_trait](crate::async_trait) macro.
 //!
-//! # Disclaimer
-//! *The library is still in the early stages and a work in progress so it can contain security flaws. Please report them or provide a PR: [Authfix repo](https://github.com/Hypnagokali/authfix)*
-//!
 //! # Examples
-//! ## Example Repository
-//! see: [authfix-examples](https://github.com/Hypnagokali/authfix-examples)
-//!
 //! ## Session based authentication
 //! ```no_run
 //! use actix_web::{HttpResponse, HttpServer, Responder, cookie::Key, get};
 //! use authfix::{
 //!     AuthToken,
-//!     async_trait,
 //!     login::{LoadUserByCredentials, LoadUserError, LoginToken},
-//!     session::{app_builder::SessionLoginAppBuilder, AccountInfo},
+//!     session::{AccountInfo, app_builder::SessionLoginAppBuilder},
 //! };
 //! use serde::{Deserialize, Serialize};
-//!
-//! // A user intended for session authentication must derive Serialize and Deserialize.
+//! 
+//! // A user intended for session authentication must derive Serialize, and Deserialize.
 //! #[derive(Serialize, Deserialize)]
 //! struct User {
 //!     name: String,
 //! }
-//!
+//! 
 //! // AccountInfo trait is used for disabling the user or to lock the account
 //! // The user is enabled by default
 //! impl AccountInfo for User {}
-//!
+//! 
 //! // Struct that handles the authentication
 //! struct AuthenticationService;
-//!
+//! 
+//! // LoadUsersByCredentials uses async_trait, so its needed when implementing the trait for AuthenticationService
+//! // async_trait is re-exported by authfix.
 //! impl LoadUserByCredentials for AuthenticationService {
 //!     type User = User;
-//!
+//! 
 //!     async fn load_user(&self, login_token: &LoginToken) -> Result<Self::User, LoadUserError> {
 //!         // load user by email logic and check password
 //!         // currently authfix does not provide hashing functions, you can use for example https://docs.rs/argon2/latest/argon2/
@@ -72,22 +69,20 @@
 //!         }
 //!     }
 //! }
-//!
+//! 
 //! // You have access to the user via the AuthToken extractor in secured routes.
 //! #[get("/secured")]
 //! async fn secured(auth_token: AuthToken<User>) -> impl Responder {
 //!     let user = auth_token.authenticated_user();
 //!     HttpResponse::Ok().json(&*user)
 //! }
-//!
+//! 
 //! #[actix_web::main]
 //! async fn main() -> std::io::Result<()> {
-//!     // In production, you should read the key from an external source so that you can use sessions across restarts
-//!     // see: https://docs.rs/actix-session/latest/actix_session/
 //!     let key = Key::generate();
 //!     HttpServer::new(move || {
 //!         // SessionLoginAppBuilder is the simplest way to create an App instance configured with session based authentication
-//!         // This config registers: /login, /logout and /login/mfa (even if mfa is not configured)
+//!         // This default config registers handlers for: /login, /logout and /login/mfa.
 //!         SessionLoginAppBuilder::create(AuthenticationService, key.clone())
 //!             .build()
 //!             .service(secured)
@@ -99,21 +94,24 @@
 //! ```
 //! 
 //! ## Configure the session
-//! The session based authentication is built on [Actix Session](https://docs.rs/actix-session/latest/actix_session/). Authfix re-exports it, you don't need it as a dependency.
 //! ```no_run
-//! use authfix::session::actix_session::{
-//!     SessionMiddleware,
-//!     config::{PersistentSession, SessionLifecycle},
-//!     storage::CookieSessionStore,
-//! };
 //! use actix_web::{HttpResponse, HttpServer, Responder, cookie::Key, get, middleware::Logger};
 //! use authfix::{
 //!     AuthToken,
 //!     login::{LoadUserByCredentials, LoadUserError, LoginToken},
-//!     session::{AccountInfo, app_builder::SessionLoginAppBuilder, config::Routes},
+//!     session::{
+//!         AccountInfo,
+//!         actix_session::{
+//!             SessionMiddleware,
+//!             config::{PersistentSession, SessionLifecycle},
+//!             storage::CookieSessionStore,
+//!         },
+//!         app_builder::SessionLoginAppBuilder,
+//!     },
 //! };
 //! use serde::{Deserialize, Serialize};
 //! 
+//! // A user intended for session authentication must derive or implement Serialize, and Deserialize.
 //! #[derive(Serialize, Deserialize)]
 //! struct User {
 //!     name: String,
@@ -121,12 +119,17 @@
 //! 
 //! impl AccountInfo for User {}
 //! 
+//! // Struct that handles the authentication
 //! struct AuthenticationService;
 //! 
+//! // LoadUsersByCredentials uses async_trait, so its needed when implementing the trait for AuthenticationService
+//! // async_trait is re-exported by authfix.
 //! impl LoadUserByCredentials for AuthenticationService {
 //!     type User = User;
 //! 
 //!     async fn load_user(&self, login_token: &LoginToken) -> Result<Self::User, LoadUserError> {
+//!         // load user by email logic and check password
+//!         // currently authfix does not provide hashing functions, you can use for example https://docs.rs/argon2/latest/argon2/
 //!         if login_token.email == "test@example.org" && login_token.password == "password" {
 //!             Ok(User {
 //!                 name: "Johnny".to_owned(),
@@ -137,6 +140,7 @@
 //!     }
 //! }
 //! 
+//! // You have access to the user via the AuthToken extractor in secured routes.
 //! #[get("/secured")]
 //! async fn secured(auth_token: AuthToken<User>) -> impl Responder {
 //!     let user = auth_token.authenticated_user();
@@ -159,10 +163,12 @@
 //! async fn main() -> std::io::Result<()> {
 //!     let key = Key::generate();
 //!     HttpServer::new(move || {
+//!         // SessionLoginAppBuilder is the simplest way to create an App instance configured with session based authentication
 //!         SessionLoginAppBuilder::create_with_session_middleware(
 //!             AuthenticationService,
 //!             session_config(key.clone()),
 //!         )
+//!         // create App instance with build()
 //!         .build()
 //!         .wrap(Logger::default())
 //!         .service(secured)
