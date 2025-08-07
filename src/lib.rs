@@ -95,7 +95,7 @@
 //!
 //! ## Configure the session
 //! ```no_run
-//! use actix_web::{HttpResponse, HttpServer, Responder, cookie::Key, get, middleware::Logger};
+//! use actix_web::{HttpResponse, HttpServer, Responder, cookie::Key, get};
 //! use authfix::{
 //!     AuthToken,
 //!     login::{LoadUserByCredentials, LoadUserError, LoginToken},
@@ -170,7 +170,6 @@
 //!         )
 //!         // create App instance with build()
 //!         .build()
-//!         .wrap(Logger::default())
 //!         .service(secured)
 //!     })
 //!     .bind("127.0.0.1:7080")?
