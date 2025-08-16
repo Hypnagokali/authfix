@@ -16,10 +16,16 @@ use actix_web::{
 use log::error;
 
 use crate::{
-    errors::UnauthorizedRedirect, helper::redirect_response_builder, login::{FailureHandler, LoadUserByCredentials, SuccessHandler}, middleware::PathMatcher, multifactor::config::MfaConfig, session::{
+    errors::UnauthorizedRedirect,
+    helper::redirect_response_builder,
+    login::{FailureHandler, LoadUserByCredentials, SuccessHandler},
+    middleware::PathMatcher,
+    multifactor::config::MfaConfig,
+    session::{
         config::Routes, SessionUser, SESSION_KEY_LOGIN_VALID_UNTIL, SESSION_KEY_NEED_MFA,
         SESSION_KEY_USER,
-    }, AuthState, AuthToken, AuthenticationProvider, LoginState, UnauthorizedError
+    },
+    AuthState, AuthToken, AuthenticationProvider, LoginState, UnauthorizedError,
 };
 
 type LoginStateResult<U> = Result<LoginState<U>, UnauthorizedError>;
@@ -112,7 +118,10 @@ where
     }
 
     /// Creates a valid (not Unauthenticated) LoginState from the session or returns an UnauthorizedError.
-    pub fn valid_login_state_from_session(&self, req: &actix_web::HttpRequest) -> LoginStateResult<U> {
+    pub fn valid_login_state_from_session(
+        &self,
+        req: &actix_web::HttpRequest,
+    ) -> LoginStateResult<U> {
         // use cached result if available
         if let Some(result) = req.extensions().get::<LoginStateResult<U>>() {
             return result.clone();
@@ -138,7 +147,6 @@ where
         };
 
         let res = Ok(LoginState::new(AuthToken::new(user), state));
-
 
         req.extensions_mut().insert(res.clone());
         res
@@ -211,7 +219,8 @@ where
             let login_state = login_state_res?;
 
             if *login_state.state() == AuthState::Authenticated
-                || (*login_state.state() == AuthState::PendingChallenge && PathMatcher::are_equal(&mfa_route, &request_path))
+                || (*login_state.state() == AuthState::PendingChallenge
+                    && PathMatcher::are_equal(&mfa_route, &request_path))
             {
                 Ok(login_state)
             } else {

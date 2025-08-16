@@ -186,7 +186,13 @@ use actix_web::{
 use errors::UnauthorizedError;
 
 use std::{
-    any::Any, cell::{Ref, RefCell}, collections::HashMap, future::{ready, Future, Ready}, pin::Pin, rc::Rc, sync::Arc
+    any::Any,
+    cell::{Ref, RefCell},
+    collections::HashMap,
+    future::{ready, Future, Ready},
+    pin::Pin,
+    rc::Rc,
+    sync::Arc,
 };
 
 pub mod errors;
@@ -211,7 +217,7 @@ where
     U: 'static,
 {
     /// Tries to retrieve the logged in user or fails with [UnauthorizedError]
-    /// 
+    ///
     /// It must not return a [LoginState] with [AuthState::Unauthenticated].
     fn try_get_auth_token(
         &self,
@@ -266,9 +272,12 @@ impl<U> LoginState<U> {
 
     pub fn get<T: Any>(&self, key: &str) -> Option<Ref<T>> {
         Ref::filter_map(self.0.borrow(), |inner| {
-            inner.map.get(key)
-                 .and_then(|state| state.downcast_ref::<T>())
-        }).ok()
+            inner
+                .map
+                .get(key)
+                .and_then(|state| state.downcast_ref::<T>())
+        })
+        .ok()
     }
 
     pub fn state(&self) -> Ref<AuthState> {
@@ -306,7 +315,6 @@ impl<U> LoginState<U> {
     }
 }
 
-
 impl<U: 'static> FromRequest for LoginState<U> {
     type Error = Error;
 
@@ -321,8 +329,6 @@ impl<U: 'static> FromRequest for LoginState<U> {
         }
     }
 }
-
-
 
 /// Extractor that holds the authenticated user.
 ///

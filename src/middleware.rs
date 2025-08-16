@@ -197,7 +197,7 @@ where
                     log::error!("LoginState is None, but it should not be. This is a bug in the authentication provider implementation.");
                     actix_web::error::ErrorInternalServerError("LoginState is None.")
                 })?;
-                    
+
                 {
                     let mut extensions = req.extensions_mut();
                     extensions.insert(login_state);
@@ -207,13 +207,13 @@ where
 
                 // After request: apply logout logic
                 // let initiate_logout = {
-                    // let extensions = res.request().extensions();
-                    // if let Some(token) = extensions.get::<LoginState<U>>() {
-                    //     token.valid()
-                    // } else {
-                    //     // If there is no AuthToken, authentication is no longer valid
-                    //     false
-                    // }
+                // let extensions = res.request().extensions();
+                // if let Some(token) = extensions.get::<LoginState<U>>() {
+                //     token.valid()
+                // } else {
+                //     // If there is no AuthToken, authentication is no longer valid
+                //     false
+                // }
                 // };
 
                 if token.is_marked_for_logout() {

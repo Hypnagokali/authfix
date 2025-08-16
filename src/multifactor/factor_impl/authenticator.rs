@@ -100,19 +100,15 @@ where
         req: &HttpRequest,
     ) -> Pin<Box<dyn Future<Output = Result<(), CheckCodeError>>>> {
         let extensions = req.extensions();
-        
+
         // This needs refactoring. It would be better to use a associated type U that can be used here as argument.
         let token = match extensions.get::<LoginState<U>>() {
-            Some(login_session) => {
-                match login_session.token() {
-                    Some(token) => {
-                        token
-                    },
-                    None => {
-                        return Box::pin(ready(Err(CheckCodeError::UnknownError(
-                            "LoginState does not contain an AuthToken".to_owned(),
-                        ))));
-                    }
+            Some(login_session) => match login_session.token() {
+                Some(token) => token,
+                None => {
+                    return Box::pin(ready(Err(CheckCodeError::UnknownError(
+                        "LoginState does not contain an AuthToken".to_owned(),
+                    ))));
                 }
             },
             None => {
