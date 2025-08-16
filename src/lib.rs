@@ -270,7 +270,7 @@ impl<U> LoginState<U> {
         self.0.borrow_mut().map.insert(key.to_owned(), Box::new(t));
     }
 
-    pub fn get<T: Any>(&self, key: &str) -> Option<Ref<T>> {
+    pub fn get<T: Any>(&self, key: &str) -> Option<Ref<'_, T>> {
         Ref::filter_map(self.0.borrow(), |inner| {
             inner
                 .map
@@ -280,7 +280,7 @@ impl<U> LoginState<U> {
         .ok()
     }
 
-    pub fn state(&self) -> Ref<AuthState> {
+    pub fn state(&self) -> Ref<'_, AuthState> {
         Ref::map(self.0.borrow(), |inner| &inner.state)
     }
 
