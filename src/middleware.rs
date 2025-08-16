@@ -14,7 +14,7 @@ use log::{debug, trace};
 use regex::Regex;
 use urlencoding::encode;
 
-use crate::{AuthToken, AuthenticationProvider};
+use crate::AuthenticationProvider;
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 
@@ -190,29 +190,34 @@ where
             debug!("Secured route: '{debug_path}'");
 
             Box::pin(async move {
-                // Before request: get AuthToken or respond with 401 or 302 (if redirect flow is set up)
-                let token = auth_provider.try_get_auth_token(&req).await?;
+                // Before request: try to get LoginState or otherwise respond with 401 (302 if redirect flow is set up)
+                let login_state = auth_provider.try_get_auth_token(&req).await?;
 
+                let token = login_state.token().ok_or_else(|| {
+                    log::error!("LoginState is None, but it should not be. This is a bug in the authentication provider implementation.");
+                    actix_web::error::ErrorInternalServerError("LoginState is None.")
+                })?;
+                    
                 {
                     let mut extensions = req.extensions_mut();
-                    extensions.insert(token);
+                    extensions.insert(login_state);
                 }
 
                 let res = service.call(req).await?;
 
                 // After request: apply logout logic
-                let token_valid = {
-                    let extensions = res.request().extensions();
-                    if let Some(token) = extensions.get::<AuthToken<U>>() {
-                        token.is_valid()
-                    } else {
-                        // If there is no AuthToken, authentication is no longer valid
-                        false
-                    }
-                };
+                // let initiate_logout = {
+                    // let extensions = res.request().extensions();
+                    // if let Some(token) = extensions.get::<LoginState<U>>() {
+                    //     token.valid()
+                    // } else {
+                    //     // If there is no AuthToken, authentication is no longer valid
+                    //     false
+                    // }
+                // };
 
-                if !token_valid {
-                    debug!("AuthToken no longer valid (maybe logged out). Invalidate authentication. (Triggered by path: {debug_path})");
+                if token.is_marked_for_logout() {
+                    debug!("AuthToken has been marked for logout. Invalidate authentication. (Triggered by path: {debug_path})");
                     let req = res.request().clone();
                     auth_provider.invalidate(req).await;
                 }

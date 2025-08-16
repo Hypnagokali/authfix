@@ -227,13 +227,13 @@ impl MfaRequestBody {
 }
 
 async fn logout_json<U: SessionUser>(token: AuthToken<U>) -> impl Responder {
-    token.invalidate();
+    token.mark_for_logout();
 
     HttpResponse::Ok()
 }
 
 async fn logout_form<U: SessionUser>(routes: Data<Routes>, token: AuthToken<U>) -> impl Responder {
-    token.invalidate();
+    token.mark_for_logout();
 
     redirect_response_builder()
         .insert_header((LOCATION, routes.login()))
@@ -346,13 +346,11 @@ async fn mfa_internal<U: SessionUser>(
     let user: U = session.user().unwrap();
 
     if let Some(f) = mfa_config.factor_by_user(&user).await {
-        match f.check_code(body.code(), &req).await {
-            Ok(_) => {}
-            Err(e) => {
-                handle_error(error_handler, req).await?;
-                return Err(e.into());
-            }
+        if let Err(e) = f.check_code(body.code(), &req).await {
+            handle_error(error_handler, req).await?;
+            return Err(e.into());
         }
+
         session.mfa_challenge_done();
         handle_success(success_handler, req, &user).await?;
         Ok(mfa_config.handle_success(&user, res).await)

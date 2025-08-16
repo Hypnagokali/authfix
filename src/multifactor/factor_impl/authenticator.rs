@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use crate::{
     multifactor::factor::{CheckCodeError, Factor, GenerateCodeError},
-    AuthToken,
+    LoginState,
 };
 
 /// ID to reference authenticator mfa
@@ -100,21 +100,33 @@ where
         req: &HttpRequest,
     ) -> Pin<Box<dyn Future<Output = Result<(), CheckCodeError>>>> {
         let extensions = req.extensions();
-        let token = match extensions.get::<AuthToken<U>>() {
-            Some(token) => token,
+        
+        // This needs refactoring. It would be better to use a associated type U that can be used here as argument.
+        let token = match extensions.get::<LoginState<U>>() {
+            Some(login_session) => {
+                match login_session.token() {
+                    Some(token) => {
+                        token
+                    },
+                    None => {
+                        return Box::pin(ready(Err(CheckCodeError::UnknownError(
+                            "LoginState does not contain an AuthToken".to_owned(),
+                        ))));
+                    }
+                }
+            },
             None => {
                 return Box::pin(ready(Err(CheckCodeError::UnknownError(
-                    "Cannot load AuthToken".to_owned(),
-                ))))
+                    "Cannot load LoginState".to_owned(),
+                ))));
             }
         };
 
-        let token_to_check = AuthToken::from_ref(token);
         let repo = Arc::clone(&self.totp_secret_repo);
         let code_to_check = code.trim().to_owned();
         let discrepancy = self.discrepancy;
         Box::pin(async move {
-            repo.auth_secret(&token_to_check.authenticated_user())
+            repo.auth_secret(&token.authenticated_user())
                 .await
                 .map(|secret| {
                     if Authenticator::verify(&secret, &code_to_check, discrepancy) {
