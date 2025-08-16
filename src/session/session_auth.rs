@@ -25,10 +25,10 @@ use crate::{
         config::Routes, SessionUser, SESSION_KEY_LOGIN_VALID_UNTIL, SESSION_KEY_NEED_MFA,
         SESSION_KEY_USER,
     },
-    AuthState, AuthToken, AuthenticationProvider, UnauthorizedError,
+    AuthState, AuthToken, AuthenticationProvider, LoginState, UnauthorizedError,
 };
 
-type AuthTokenResult<U> = Result<AuthToken<U>, UnauthorizedError>;
+type LoginStateResult<U> = Result<LoginState<U>, UnauthorizedError>;
 
 /// Provider for session based authentication.
 ///
@@ -117,9 +117,13 @@ where
         self.success_handler = success_handler;
     }
 
-    pub fn auth_token_from_session(&self, req: &actix_web::HttpRequest) -> AuthTokenResult<U> {
+    /// Creates a valid (not Unauthenticated) LoginState from the session or returns an UnauthorizedError.
+    pub fn valid_login_state_from_session(
+        &self,
+        req: &actix_web::HttpRequest,
+    ) -> LoginStateResult<U> {
         // use cached result if available
-        if let Some(result) = req.extensions().get::<AuthTokenResult<U>>() {
+        if let Some(result) = req.extensions().get::<LoginStateResult<U>>() {
             return result.clone();
         }
 
@@ -134,7 +138,7 @@ where
         };
 
         let state = match session.get::<String>(SESSION_KEY_NEED_MFA) {
-            Ok(Some(_mfa_id)) => AuthState::NeedsMfa,
+            Ok(Some(_mfa_id)) => AuthState::PendingChallenge,
             Ok(None) => AuthState::Authenticated,
             Err(_) => {
                 error!("Cannot read '{SESSION_KEY_NEED_MFA}' value from session");
@@ -142,7 +146,8 @@ where
             }
         };
 
-        let res = Ok(AuthToken::new(user, state));
+        let res = Ok(LoginState::new(AuthToken::new(user), state));
+
         req.extensions_mut().insert(res.clone());
         res
     }
@@ -168,10 +173,10 @@ where
             return None;
         }
 
-        let auth_token_req = self.auth_token_from_session(req).ok();
+        let login_state = self.valid_login_state_from_session(req).ok();
 
-        if let Some(token) = auth_token_req {
-            if token.is_authenticated()
+        if let Some(login_state) = login_state {
+            if *login_state.state() == AuthState::Authenticated
                 && self.redirect_flow
                 && (PathMatcher::are_equal(self.routes.login(), req.path())
                     || PathMatcher::are_equal(self.routes.mfa(), req.path()))
@@ -203,20 +208,21 @@ where
     fn try_get_auth_token(
         &self,
         req: &ServiceRequest,
-    ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>> {
+    ) -> Pin<Box<dyn Future<Output = Result<LoginState<U>, UnauthorizedError>>>> {
         let request_path = req.request().path().to_owned();
 
-        let auth_token_req = self.auth_token_from_session(req.request());
+        let login_state_res = self.valid_login_state_from_session(req.request());
         let mfa_route = self.routes.mfa().to_owned();
 
         let error = build_error(self, req.request());
         Box::pin(async move {
-            let token = auth_token_req?;
+            let login_state = login_state_res?;
 
-            if token.is_authenticated()
-                || (token.is_mfa_needed() && PathMatcher::are_equal(&mfa_route, &request_path))
+            if *login_state.state() == AuthState::Authenticated
+                || (*login_state.state() == AuthState::PendingChallenge
+                    && PathMatcher::are_equal(&mfa_route, &request_path))
             {
-                Ok(token)
+                Ok(login_state)
             } else {
                 Err(error)
             }

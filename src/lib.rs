@@ -186,7 +186,9 @@ use actix_web::{
 use errors::UnauthorizedError;
 
 use std::{
-    cell::RefCell,
+    any::Any,
+    cell::{Ref, RefCell},
+    collections::HashMap,
     future::{ready, Future, Ready},
     pin::Pin,
     rc::Rc,
@@ -215,10 +217,12 @@ where
     U: 'static,
 {
     /// Tries to retrieve the logged in user or fails with [UnauthorizedError]
+    ///
+    /// It must not return a [LoginState] with [AuthState::Unauthenticated].
     fn try_get_auth_token(
         &self,
         service_request: &ServiceRequest,
-    ) -> Pin<Box<dyn Future<Output = Result<AuthToken<U>, UnauthorizedError>>>>;
+    ) -> Pin<Box<dyn Future<Output = Result<LoginState<U>, UnauthorizedError>>>>;
 
     /// This is a hook that is called before any request is handled.
     /// It should be used to analyze the request and return a response if needed.
@@ -241,6 +245,89 @@ where
     /// E.g.: the session authentication requires a user service to retrieve the user by credentials - this service is injected using this method.
     #[allow(unused)]
     fn configure_request(&self, extensions: &mut Extensions);
+}
+
+pub struct LoginState<U>(Rc<RefCell<LoginStateInner<U>>>);
+
+impl<U> Clone for LoginState<U> {
+    fn clone(&self) -> Self {
+        LoginState(Rc::clone(&self.0))
+    }
+}
+
+pub struct LoginStateInner<U> {
+    token: Option<AuthToken<U>>,
+    map: HashMap<String, Box<dyn Any>>,
+    state: AuthState,
+}
+
+impl<U> LoginState<U> {
+    pub fn token(&self) -> Option<AuthToken<U>> {
+        self.0.borrow().token.as_ref().map(AuthToken::from_ref)
+    }
+
+    pub fn set<T: Any>(&self, key: &str, t: T) {
+        self.0.borrow_mut().map.insert(key.to_owned(), Box::new(t));
+    }
+
+    pub fn get<T: Any>(&self, key: &str) -> Option<Ref<'_, T>> {
+        Ref::filter_map(self.0.borrow(), |inner| {
+            inner
+                .map
+                .get(key)
+                .and_then(|state| state.downcast_ref::<T>())
+        })
+        .ok()
+    }
+
+    pub fn state(&self) -> Ref<'_, AuthState> {
+        Ref::map(self.0.borrow(), |inner| &inner.state)
+    }
+
+    /// Sets an [AuthToken], which means, a user has been authenticated (maybe a challenge is still outstanding).
+    /// # panics
+    /// Panics if the [AuthState] is [AuthState::Unauthenticated]
+    pub fn new(token: AuthToken<U>, auth_state: AuthState) -> Self {
+        if auth_state == AuthState::Unauthenticated {
+            panic!("Cannot create a LoginState with AuthToken and AuthState::Unauthenticated");
+        }
+        let inner = LoginStateInner {
+            token: Some(AuthToken::from_ref(&token)),
+            map: HashMap::new(),
+            state: auth_state,
+        };
+
+        Self(Rc::new(RefCell::new(inner)))
+    }
+
+    pub fn empty() -> Self {
+        let inner = LoginStateInner {
+            token: None,
+            map: HashMap::new(),
+            state: AuthState::Unauthenticated,
+        };
+
+        Self(Rc::new(RefCell::new(inner)))
+    }
+
+    pub fn from_ref(login_state: &LoginState<U>) -> Self {
+        LoginState(Rc::clone(&login_state.0))
+    }
+}
+
+impl<U: 'static> FromRequest for LoginState<U> {
+    type Error = Error;
+
+    type Future = Ready<Result<LoginState<U>, Self::Error>>;
+
+    fn from_request(req: &HttpRequest, _: &mut actix_web::dev::Payload) -> Self::Future {
+        let extensions = req.extensions();
+        if let Some(login_state) = extensions.get::<LoginState<U>>() {
+            ready(Ok(LoginState::from_ref(login_state)))
+        } else {
+            ready(Ok(LoginState::empty()))
+        }
+    }
 }
 
 /// Extractor that holds the authenticated user.
@@ -287,31 +374,19 @@ impl<U> AuthToken<U> {
         Arc::clone(&self.user)
     }
 
-    /// Invalidates the AuthToken. This triggers [AuthenticationProvider::invalidate]
-    pub fn invalidate(&self) {
+    pub fn is_marked_for_logout(&self) -> bool {
+        self.inner_state.borrow().logout
+    }
+
+    /// Invalidates the AuthToken and initiate a logout.
+    pub fn mark_for_logout(&self) {
         let mut inner = self.inner_state.borrow_mut();
-        inner.auth_state = AuthState::Invalid;
+        inner.logout = true;
     }
 
-    pub(crate) fn is_mfa_needed(&self) -> bool {
-        let inner = self.inner_state.borrow();
-        inner.auth_state == AuthState::NeedsMfa
-    }
-
-    pub(crate) fn is_valid(&self) -> bool {
-        let inner = self.inner_state.borrow();
-        inner.auth_state != AuthState::Invalid
-    }
-
-    #[allow(unused)]
-    pub(crate) fn is_authenticated(&self) -> bool {
-        let inner = self.inner_state.borrow();
-        inner.auth_state == AuthState::Authenticated
-    }
-
-    pub(crate) fn new(user: U, auth_state: AuthState) -> Self {
+    pub(crate) fn new(user: U) -> Self {
         Self {
-            inner_state: Rc::new(RefCell::new(AuthTokenInner { auth_state })),
+            inner_state: Rc::new(RefCell::new(AuthTokenInner { logout: false })),
             user: Arc::new(user),
         }
     }
@@ -325,14 +400,16 @@ impl<U> AuthToken<U> {
 }
 
 #[derive(PartialEq, Debug)]
-enum AuthState {
+pub enum AuthState {
+    Unauthenticated,
     Authenticated,
-    NeedsMfa,
+    PendingChallenge,
     Invalid,
 }
 
 struct AuthTokenInner {
-    auth_state: AuthState,
+    // there will be more fields here, such as roles and permissions
+    logout: bool,
 }
 
 impl<U> FromRequest for AuthToken<U>
@@ -344,10 +421,14 @@ where
 
     fn from_request(req: &HttpRequest, _payload: &mut actix_web::dev::Payload) -> Self::Future {
         let extensions = req.extensions();
-        if let Some(token) = extensions.get::<AuthToken<U>>() {
-            return ready(Ok(AuthToken::from_ref(token)));
+        if let Some(login_state) = extensions.get::<LoginState<U>>() {
+            if let Some(token) = login_state.token() {
+                return ready(Ok(token));
+            }
         }
 
+        // If we reach this point, the AuthToken is not available in the request.
+        // If this point is reached in secured routes, something must be wrong with the AuthenticationProvider or Middleware.
         ready(Err(actix_web::error::ErrorInternalServerError(
             "'AuthToken' cannot be used in public routes.",
         )))
