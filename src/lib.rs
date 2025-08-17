@@ -218,6 +218,7 @@ where
 {
     /// Tries to retrieve the logged in user or fails with [UnauthorizedError]
     ///
+    /// If the user is not logged in, it returns an [UnauthorizedError].
     /// It must not return a [LoginState] with [AuthState::Unauthenticated].
     fn try_get_auth_token(
         &self,
@@ -225,6 +226,7 @@ where
     ) -> Pin<Box<dyn Future<Output = Result<LoginState<U>, UnauthorizedError>>>>;
 
     /// This is a hook that is called before any request is handled.
+    ///
     /// It should be used to analyze the request and return a response if needed.
     /// Its not intended for checking whether the user is authenticated (use `try_get_auth_token` for that).
     ///
@@ -235,9 +237,12 @@ where
         None
     }
 
-    /// Invalidates the authentication after [AuthToken] has been set to invalid.
+    /// Invalidates the authentication after [AuthToken] has been flagged for logout.
     fn invalidate(&self, req: HttpRequest) -> Pin<Box<dyn Future<Output = ()>>>;
 
+    /// This method is used to check whether the request requires additional configuration.
+    ///
+    /// If it returns true, the [AuthenticationProvider::configure_request] method will be called.
     fn is_request_config_required(&self, req: &HttpRequest) -> bool;
 
     /// Configures the request if needed
@@ -247,6 +252,12 @@ where
     fn configure_request(&self, extensions: &mut Extensions);
 }
 
+/// State of the login
+///
+/// If no authentications has been performed, the state is [AuthState::Unauthenticated].
+/// If the user has been authenticated, but a challenge is still outstanding, the state is [AuthState::PendingChallenge].
+/// If the user has been authenticated completely, the state is [AuthState::Authenticated].
+/// Right after the user has been logged out, the state is [AuthState::Invalid] until the whole authentication has been invalidated.
 pub struct LoginState<U>(Rc<RefCell<LoginStateInner<U>>>);
 
 impl<U> Clone for LoginState<U> {
@@ -255,21 +266,24 @@ impl<U> Clone for LoginState<U> {
     }
 }
 
-pub struct LoginStateInner<U> {
+struct LoginStateInner<U> {
     token: Option<AuthToken<U>>,
     map: HashMap<String, Box<dyn Any>>,
     state: AuthState,
 }
 
 impl<U> LoginState<U> {
+    /// Returns the [AuthToken] if it exists in the [LoginState].
     pub fn token(&self) -> Option<AuthToken<U>> {
         self.0.borrow().token.as_ref().map(AuthToken::from_ref)
     }
 
+    /// Can store information of any type about the login state.
     pub fn set<T: Any>(&self, key: &str, t: T) {
         self.0.borrow_mut().map.insert(key.to_owned(), Box::new(t));
     }
 
+    // Retrieves a value from the [LoginState] by its key.
     pub fn get<T: Any>(&self, key: &str) -> Option<Ref<'_, T>> {
         Ref::filter_map(self.0.borrow(), |inner| {
             inner
@@ -280,11 +294,13 @@ impl<U> LoginState<U> {
         .ok()
     }
 
+    /// Returns the current state of the [LoginState].
     pub fn state(&self) -> Ref<'_, AuthState> {
         Ref::map(self.0.borrow(), |inner| &inner.state)
     }
 
     /// Sets an [AuthToken], which means, a user has been authenticated (maybe a challenge is still outstanding).
+    ///
     /// # panics
     /// Panics if the [AuthState] is [AuthState::Unauthenticated]
     pub fn new(token: AuthToken<U>, auth_state: AuthState) -> Self {
@@ -300,6 +316,10 @@ impl<U> LoginState<U> {
         Self(Rc::new(RefCell::new(inner)))
     }
 
+    /// Creates a new [LoginState] without an [AuthToken].
+    ///
+    /// [LoguinState] can be extracted anywhere and if it contains no user information
+    /// it can be interpreted as 'anonymous user'.
     pub fn empty() -> Self {
         let inner = LoginStateInner {
             token: None,
@@ -456,7 +476,7 @@ pub trait AuthTokenExt {
 impl AuthTokenExt for HttpRequest {
     fn auth_token<U: 'static>(&self) -> Option<AuthToken<U>> {
         let ext = self.extensions();
-        ext.get::<AuthToken<U>>()
-            .map(|auth_token_ref| AuthToken::from_ref(auth_token_ref))
+
+        ext.get::<LoginState<U>>().and_then(|state| state.token())
     }
 }

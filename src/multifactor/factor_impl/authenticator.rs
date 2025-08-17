@@ -5,14 +5,14 @@ use std::{
     sync::Arc,
 };
 
-use actix_web::{HttpMessage, HttpRequest};
+use actix_web::HttpRequest;
 use google_authenticator::GoogleAuthenticator;
 use rand::RngCore;
 use thiserror::Error;
 
 use crate::{
     multifactor::factor::{CheckCodeError, Factor, GenerateCodeError},
-    LoginState,
+    AuthTokenExt,
 };
 
 /// ID to reference authenticator mfa
@@ -99,21 +99,12 @@ where
         code: &str,
         req: &HttpRequest,
     ) -> Pin<Box<dyn Future<Output = Result<(), CheckCodeError>>>> {
-        let extensions = req.extensions();
-
         // This needs refactoring. It would be better to use a associated type U that can be used here as argument.
-        let token = match extensions.get::<LoginState<U>>() {
-            Some(login_session) => match login_session.token() {
-                Some(token) => token,
-                None => {
-                    return Box::pin(ready(Err(CheckCodeError::UnknownError(
-                        "LoginState does not contain an AuthToken".to_owned(),
-                    ))));
-                }
-            },
+        let token = match req.auth_token::<U>() {
+            Some(token) => token,
             None => {
                 return Box::pin(ready(Err(CheckCodeError::UnknownError(
-                    "Cannot load LoginState".to_owned(),
+                    "Found not AuthToken in request".to_owned(),
                 ))));
             }
         };
