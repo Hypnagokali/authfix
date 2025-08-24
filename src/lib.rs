@@ -186,13 +186,7 @@ use actix_web::{
 use errors::UnauthorizedError;
 
 use std::{
-    any::Any,
-    cell::{Ref, RefCell},
-    collections::HashMap,
-    future::{ready, Future, Ready},
-    pin::Pin,
-    rc::Rc,
-    sync::Arc,
+    any::Any, cell::{Ref, RefCell}, collections::HashMap, future::{ready, Future, Ready}, ops::Deref, pin::Pin, rc::Rc, sync::Arc
 };
 
 pub mod errors;
@@ -376,10 +370,20 @@ pub struct AuthToken<U> {
     user: Arc<U>,
 }
 
-impl<U> Clone for AuthToken<U>
-where
-    U: 'static,
-{
+/// Wrapper around Option<AuthToken<U>> for ergonomic extraction.
+///
+/// This can be used as an extractor in handlers where authentication is optional.
+pub struct AuthTokenOption<U>(Option<AuthToken<U>>);
+
+impl<U> Deref for AuthTokenOption<U> {
+    type Target = Option<AuthToken<U>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<U> Clone for AuthToken<U> {
     fn clone(&self) -> Self {
         Self {
             inner_state: Rc::clone(&self.inner_state),
@@ -431,6 +435,19 @@ struct AuthTokenInner {
     // there will be more fields here, such as roles and permissions
     logout: bool,
 }
+
+impl<U> FromRequest for AuthTokenOption<U> 
+where 
+    U: 'static,{
+    type Error = Error;
+    type Future = Ready<Result<AuthTokenOption<U>, Error>>;
+
+    fn from_request(req: &HttpRequest, payload: &mut actix_web::dev::Payload) -> Self::Future {
+        let token = AuthToken::<U>::from_request(req, payload).into_inner().ok();
+        ready(Ok(AuthTokenOption(token)))
+    }
+}
+
 
 impl<U> FromRequest for AuthToken<U>
 where

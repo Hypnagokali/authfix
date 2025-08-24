@@ -4,7 +4,7 @@ use actix_web::{cookie::Key, get, HttpResponse, HttpServer, Responder};
 use authfix::{
     login::LoadUserByCredentials,
     session::{app_builder::SessionLoginAppBuilder, config::Routes},
-    AuthToken,
+    AuthToken, AuthTokenOption,
 };
 use authfix_test_utils::User;
 use reqwest::{Client, StatusCode};
@@ -26,11 +26,12 @@ impl LoadUserByCredentials for AcceptEveryoneLoginService {
 }
 
 #[get("/public-route")]
-pub async fn public_route(token: AuthToken<User>) -> impl Responder {
-    HttpResponse::Ok().body(format!(
-        "Request from user: {}",
-        token.authenticated_user().email
-    ))
+pub async fn public_route(token: AuthTokenOption<User>) -> impl Responder {
+    let res = match &*token {
+        Some(token) => format!("Request from user: {}", token.authenticated_user().email),
+        None => return HttpResponse::Ok().body("Request from anonymous user"),
+    };
+    HttpResponse::Ok().body(res)
 }
 
 #[get("/secured-route")]
@@ -66,7 +67,34 @@ async fn should_can_login() {
 }
 
 #[actix_rt::test]
-async fn should_return_500_when_auth_token_is_used_in_a_non_secured_route() {
+async fn should_return_user_if_logged_in_requesting_public_route() {
+    let addr = actix_test::unused_addr();
+
+    start_test_server(addr);
+
+    let client = Client::builder().cookie_store(true).build().unwrap();
+
+    client
+        .post(format!("http://{addr}/login"))
+        .body(r#"{ "email": "any", "password": "none" }"#)
+        .header("Content-Type", "application/json")
+        .send()
+        .await
+        .unwrap();
+
+    let res = client
+        .get(format!("http://{addr}/public-route"))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+    let res = res.text().await.unwrap();
+    assert_eq!(res, "Request from user: test@example.org");
+}
+
+#[actix_rt::test]
+async fn should_return_anonymous_user_if_not_logged_in_requesting_public_route() {
     let addr = actix_test::unused_addr();
 
     start_test_server(addr);
@@ -79,7 +107,9 @@ async fn should_return_500_when_auth_token_is_used_in_a_non_secured_route() {
         .await
         .unwrap();
 
-    assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(res.status(), StatusCode::OK);
+    let res = res.text().await.unwrap();
+    assert_eq!(res, "Request from anonymous user");
 }
 
 #[actix_rt::test]
