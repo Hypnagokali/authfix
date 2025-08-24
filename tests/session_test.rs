@@ -31,6 +31,7 @@ pub async fn public_route(token: AuthTokenOption<User>) -> impl Responder {
         Some(token) => format!("Request from user: {}", token.authenticated_user().email),
         None => return HttpResponse::Ok().body("Request from anonymous user"),
     };
+
     HttpResponse::Ok().body(res)
 }
 

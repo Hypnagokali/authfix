@@ -186,7 +186,14 @@ use actix_web::{
 use errors::UnauthorizedError;
 
 use std::{
-    any::Any, cell::{Ref, RefCell}, collections::HashMap, future::{ready, Future, Ready}, ops::Deref, pin::Pin, rc::Rc, sync::Arc
+    any::Any,
+    cell::{Ref, RefCell},
+    collections::HashMap,
+    future::{ready, Future, Ready},
+    ops::Deref,
+    pin::Pin,
+    rc::Rc,
+    sync::Arc,
 };
 
 pub mod errors;
@@ -346,7 +353,8 @@ impl<U: 'static> FromRequest for LoginState<U> {
 
 /// Extractor that holds the authenticated user.
 ///
-/// Injecting [AuthToken] into an unsecured (public) route currently results in a 500 error.
+/// Injecting [AuthToken] into an unsecured (public) route results in a 500 error.
+/// You can use [AuthTokenOption] for public routes.
 ///
 /// # Example
 /// ```no_run
@@ -436,9 +444,10 @@ struct AuthTokenInner {
     logout: bool,
 }
 
-impl<U> FromRequest for AuthTokenOption<U> 
-where 
-    U: 'static,{
+impl<U> FromRequest for AuthTokenOption<U>
+where
+    U: 'static,
+{
     type Error = Error;
     type Future = Ready<Result<AuthTokenOption<U>, Error>>;
 
@@ -447,7 +456,6 @@ where
         ready(Ok(AuthTokenOption(token)))
     }
 }
-
 
 impl<U> FromRequest for AuthToken<U>
 where
@@ -467,7 +475,7 @@ where
         // If we reach this point, the AuthToken is not available in the request.
         // If this point is reached in secured routes, something must be wrong with the AuthenticationProvider or Middleware.
         ready(Err(actix_web::error::ErrorInternalServerError(
-            "'AuthToken' cannot be used in public routes.",
+            "'AuthToken' cannot be used in public routes. Please use 'AuthTokenOption' instead.",
         )))
     }
 }

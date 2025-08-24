@@ -192,9 +192,10 @@ where
             // Before request: try to get LoginState or otherwise respond with 401 (302 if redirect flow is set up)
             let login_state = auth_provider.try_get_auth_token(&req).await;
 
-
             if login_state.is_err() && secured_route {
-                trace!("User accessed a secured route without being authenticated. Path: {debug_path}");
+                trace!(
+                    "User accessed a secured route without being authenticated. Path: {debug_path}"
+                );
                 return Err(login_state.err().unwrap().into());
             }
 
@@ -206,7 +207,7 @@ where
             }
 
             let res = service.call(req).await?;
-            
+
             if let Some(token) = login_state.token() {
                 if token.is_marked_for_logout() {
                     debug!(
