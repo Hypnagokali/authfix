@@ -190,6 +190,7 @@ use std::{
     cell::{Ref, RefCell},
     collections::HashMap,
     future::{ready, Future, Ready},
+    ops::Deref,
     pin::Pin,
     rc::Rc,
     sync::Arc,
@@ -352,7 +353,8 @@ impl<U: 'static> FromRequest for LoginState<U> {
 
 /// Extractor that holds the authenticated user.
 ///
-/// Injecting [AuthToken] into an unsecured (public) route currently results in a 500 error.
+/// Injecting [AuthToken] into an unsecured (public) route results in a 500 error.
+/// You can use [AuthTokenOption] for public routes.
 ///
 /// # Example
 /// ```no_run
@@ -376,10 +378,20 @@ pub struct AuthToken<U> {
     user: Arc<U>,
 }
 
-impl<U> Clone for AuthToken<U>
-where
-    U: 'static,
-{
+/// Wrapper around Option<AuthToken<U>> for ergonomic extraction.
+///
+/// This can be used as an extractor in handlers where authentication is optional.
+pub struct AuthTokenOption<U>(Option<AuthToken<U>>);
+
+impl<U> Deref for AuthTokenOption<U> {
+    type Target = Option<AuthToken<U>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<U> Clone for AuthToken<U> {
     fn clone(&self) -> Self {
         Self {
             inner_state: Rc::clone(&self.inner_state),
@@ -432,6 +444,19 @@ struct AuthTokenInner {
     logout: bool,
 }
 
+impl<U> FromRequest for AuthTokenOption<U>
+where
+    U: 'static,
+{
+    type Error = Error;
+    type Future = Ready<Result<AuthTokenOption<U>, Error>>;
+
+    fn from_request(req: &HttpRequest, payload: &mut actix_web::dev::Payload) -> Self::Future {
+        let token = AuthToken::<U>::from_request(req, payload).into_inner().ok();
+        ready(Ok(AuthTokenOption(token)))
+    }
+}
+
 impl<U> FromRequest for AuthToken<U>
 where
     U: 'static,
@@ -450,7 +475,7 @@ where
         // If we reach this point, the AuthToken is not available in the request.
         // If this point is reached in secured routes, something must be wrong with the AuthenticationProvider or Middleware.
         ready(Err(actix_web::error::ErrorInternalServerError(
-            "'AuthToken' cannot be used in public routes.",
+            "'AuthToken' cannot be used in public routes. Please use 'AuthTokenOption' instead.",
         )))
     }
 }

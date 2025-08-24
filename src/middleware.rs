@@ -14,7 +14,7 @@ use log::{debug, trace};
 use regex::Regex;
 use urlencoding::encode;
 
-use crate::AuthenticationProvider;
+use crate::{AuthenticationProvider, LoginState};
 
 const PATH_MATCHER_ANY_ENCODED: &str = "%2A"; // to match *
 
@@ -186,48 +186,40 @@ where
             return Box::pin(async move { Ok(res) });
         }
 
-        if self.path_matcher.matches(&request_path) {
-            debug!("Secured route: '{debug_path}'");
+        let secured_route = self.path_matcher.matches(&request_path);
 
-            Box::pin(async move {
-                // Before request: try to get LoginState or otherwise respond with 401 (302 if redirect flow is set up)
-                let login_state = auth_provider.try_get_auth_token(&req).await?;
+        Box::pin(async move {
+            // Before request: try to get LoginState or otherwise respond with 401 (302 if redirect flow is set up)
+            let login_state = auth_provider.try_get_auth_token(&req).await;
 
-                let token = login_state.token().ok_or_else(|| {
-                    log::error!("LoginState is None, but it should not be. This is a bug in the authentication provider implementation.");
-                    actix_web::error::ErrorInternalServerError("LoginState is None.")
-                })?;
+            if login_state.is_err() && secured_route {
+                trace!(
+                    "User accessed a secured route without being authenticated. Path: {debug_path}"
+                );
+                return Err(login_state.err().unwrap().into());
+            }
 
-                {
-                    let mut extensions = req.extensions_mut();
-                    extensions.insert(login_state);
-                }
+            let login_state = login_state.unwrap_or_else(|_| LoginState::empty());
 
-                let res = service.call(req).await?;
+            {
+                let mut extensions = req.extensions_mut();
+                extensions.insert(login_state.clone());
+            }
 
-                // After request: apply logout logic
-                // let initiate_logout = {
-                // let extensions = res.request().extensions();
-                // if let Some(token) = extensions.get::<LoginState<U>>() {
-                //     token.valid()
-                // } else {
-                //     // If there is no AuthToken, authentication is no longer valid
-                //     false
-                // }
-                // };
+            let res = service.call(req).await?;
 
+            if let Some(token) = login_state.token() {
                 if token.is_marked_for_logout() {
-                    debug!("AuthToken has been marked for logout. Invalidate authentication. (Triggered by path: {debug_path})");
+                    debug!(
+                        "AuthToken has been marked for logout. Invalidate authentication. (Triggered by path: {debug_path})"
+                    );
                     let req = res.request().clone();
                     auth_provider.invalidate(req).await;
                 }
+            }
 
-                Ok(res)
-            })
-        } else {
-            trace!("Route is not secured: {debug_path}");
-            Box::pin(async move { service.call(req).await })
-        }
+            Ok(res)
+        })
     }
 }
 
