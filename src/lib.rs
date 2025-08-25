@@ -416,7 +416,7 @@ impl<U> AuthToken<U> {
         inner.logout = true;
     }
 
-    pub(crate) fn new(user: U) -> Self {
+    pub fn new(user: U) -> Self {
         Self {
             inner_state: Rc::new(RefCell::new(AuthTokenInner { logout: false })),
             user: Arc::new(user),

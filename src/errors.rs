@@ -5,23 +5,19 @@ use std::{collections::HashMap, fmt, rc::Rc};
 use actix_web::{http::header, HttpResponse, ResponseError};
 
 #[derive(Debug, Clone)]
-pub(crate) struct UnauthorizedRedirect {
+pub struct UnauthorizedRedirect {
     location: String,
     query_string: Option<String>,
 }
 
 // helper for redirects to handle the query string
-pub(crate) struct HttpQuery {
+#[derive(Default)]
+pub struct HttpQuery {
     map: HashMap<String, Option<String>>,
 }
 
-#[allow(unused)]
+
 impl HttpQuery {
-    pub fn new() -> Self {
-        Self {
-            map: HashMap::new(),
-        }
-    }
 
     pub fn insert(&mut self, key: &str, val: &str) {
         self.map.insert(key.to_owned(), Some(val.to_owned()));
@@ -142,15 +138,14 @@ struct UnauthorizedErrorInner {
 }
 
 impl UnauthorizedError {
-    #[allow(unused)]
-    pub(crate) fn new(message: &str) -> Self {
+    pub fn new(message: &str) -> Self {
         Self(Rc::new(UnauthorizedErrorInner {
             message: message.to_owned(),
             redirect: None,
         }))
     }
 
-    pub(crate) fn new_redirect(redirect: UnauthorizedRedirect) -> Self {
+    pub fn new_redirect(redirect: UnauthorizedRedirect) -> Self {
         Self(Rc::new(UnauthorizedErrorInner {
             message: "Not authorized".to_owned(),
             redirect: Some(redirect),
@@ -207,7 +202,7 @@ mod tests {
 
     #[test]
     fn redirect_with_query_test() {
-        let mut query = HttpQuery::new();
+        let mut query = HttpQuery::default();
         query.insert_without_value("error");
         query.insert("key2", "value");
 
