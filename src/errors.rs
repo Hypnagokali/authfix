@@ -16,9 +16,7 @@ pub struct HttpQuery {
     map: HashMap<String, Option<String>>,
 }
 
-
 impl HttpQuery {
-
     pub fn insert(&mut self, key: &str, val: &str) {
         self.map.insert(key.to_owned(), Some(val.to_owned()));
     }
