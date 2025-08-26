@@ -42,7 +42,7 @@ pub struct PathMatcher {
     path_regex_list: Vec<Regex>,
 }
 
-fn add_path_to_list(path_list: &Vec<&str>, list: &mut Vec<Regex>) {
+fn add_paths_to_vec(path_list: &Vec<&str>, list: &mut Vec<Regex>) {
     for &pattern in path_list.iter() {
         let regex_pattern = format!("^{}$", transform_to_encoded_regex(pattern));
         list.push(Regex::new(&regex_pattern).unwrap());
@@ -59,10 +59,13 @@ fn add_path_to_list(path_list: &Vec<&str>, list: &mut Vec<Regex>) {
 }
 
 impl PathMatcher {
+    /// Creates a new instance of [`PathMatcher`]
+    /// `path_list` is the list of paths that should be included or excluded from authentication depending on the `is_exclusion_list` flag.
+    /// If `is_exclusion_list` is `true`, the paths in `path_list` are excluded from authentication, otherwise they are included.
     pub fn new(path_list: Vec<&str>, is_exclusion_list: bool) -> Self {
         let mut path_regex_list = Vec::new();
 
-        add_path_to_list(&path_list, &mut path_regex_list);
+        add_paths_to_vec(&path_list, &mut path_regex_list);
 
         Self {
             is_exclusion_list,
@@ -70,11 +73,15 @@ impl PathMatcher {
         }
     }
 
+    /// Adds more paths to the matcher
+    /// This is useful if you use a builder pattern to create the paths.
     pub fn add(&mut self, path_list: Vec<&str>) {
-        add_path_to_list(&path_list, &mut self.path_regex_list);
+        add_paths_to_vec(&path_list, &mut self.path_regex_list);
     }
 
-    pub(crate) fn matches(&self, path: &str) -> bool {
+    /// Checks if the given path matches the configured paths.
+    /// if `is_exclusion_list` is `true`, it returns `true` if the path is not in the list, otherwise it returns `true` if the path is in the list.
+    pub fn matches(&self, path: &str) -> bool {
         let encoded_path = transform_to_encoded_regex(path);
         let mut path_regex_iter = self.path_regex_list.iter();
 
@@ -85,7 +92,8 @@ impl PathMatcher {
         }
     }
 
-    pub(crate) fn are_equal(path1: &str, path2: &str) -> bool {
+    /// Compares two paths and returns true if they are equal, ignoring trailing slashes.
+    pub fn are_equal(path1: &str, path2: &str) -> bool {
         let path1_without_trailing = if path1.ends_with("/") && path1.len() > 1 {
             &path1[0..path1.len() - 1]
         } else {
