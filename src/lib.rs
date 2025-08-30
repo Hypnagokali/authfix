@@ -319,7 +319,7 @@ impl<U> LoginState<U> {
 
     /// Creates a new [LoginState] without an [AuthToken].
     ///
-    /// [LoguinState] can be extracted anywhere and if it contains no user information
+    /// [LoginState] can be extracted anywhere and if it contains no user information
     /// it can be interpreted as 'anonymous user'.
     pub fn empty() -> Self {
         let inner = LoginStateInner {
@@ -378,7 +378,7 @@ pub struct AuthToken<U> {
     user: Arc<U>,
 }
 
-/// Wrapper around Option<AuthToken<U>> for ergonomic extraction.
+/// Wrapper around `Option<AuthToken<U>>` for ergonomic extraction.
 ///
 /// This can be used as an extractor in handlers where authentication is optional.
 pub struct AuthTokenOption<U>(Option<AuthToken<U>>);
